@@ -97,9 +97,14 @@
  */
 
 import {
+  parseBuilding,
   parseDispatcherProfiles,
+  resolveBuilding,
+  type BuildingConfig,
   type DispatcherProfile,
   type DispatcherProfiles,
+  type ElevatorSpecs,
+  type ResolvedBuilding,
 } from '@elevator-sim/core/browser';
 
 /**
@@ -209,6 +214,30 @@ export function savedProfilesOf(
   saved: readonly { readonly profile: DispatcherProfile }[],
 ): readonly DispatcherProfile[] {
   return saved.map((entry) => entry.profile);
+}
+
+/**
+ * The building a batch runs in: a shipped one by id, or the player's own when the id is theirs.
+ *
+ * The building half of this module's argument. `dev/batchWorker.ts` is the non-test caller, and
+ * the workshop's test bed is what sends a `savedBuilding`.
+ *
+ * **A shipped id always means the shipped building.** `savedBuilding` is read only when no
+ * shipped building holds `buildingId` and its own id is that id, so a message cannot re-point a
+ * published case at a different tower, and a stale document sent beside a shipped id is ignored
+ * rather than run. The document is parsed and resolved by `core`'s own two functions, which throw
+ * by name on a building the designer could not have saved; `undefined` is only *no such building*.
+ */
+export function batchBuildingOf(
+  shipped: readonly ResolvedBuilding[],
+  buildingId: string,
+  savedBuilding: BuildingConfig | undefined,
+  specs: ElevatorSpecs,
+): ResolvedBuilding | undefined {
+  const own = shipped.find((candidate) => candidate.id === buildingId);
+  if (own !== undefined) return own;
+  if (savedBuilding === undefined || savedBuilding.id !== buildingId) return undefined;
+  return resolveBuilding(parseBuilding(savedBuilding as unknown, 'your building'), specs);
 }
 
 /* -------------------------------------------------------------------------- *

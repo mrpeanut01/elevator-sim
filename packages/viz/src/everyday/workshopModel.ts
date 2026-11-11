@@ -87,6 +87,7 @@ import {
 import {
   fallbackLineOf,
   leverLineOf,
+  canAddCondition,
   readbackOf,
   ruleIssues,
   RULES_EXCLUSIVITY_NOTE,
@@ -203,11 +204,13 @@ export const WORKSHOP_COPY = Object.freeze({
   switchingHeading: 'TRAFFIC-PATTERN SWITCHING',
   switchingHint:
     'The one thing that can change mid-shift: whether the dispatcher may notice the traffic has ' +
-    'turned over and swap what it is optimising for.',
+    'turned over and swap what it is optimising for. Which design it swaps to for each kind of ' +
+    'traffic is this dispatcher’s own choice, and is saved with it.',
   rulesHeading: 'ADVANCED: WRITE YOUR OWN RULES',
   rulesHint:
-    'Read top to bottom, first match wins. Every row says the lever it moves, so the two views can ' +
-    'never disagree.',
+    'Read top to bottom, first match wins. A row can ask for more than one thing at once with ' +
+    '“and…”, and then fires only when all of them hold. Every row says the lever it moves, so the ' +
+    'two views can never disagree.',
   /**
    * Why the list of *then* clauses is shorter than the guide's.
    *
@@ -871,6 +874,10 @@ export interface RuleRowView {
   readonly index: number;
   readonly when: RuleConditionId;
   readonly whenValue: number | string | undefined;
+  /** The row's further conditions, in order — every one must hold as well as the first. */
+  readonly and: readonly { readonly when: RuleConditionId; readonly whenValue: number | string | undefined }[];
+  /** Whether the row may take another: `ruleSpec.ts#canAddCondition`. */
+  readonly canAddCondition: boolean;
   readonly then: RuleActionId;
   readonly thenValue: number | string | undefined;
   /** §11.5's plain readback — `ruleSpec.ts#readbackOf`, composed there. */
@@ -943,6 +950,10 @@ export function rulesBlockOf(
           index,
           when: row.when,
           whenValue: row.whenValue,
+          and: Object.freeze(
+            (row.and ?? []).map((extra) => Object.freeze({ when: extra.when, whenValue: extra.whenValue })),
+          ),
+          canAddCondition: canAddCondition(row),
           then: row.then,
           thenValue: row.thenValue,
           readback: readbackOf(row),

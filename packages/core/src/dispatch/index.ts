@@ -125,6 +125,9 @@ export {
   selectWeightSet,
 } from './selector.js';
 
+export { FORMULA_OPS, MAX_FORMULAS, resolveFormulas } from './formula.js';
+export type { FormulaOp } from './formula.js';
+
 export type {
   CompiledRules,
   MembershipRamp,

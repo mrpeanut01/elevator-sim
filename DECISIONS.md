@@ -55790,7 +55790,7 @@ holed.
 
 > **Taken 2026-11-11 by the product owner** ("continue with all of it, starting with playing your own
 > building"), against the list of outstanding work this session reported after [§ D1628](#d1628)
-> merged, and built the same day by the same session (wave AY, a single lane). The owner added that
+> merged, and built the same day by the same session (wave AZ, a single lane). The owner added that
 > the gameplay is to be revamped later, so this entry builds the function and leaves its rules
 > plain. **Amends [§ D1627](#d1627)**, which named *a drawn building entered from a mode's floor* as
 > owed. **Owner-reversible**, clause by clause.
@@ -55847,5 +55847,5 @@ free), `shift/reportWindow.test.ts` (the id movers, with *Save* no longer among 
 `everyday/floors.test.ts` (the keys, the test bar) and `everyday/actionBar.test.ts` (each renamed
 cell as a deviation, read against the vendored guide both ways).
 
-**Numbers spent.** Wave AY took the charter row's **D1629** and moved the row to D1630; nothing is
+**Numbers spent.** Wave AZ took the charter row's **D1629** and moved the row to D1630; nothing is
 holed.

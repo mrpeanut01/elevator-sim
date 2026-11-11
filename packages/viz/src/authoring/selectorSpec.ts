@@ -316,7 +316,15 @@ export function defaultSelectorSpec(context: SelectorContext): SelectorSpec {
  */
 export function specFromProfile(profile: DispatcherProfile, context: SelectorContext): SelectorSpec {
   const authored = profile.selection;
-  const fallback = defaultSelectorSpec(context);
+  const shared = defaultSelectorSpec(context);
+  // The profile's own entries over the file's map — `DispatcherProfile.patternWeightSets`.
+  const fallback =
+    profile.patternWeightSets === undefined
+      ? shared
+      : Object.freeze({
+          ...shared,
+          weightSetsByPattern: Object.freeze({ ...shared.weightSetsByPattern, ...profile.patternWeightSets }),
+        });
   if (authored === undefined) return fallback;
   const policy = POLICY_VALUES.find((candidate) => candidate === authored.policy);
   return Object.freeze({
@@ -373,9 +381,23 @@ function armMapOf(context: SelectorContext): Readonly<Record<string, string>> {
  *    model, and silently deleting an author's note on save is a data loss the round-trip test would
  *    otherwise catch and nobody would want fixed by removing the test.
  *
- * The arm map is not written here. It is file-level; see {@link patternSwitchingWithSelector}.
+ * ## The arm map, and the two places it can be written
+ *
+ * Without a `context` the arm map is **not** written here: the session's run takes it from the
+ * library ({@link patternSwitchingWithSelector}), and any `patternWeightSets` the profile already
+ * carried is removed so the profile's own entries cannot outrank the map the panel is showing.
+ *
+ * With a `context` — which is how a save and the test bed call it — the map is written **onto the
+ * profile**, as `core`'s `DispatcherProfile.patternWeightSets`: the entries where the spec differs
+ * from the file's own map, and nothing where it does not. That is what lets a saved dispatcher
+ * carry its own answer to *which priorities under which traffic*, and lets two arms of one
+ * comparison disagree about it, which a single file-level map could not.
  */
-export function profileWithSelector(profile: DispatcherProfile, spec: SelectorSpec): DispatcherProfile {
+export function profileWithSelector(
+  profile: DispatcherProfile,
+  spec: SelectorSpec,
+  context?: SelectorContext | undefined,
+): DispatcherProfile {
   const authored = profile.selection;
   const selection: Record<string, unknown> = {};
   if (authored?.$comment !== undefined) selection['$comment'] = authored.$comment;
@@ -392,6 +414,11 @@ export function profileWithSelector(profile: DispatcherProfile, spec: SelectorSp
   const next: Record<string, unknown> = { ...profile };
   if (Object.keys(selection).length === 0) delete next['selection'];
   else next['selection'] = selection as SelectionStageConfig;
+  delete next['patternWeightSets'];
+  if (context !== undefined) {
+    const own = ownWeightSetsOf(spec, context);
+    if (Object.keys(own).length > 0) next['patternWeightSets'] = own;
+  }
   return next as unknown as DispatcherProfile;
 }
 
@@ -408,6 +435,26 @@ export function profileWithSelector(profile: DispatcherProfile, spec: SelectorSp
  * into and inventing a detector would be authoring five pattern names in code — CLAUDE.md
  * invariant 7's exact failure.
  */
+/**
+ * The entries of the spec's map that are this dispatcher's own: a pattern the detector declares,
+ * naming a different profile from the one the file's map names. A pattern the detector does not
+ * declare is left out — `resolveWeightSets` refuses it on a profile, and {@link selectorIssues}
+ * has already said it is read by nothing.
+ */
+function ownWeightSetsOf(
+  spec: SelectorSpec,
+  context: SelectorContext,
+): Readonly<Record<string, string>> {
+  const source = context.patternSwitching;
+  if (source === undefined) return Object.freeze({});
+  const own: Record<string, string> = {};
+  for (const patternId of source.patternDetector.patterns) {
+    const chosen = spec.weightSetsByPattern[patternId];
+    if (chosen !== undefined && chosen !== source.weightSetsByPattern[patternId]) own[patternId] = chosen;
+  }
+  return Object.freeze(own);
+}
+
 export function patternSwitchingWithSelector(
   spec: SelectorSpec,
   context: SelectorContext,

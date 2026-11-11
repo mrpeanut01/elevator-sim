@@ -49,6 +49,7 @@
 
 import { WARNING_CODES, parseBuilding, resolveBuilding, ConfigError } from '@elevator-sim/core/browser';
 import type {
+  CallType,
   BankConfig,
   BuildingConfig,
   BuildingType,
@@ -62,12 +63,14 @@ import {
   BLANK_SPEC,
   accessZonesOf,
   escalatorSecondsFor,
+  nextZoneId,
   floorIdOf,
   machineAt,
   nextTransportModeId,
   specFromBuilding,
   transferSecondsFor,
   transportModesOf,
+  withTransportSeconds,
   upPeakBanksOf,
   type BuildingSpec,
   type SpecAccessZone,
@@ -126,6 +129,16 @@ export interface PlanShaft {
    * that opening `ctf-class-reference` and saving it does not make its shuttle symmetric.
    */
   readonly descentSpeedMps?: number | undefined;
+  /**
+   * **Which block of its height the shaft stands in**, for shafts that stop below the roof.
+   *
+   * Absent or `0` is the first block. Shafts that share a top *and* a block number are one wing
+   * and one group; a different number is a wing of its own on the far side, with its own calls —
+   * the two arms of a mall. It is part of {@link groupsOf}'s key, so two blocks whose doors open
+   * on the same floors are written as two banks and read back as two blocks. On a shaft that
+   * reaches the roof it changes the grouping and not the drawing: the core is one structure.
+   */
+  readonly wing?: number | undefined;
 }
 
 /** The drawing board's whole state. */
@@ -148,6 +161,13 @@ export interface TowerPlan {
   readonly populationByFloor: Readonly<Record<number, number>>;
   /** A floor's own crowd, as a traffic-profile id. Absent means the building's. */
   readonly useByFloor: Readonly<Record<number, string>>;
+  /**
+   * What the call fixture on a landing is, where it is not the dispatcher's own — `core`'s
+   * `FloorConfig.landingCallType`. A floor with no entry writes nothing, which is every floor of
+   * every shipped building. It decides what a call registered there discloses and restricts no
+   * car and no rider.
+   */
+  readonly panelByFloor: Readonly<Record<number, CallType>>;
   /** Floors above the lobby where a journey may change lifts. */
   readonly skyLobbies: readonly number[];
   readonly shafts: readonly PlanShaft[];
@@ -251,21 +271,29 @@ const MIN_STRUCTURE_SHAFT_BAYS = 2;
  * The shafts that reach highest are the core, and the core stands to the building's full height
  * whether or not they do: a floor above every shaft is still a floor, and
  * {@link orphanFloorsOf} is what says nobody can reach it. Every other shaft joins a wing with the
- * shafts that share its top. Wings are placed tallest first and **alternate sides**, left then
+ * shafts that share its top and its block number ({@link PlanShaft.wing}), so two blocks of one
+ * height stand on opposite sides rather than as one. Wings are placed tallest first and **alternate sides**, left then
  * right, each one outboard of the last on its side — so the tallest wings sit against the core and
  * the building steps down outward, which is the shape a podium and a mall both are.
  */
 export function layoutOf(plan: TowerPlan): TowerLayout {
   const tallest = plan.shafts.reduce((best, shaft) => Math.max(best, shaft.top), Number.NEGATIVE_INFINITY);
   const core = plan.shafts.filter((shaft) => shaft.top === tallest);
-  const tops = [...new Set(plan.shafts.filter((shaft) => shaft.top !== tallest).map((shaft) => shaft.top))].sort(
-    (a, b) => b - a,
-  );
+  /* A wing is a top and a block number: tallest first, and at one height the lower number first. */
+  const wingKeys = new Map<string, { top: number; wing: number; keys: string[] }>();
+  for (const shaft of plan.shafts) {
+    if (shaft.top === tallest) continue;
+    const wing = shaft.wing ?? 0;
+    const key = [shaft.top, wing].map(String).join('|');
+    const found = wingKeys.get(key);
+    if (found === undefined) wingKeys.set(key, { top: shaft.top, wing, keys: [shaft.key] });
+    else found.keys.push(shaft.key);
+  }
+  const wings = [...wingKeys.values()].sort((a, b) => b.top - a.top || a.wing - b.wing);
   const left: { top: number; keys: string[] }[] = [];
   const right: { top: number; keys: string[] }[] = [];
-  tops.forEach((top, index) => {
-    const keys = plan.shafts.filter((shaft) => shaft.top === top).map((shaft) => shaft.key);
-    (index % 2 === 0 ? left : right).push({ top, keys });
+  wings.forEach((wing, index) => {
+    (index % 2 === 0 ? left : right).push({ top: wing.top, keys: wing.keys });
   });
   const widthOf = (count: number): number => Math.max(MIN_STRUCTURE_SHAFT_BAYS, count) + 1;
 
@@ -452,11 +480,13 @@ export interface PlanGroup {
 }
 
 /**
- * Shafts grouped by the floors they open onto and by their deck count.
+ * Shafts grouped by the floors they open onto, by their deck count and by their block.
  *
  * *The set of cars that open onto the same floors* is what `BankConfig` means, so that is the key.
  * The deck count is part of it because a bank has one `servesFloorPairs`: a single-deck car in a
- * paired bank would be a car the loader runs as if it had two decks.
+ * paired bank would be a car the loader runs as if it had two decks. The block number
+ * ({@link PlanShaft.wing}) is part of it because two wings are two lobbies' worth of call buttons:
+ * a rider at one arm of a mall is not answered by a car in the other.
  *
  * Ordered by lowest stop, then highest, then the key itself — invariant 4's rule applied to
  * authoring, so two plans that describe one building write one document.
@@ -466,7 +496,7 @@ export function groupsOf(plan: TowerPlan): readonly PlanGroup[] {
   plan.shafts.forEach((shaft, index) => {
     const stops = writtenStopsOf(plan, shaft);
     /* Joined rather than interpolated: this is a map key, and nothing here is a sentence. */
-    const key = [shaft.decks, ...stops].map(String).join('|');
+    const key = [shaft.wing ?? 0, shaft.decks, ...stops].map(String).join('|');
     const found = byKey.get(key);
     if (found === undefined) {
       byKey.set(key, { shafts: [index], stops, decks: shaft.decks, kinds: new Set([shaft.service]) });
@@ -669,6 +699,8 @@ export function buildingFromPlan(plan: TowerPlan, specs: ElevatorSpecs): Buildin
     if ((floor > 0 && skies.has(floor)) || (floor === 0 && lobbyTransfers)) config.isTransferFloor = true;
     const use = plan.useByFloor[floor];
     if (use !== undefined && use !== plan.trafficProfile) config.trafficProfile = use;
+    const panel = plan.panelByFloor[floor];
+    if (panel !== undefined) config.landingCallType = panel;
     floors.push(config);
   }
 
@@ -784,6 +816,26 @@ const SAID_BY_THE_BOARD: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * **Why a group with two cars in one hoistway has no interval and no handling figure.**
+ *
+ * The closed form counts cars: `analyzeUpPeak` divides one round trip by `cars.length`, and every
+ * one of those cars is assumed to leave the main lobby and reach the top. Two cars in one shaft do
+ * neither — the upper never reaches the bottom landing and the lower never reaches the top
+ * (`sim/twinShaft.test.ts`) — and the expression has no term for it, exactly as it has none for a
+ * second deck. `oracle/upPeakCase.ts#isolateBank` drops the `shafts` block, so no residual is
+ * published for such a bank either.
+ *
+ * It was measured before it was withheld (2026-11-11, `zonedTowerPlan`, 20 seeds × 1 800 s, the
+ * low group's first shaft given a second car): the closed form moved the group's interval from
+ * 40.1 s to 32.1 s, while the pair together carried fewer riders in every profile tried than the
+ * one car it replaced. A figure that improves when the run does not is the one this screen may
+ * not draw, so the group's row says why and the run is where the reader finds out.
+ */
+export const TWO_CAR_FIGURES_WITHHELD =
+  'Not worked out for a group with two cars in one shaft: the round-trip sum counts every car as ' +
+  'free to reach the lobby and the top, and a pair cannot pass each other. Run it to measure it.';
+
+/**
  * **The plan through the real loader and the real closed form.**
  *
  * `buildingFromPlan → parseBuilding → resolveBuilding → analyzeUpPeak`, which is the chain
@@ -801,7 +853,11 @@ export function planAnalysisOf(plan: TowerPlan, specs: ElevatorSpecs): PlanAnaly
       advisories: resolved.warnings
         .filter((warning) => !SAID_BY_THE_BOARD.has(warning.code))
         .map((warning) => warning.message),
-      banks: upPeakBanksOf(resolved, specs),
+      banks: upPeakBanksOf(resolved, specs).map((bank, index) =>
+        resolved.banks[index]?.shafts.some((shaft) => shaft.carIds.length === 2) === true
+          ? { ...bank, figures: undefined, refusal: TWO_CAR_FIGURES_WITHHELD, line: '', reading: '', warnings: [] }
+          : bank,
+      ),
       resolved,
     };
   } catch (error) {
@@ -841,6 +897,10 @@ export function fittedPlan(plan: TowerPlan): TowerPlan {
     skyLobbies: [...new Set(plan.skyLobbies)].filter((floor) => floor > 0 && floor < plan.floors).sort((a, b) => a - b),
     populationByFloor: keep(plan.populationByFloor),
     useByFloor: keep(plan.useByFloor),
+    panelByFloor: keep(plan.panelByFloor),
+    accessZones: plan.accessZones
+      .map((zone) => ({ ...zone, floors: zone.floors.filter(inside) }))
+      .filter((zone) => zone.floors.length > 0),
     transportModes: plan.transportModes.filter((mode) => mode.connects.every(inside)),
   };
 }
@@ -936,6 +996,15 @@ export function withCars(plan: TowerPlan, keys: readonly string[], cars: 1 | 2):
   return withShafts(plan, keys, (shaft) => ({ ...shaft, cars, decks: cars === 2 ? 1 : shaft.decks }));
 }
 
+/** Stand shafts in a block of their own (`1`), or put them back in the first (`0`). */
+export function withWing(plan: TowerPlan, keys: readonly string[], wing: number): TowerPlan {
+  return withShafts(plan, keys, (shaft) => {
+    const { wing: _dropped, ...rest } = shaft;
+    void _dropped;
+    return wing === 0 ? rest : { ...rest, wing };
+  });
+}
+
 /**
  * Open or close one shaft's doors at one floor, by hand.
  *
@@ -987,8 +1056,126 @@ export function withUse(plan: TowerPlan, floors: readonly number[], profileId: s
 /** The escalator joining `floor` to the one above it, if the plan has one. */
 export function escalatorAbove(plan: TowerPlan, floor: number): SpecTransportMode | undefined {
   return plan.transportModes.find(
-    (mode) => Math.min(...mode.connects) === floor && Math.max(...mode.connects) === floor + 1,
+    (mode) => mode.kind !== 'stairs' && Math.min(...mode.connects) === floor && Math.max(...mode.connects) === floor + 1,
   );
+}
+
+/** The stair joining `floor` to the one above it, if the plan has one. */
+export function stairsAbove(plan: TowerPlan, floor: number): SpecTransportMode | undefined {
+  return plan.transportModes.find(
+    (mode) => mode.kind === 'stairs' && Math.min(...mode.connects) === floor && Math.max(...mode.connects) === floor + 1,
+  );
+}
+
+/** The four numbers a stair is, all of them the reader's. See {@link withStairsAdded}. */
+export interface PlanStairs {
+  /** Seconds to climb one flight, landing to landing. */
+  readonly upS: number;
+  /** Seconds to walk down it. Never more than {@link upS}. */
+  readonly downS: number;
+  /** The share of riders going up one floor who walk, 0 to 1. */
+  readonly up: number;
+  /** The share going down who walk, 0 to 1. */
+  readonly down: number;
+}
+
+/** Whether four numbers make a stair the loader will take: a climb no faster than the descent. */
+export function stairsAreValid(stairs: PlanStairs): boolean {
+  const share = (value: number): boolean => Number.isFinite(value) && value >= 0 && value <= 1;
+  return (
+    Number.isFinite(stairs.upS) &&
+    Number.isFinite(stairs.downS) &&
+    stairs.downS > 0 &&
+    stairs.upS >= stairs.downS &&
+    share(stairs.up) &&
+    share(stairs.down)
+  );
+}
+
+/**
+ * Add a stair from a floor to the one above it.
+ *
+ * **Every number is the caller's and none is seeded**, which is the whole difference from
+ * {@link withEscalatorToggled}. `docs/02` § *Stairs* carries no calibrated figure and says none has
+ * been invented, and `core`'s `StairsUseConfig` has no default in code on purpose: who walks is a
+ * claim about this building's people. So the board asks for all four, and
+ * `buildingSpec.ts#transportModesOf` writes them into the document as set by hand and not cited.
+ * A stair that is not {@link stairsAreValid} changes nothing.
+ */
+export function withStairsAdded(plan: TowerPlan, floor: number, stairs: PlanStairs): TowerPlan {
+  if (!stairsAreValid(stairs)) return plan;
+  if (stairsAbove(plan, floor) !== undefined) return plan;
+  if (floor < planLowestFloor(plan) || floor + 1 > plan.floors) return plan;
+  const mode: SpecTransportMode = {
+    id: nextTransportModeId(planFrame(plan)),
+    connects: [floor, floor + 1],
+    kind: 'stairs',
+    traversalTimeS: { upS: stairs.upS, downS: stairs.downS },
+    use: { up: stairs.up, down: stairs.down },
+  };
+  return { ...plan, transportModes: [...plan.transportModes, mode] };
+}
+
+/** Take one escalator or stair away, by its id. */
+export function withTransportModeRemoved(plan: TowerPlan, id: string): TowerPlan {
+  return { ...plan, transportModes: plan.transportModes.filter((mode) => mode.id !== id) };
+}
+
+/**
+ * Set how long one escalator takes, landing to landing.
+ *
+ * `buildingSpec.ts#withTransportSeconds` does the clamping and refuses a stair, whose time is a
+ * pair; this is its door from the drawing board.
+ */
+export function withEscalatorSeconds(plan: TowerPlan, floor: number, seconds: number): TowerPlan {
+  const escalator = escalatorAbove(plan, floor);
+  if (escalator === undefined) return plan;
+  return { ...plan, transportModes: withTransportSeconds(planFrame(plan), escalator.id, seconds) };
+}
+
+/** Set the fixture on floors' landings, or hand them back to the dispatcher with `undefined`. */
+export function withPanel(plan: TowerPlan, floors: readonly number[], panel: CallType | undefined): TowerPlan {
+  const panelByFloor = { ...plan.panelByFloor };
+  for (const floor of floors) {
+    if (panel === undefined) delete panelByFloor[floor];
+    else panelByFloor[floor] = panel;
+  }
+  return { ...plan, panelByFloor };
+}
+
+/**
+ * Set how fast shafts' cars may come down, or let them descend at rated speed with `undefined`.
+ *
+ * Never above the rated speed: a descent limit is a limit, and `core` reads one above the rated
+ * speed as a document error.
+ */
+export function withDescentSpeed(plan: TowerPlan, keys: readonly string[], mps: number | undefined): TowerPlan {
+  return withShafts(plan, keys, (shaft) => {
+    const { descentSpeedMps: _dropped, ...rest } = shaft;
+    void _dropped;
+    return mps === undefined || mps >= shaft.machine.ratedSpeedMps ? rest : { ...rest, descentSpeedMps: mps };
+  });
+}
+
+/**
+ * Keep floors for one group of people: a new access zone over them.
+ *
+ * Access zoning is the credential kind and none of the other two — it decides who may travel to a
+ * floor, and moves no shaft's doors. `traffic/generator.ts` draws each rider's credential from the
+ * zones, so the control needs nothing else declared. A blank name, or no floor, changes nothing.
+ */
+export function withAccessZoneAdded(plan: TowerPlan, floors: readonly number[], group: string): TowerPlan {
+  const wanted = group.trim();
+  const lowest = planLowestFloor(plan);
+  const inside = [...new Set(floors)].filter((floor) => floor >= lowest && floor <= plan.floors).sort((a, b) => a - b);
+  if (wanted === '' || inside.length === 0) return plan;
+  const zone: SpecAccessZone = { id: nextZoneId(planFrame(plan)), floors: inside, credentialGroups: [wanted] };
+  return { ...plan, accessZones: [...plan.accessZones, zone] };
+}
+
+/** Lift one access zone, by its id. */
+export function withAccessZoneRemoved(plan: TowerPlan, id: string): TowerPlan {
+  return { ...plan, accessZones: plan.accessZones.filter((zone) => zone.id !== id) };
 }
 
 /**
@@ -1081,6 +1268,7 @@ const PLAN_BASE = Object.freeze({
   occupancyPct: 85,
   populationByFloor: Object.freeze({}),
   useByFloor: Object.freeze({}),
+  panelByFloor: Object.freeze({}),
   skyLobbies: Object.freeze([]) as readonly number[],
   transportModes: Object.freeze([]) as readonly SpecTransportMode[],
   accessZones: Object.freeze([]) as readonly SpecAccessZone[],
@@ -1233,7 +1421,6 @@ export type PlanLoss =
   | 'uneven-floor-heights'
   | 'floor-labels'
   | 'floor-areas'
-  | 'landing-call-types'
   | 'car-timings'
   | 'service-events'
   | 'notes'
@@ -1295,7 +1482,12 @@ export function planFromBuilding(config: BuildingConfig, id: string): PlanReadin
 
   const shafts: PlanShaft[] = [];
   let carIndex = 0;
+  /* Banks whose doors open on exactly the same floors are separate blocks, numbered as they come. */
+  const blocksSeen = new Map<string, number>();
   for (const bank of carried?.banks ?? []) {
+    const blockKey = [bank.cars[0]?.doubleDeck === true ? 2 : 1, ...bank.servesFloors].join('|');
+    const wing = blocksSeen.get(blockKey) ?? 0;
+    blocksSeen.set(blockKey, wing + 1);
     const stops = bank.servesFloors
       .map((floorId) => numberById.get(floorId))
       .filter((floor): floor is number => floor !== undefined)
@@ -1327,6 +1519,7 @@ export function planFromBuilding(config: BuildingConfig, id: string): PlanReadin
         duty: car.duty ?? 'passenger',
         pressurised: car.cabinPressurised === true,
         ...(car.descentSpeedMps === undefined ? {} : { descentSpeedMps: car.descentSpeedMps }),
+        ...(wing === 0 ? {} : { wing }),
       };
       shafts.push(classifiedShaft(shell, drawn, stops));
     }
@@ -1352,6 +1545,11 @@ export function planFromBuilding(config: BuildingConfig, id: string): PlanReadin
   const dense: TowerPlan = { ...withShaftsDrawn, peoplePerBay, occupancyPct };
   const populationByFloor: Record<number, number> = {};
   const useByFloor: Record<number, string> = {};
+  const panelByFloor: Record<number, CallType> = {};
+  for (const authored of config.floors ?? []) {
+    const number = numberById.get(authored.id);
+    if (number !== undefined && authored.landingCallType !== undefined) panelByFloor[number] = authored.landingCallType;
+  }
   for (let floor = planLowestFloor(dense); floor <= dense.floors; floor += 1) {
     const authored = carried?.floors[floor];
     if (authored === undefined) continue;
@@ -1374,7 +1572,6 @@ export function planFromBuilding(config: BuildingConfig, id: string): PlanReadin
   if (authoredFloors.some((floor) => floor.grossAreaM2 !== undefined) || config.grossAreaPerFloorM2 !== undefined) {
     notCarried.push('floor-areas');
   }
-  if ((config.floors ?? []).some((floor) => floor.landingCallType !== undefined)) notCarried.push('landing-call-types');
   if (
     cars.some(
       (car) =>
@@ -1395,5 +1592,5 @@ export function planFromBuilding(config: BuildingConfig, id: string): PlanReadin
   const drives = new Set((carried?.banks ?? []).map((bank) => bank.regenerativeDrive === true));
   if (ropes.size > 1 || drives.size > 1) notCarried.push('mixed-bank-equipment');
 
-  return { plan: fittedPlan({ ...dense, populationByFloor, useByFloor }), notCarried };
+  return { plan: fittedPlan({ ...dense, populationByFloor, useByFloor, panelByFloor }), notCarried };
 }

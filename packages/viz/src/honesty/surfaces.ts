@@ -137,6 +137,18 @@ import {
   testBedWorkingProfileOf,
 } from '../everyday/testBedModel.js';
 import { JOURNEY_COPY, journeyOf } from '../everyday/workshopJourney.js';
+import { plainControlWordsOf } from '../everyday/plainControls.js';
+import {
+  FORMULA_COPY,
+  FORMULA_OP_ORDER,
+  FORMULA_OP_WORDS,
+  expressionOf,
+  formulaIssueOf,
+  formulaReadbackOf,
+  formulaTermOptions,
+  withFormulaAt,
+  withNewFormula,
+} from '../authoring/formulaSpec.js';
 import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
 import { versionedNameOf } from '../authoring/dispatcherShelf.js';
 import {
@@ -175,6 +187,7 @@ import {
   DESIGNER_COPY,
   DESIGNER_DUTY_COPY,
   DESIGNER_KIND_COPY,
+  DESIGNER_PANEL_COPY,
   DESIGNER_SERVICE_COPY,
   DESIGNER_STEPS,
   DESIGNER_TEMPLATE_COPY,
@@ -197,8 +210,12 @@ import {
   planAnalysisOf,
   planFromBuilding,
   skyLobbyPlan,
+  withAccessZoneAdded,
   withCars,
   withDecks,
+  withDescentSpeed,
+  withPanel,
+  withStairsAdded,
   withPopulation,
   withSkyLobbyToggled,
   withStopToggled,
@@ -724,6 +741,7 @@ import {
   profileFromSpec,
   specFromProfile,
   type DispatcherSpec,
+  familySpace,
 } from '../authoring/dispatcherSpec.js';
 import {
   classesFromSpecs,
@@ -9500,7 +9518,51 @@ const RULES_EDITOR: SurfaceAdapter = {
         true,
       ],
       ['out-of-list', [{ when: 'call-waited', whenValue: 61, then: 'jump-queue' }], true],
+      // A row's further conditions: their own out-of-list and clockless refusals, the bound, and
+      // the whole-run ceiling that can carry none.
+      [
+        'and-out-of-list',
+        [{ when: 'shaft-out', and: [{ when: 'call-waited', whenValue: 61 }], then: 'jump-queue' }],
+        true,
+      ],
+      [
+        'and-clockless',
+        [{ when: 'shaft-out', and: [{ when: 'day-period', whenValue: 'lunch' }], then: 'jump-queue' }],
+        false,
+      ],
+      [
+        'and-too-many',
+        [
+          {
+            when: 'shaft-out',
+            and: [{ when: 'shaft-out' }, { when: 'shaft-out' }, { when: 'shaft-out' }],
+            then: 'jump-queue',
+          },
+        ],
+        true,
+      ],
+      [
+        'and-on-ceiling',
+        [{ when: 'car-fuller-than', whenValue: 0.8, and: [{ when: 'shaft-out' }], then: 'no-new-pickups' }],
+        true,
+      ],
     ];
+    // A row that asks for more than one thing, over every condition as its further one: the
+    // readback's "and" join and the provenance pill's, each from the same table.
+    RULE_CONDITIONS.forEach((when) => {
+      const value = RULE_CONDITION_WORDS[when].values?.[0]?.value;
+      const row: RuleRow = {
+        when: 'shaft-out',
+        and: [{ when, ...(value === undefined ? {} : { whenValue: value }) }],
+        then: 'jump-queue',
+      };
+      seeds.push({ field: `readback.and.${when}`, text: `Reads as: ${readbackOf(row)}`, role: 'label' });
+      seeds.push({
+        field: `provenance.and.${when}`,
+        text: ruleProvenanceName(`rule-1:shaft-out+${when}${value === undefined ? '' : `:${String(value)}`}`) ?? '',
+        role: 'label',
+      });
+    });
     for (const [name, rows, hasClock] of refusalArms) {
       for (const [index, issue] of ruleIssues(rows, { hasClock }).entries()) {
         seeds.push({
@@ -10812,6 +10874,9 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     /* `DESIGNER_DUTY_COPY` is four single words, which the derivation does not read as prose; it
        is seeded below all the same, because a label is still something a player reads. */
     'everyday/designerModel.ts#DESIGNER_KIND_COPY',
+    'everyday/designerModel.ts#DESIGNER_PANEL_COPY',
+    /* Drawn on the group row and under the headline figures, by the `paired-one` arm below. */
+    'authoring/towerPlan.ts#TWO_CAR_FIGURES_WITHHELD',
     'everyday/designerModel.ts#designerGroupRows',
     'everyday/designerModel.ts#designerFloorFacts',
     'everyday/designerModel.ts#designerServiceLine',
@@ -11104,7 +11169,7 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     }
 
     /* ------------------------------------------------------- § 13 designer */
-    const designerProse = new Set(['specNote', 'lede', 'notScored', 'groupsHint', 'groupNotSized']);
+    const designerProse = new Set(['specNote', 'lede', 'notScored', 'groupsHint', 'groupNotSized', 'stairsRefused', 'accessOpen']);
     for (const [key, text] of Object.entries(DESIGNER_COPY)) {
       seeds.push({
         field: `designer.copy.${key}`,
@@ -11129,6 +11194,9 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     }
     for (const [kind, text] of Object.entries(DESIGNER_KIND_COPY)) {
       seeds.push({ field: `designer.kind.${kind}`, text, role: 'label' });
+    }
+    for (const [panel, text] of Object.entries(DESIGNER_PANEL_COPY)) {
+      seeds.push({ field: `designer.panel.${panel}`, text, role: 'label' });
     }
 
     const specs = context.elevatorSpecs;
@@ -11166,7 +11234,22 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       ],
       ['stranded', withSkyLobbyToggled(skyLobbyPlan(), [30])],
       ['paired', withCars(small, small.shafts.map((shaft) => shaft.key), 2)],
+      /* One pair beside ordinary shafts: the group loads, and its figures are withheld with the reason. */
+      ['paired-one', withCars(small, [firstKey], 2)],
       ['decked', withDecks(small, [firstKey], 2)],
+      /* A stair, a landing panel, floors kept for one group and a slower descent, on one block. */
+      [
+        'fitted-out',
+        withDescentSpeed(
+          withAccessZoneAdded(
+            withPanel(withStairsAdded(small, 1, { upS: 26, downS: 19, up: 0.35, down: 0.55 }), [1], 'destination-entry'),
+            [2, 3],
+            'tenants',
+          ),
+          [firstKey],
+          1,
+        ),
+      ],
       ['hand', withPopulation(withStopToggled(small, firstKey, 7), [5], 200)],
       /*
        * Equipment a small block has no use for — a pressurised cabin, a rope and a regenerative
@@ -11302,6 +11385,10 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         seeds.push({ field: `${at}.title`, text: facts.title, role: 'label' });
         seeds.push({ field: `${at}.people`, text: String(facts.people), role: 'observation' });
         seeds.push({ field: `${at}.peopleNote`, text: facts.peopleNote, role: 'reason' });
+        if (facts.stairs !== '') seeds.push({ field: `${at}.stairs`, text: facts.stairs, role: 'observation' });
+        for (const zone of facts.zones) {
+          seeds.push({ field: `${at}.zone.${zone.id}`, text: zone.line, role: 'observation' });
+        }
       }
       const reading = designerReading(analysis);
       if (reading !== '') {
@@ -11310,14 +11397,13 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     }
     /*
      * The opened-building line, on the case's own document and on **every** code at once — the
-     * second because no shipped building declares a service schedule or a landing call type, so a
-     * corpus drawn only from documents would never render two of the eight clauses.
+     * second because no shipped building declares a service schedule, so a
+     * corpus drawn only from documents would never render one of the seven clauses.
      */
     const everyLoss: readonly PlanLoss[] = [
       'uneven-floor-heights',
       'floor-labels',
       'floor-areas',
-      'landing-call-types',
       'car-timings',
       'service-events',
       'notes',
@@ -17082,6 +17168,11 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
     'everyday/testBedModel.ts#testBedViewOf',
     'everyday/testBedModel.ts#testBedWorkingProfileOf',
     'everyday/workshopJourney.ts#journeyOf',
+    'authoring/formulaSpec.ts#FORMULA_COPY',
+    'authoring/formulaSpec.ts#FORMULA_OP_WORDS',
+    'authoring/formulaSpec.ts#formulaReadbackOf',
+    'authoring/formulaSpec.ts#formulaIssueOf',
+    'authoring/formulaSpec.ts#withNewFormula',
     'everyday/workshopModel.ts#switchingBlockOf',
     'everyday/workshopModel.ts#rulesBlockOf',
     'everyday/workshopModel.ts#nameplateOf',
@@ -17286,6 +17377,7 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
             rows: [],
           },
           bedProfile,
+          selectorContextFrom(file, 900),
         ).name,
         role: 'label',
       });
@@ -17305,6 +17397,52 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       role: 'label',
     });
 
+    /*
+     * A priority of the player's own — `authoring/formulaSpec.ts`. Every authored line of the
+     * block, every operation's label and meaning, the readback over each operation and over a
+     * nested hand-written tree, a new formula's default name, and the one refusal.
+     */
+    for (const [key, text] of Object.entries(FORMULA_COPY)) {
+      seeds.push({ field: `formula.copy.${key}`, text, role: 'prose', provenance: 'authored' });
+    }
+    const formulaTerms = formulaTermOptions().map((option) => option.id);
+    for (const op of FORMULA_OP_ORDER) {
+      seeds.push({ field: `formula.op.${op}.label`, text: FORMULA_OP_WORDS[op].label, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `formula.op.${op}.meaning`, text: FORMULA_OP_WORDS[op].meaning, role: 'prose', provenance: 'authored' });
+      const [made] = withFormulaAt(withNewFormula([]), 0, {
+        expression: expressionOf({ op, termIds: formulaTerms.slice(0, 3) }),
+      });
+      if (made !== undefined) {
+        seeds.push({ field: `formula.${op}.name`, text: made.name, role: 'label' });
+        seeds.push({ field: `formula.${op}.readback`, text: formulaReadbackOf(made), role: 'label' });
+      }
+    }
+    for (const option of formulaTermOptions()) {
+      seeds.push({ field: `formula.term.${option.id}`, text: option.name, role: 'label' });
+    }
+    seeds.push({
+      field: 'formula.nested.readback',
+      text: formulaReadbackOf({
+        id: 'hand',
+        name: 'Hand',
+        weight: 1,
+        expression: { op: 'multiply', of: [{ term: 'waitTime' }, { op: 'add', of: [{ term: 'loadFactor' }, { value: 1 }] }] },
+      }),
+      role: 'label',
+    });
+    seeds.push({
+      field: 'formula.issue',
+      text: formulaIssueOf([{ id: 'x', name: 'X', weight: 1, expression: { term: 'no-such-term' } }]) ?? '',
+      role: 'reason',
+    });
+
+    /* The Detailed depth's plain name, and effect where core authors one, for every setting it draws. */
+    for (const id of familySpace().byId.keys()) {
+      const words = plainControlWordsOf(id);
+      seeds.push({ field: `plain.${id}.name`, text: words.name, role: 'label' });
+      if (words.effect !== undefined) seeds.push({ field: `plain.${id}.effect`, text: words.effect, role: 'prose' });
+    }
+
     /* The arms no shipped profile reaches, manufactured so each sentence has been rendered once. */
     const journeyBase = file.profiles[0];
     if (journeyBase !== undefined) {
@@ -17317,6 +17455,8 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
         { ...journeyBase, eligibility: { maxLoadFactorForAssignment: 0.7 } },
         { ...journeyBase, answer: { bypassLoadThreshold: 0.8, dwellPolicy: 'adaptive' } },
         { ...journeyBase, selection: { policy: 'fuzzy' } },
+        { ...journeyBase, selection: { policy: 'fuzzy' }, patternWeightSets: { 'up-peak': journeyBase.id } },
+        { ...journeyBase, selection: { policy: 'fuzzy' }, patternWeightSets: { 'up-peak': journeyBase.id, idle: journeyBase.id } },
         { ...journeyBase, selection: { policy: 'rules' }, rules: { rows: [{ when: 'shaft-out', then: 'nearest-car' }] } },
         { ...journeyBase, engine: 'no-such-engine' },
       ];

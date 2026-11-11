@@ -349,7 +349,9 @@ const ROUND_KEYS: readonly string[] = Object.freeze(['dispatcherProfileId', 'rul
  * an entry *say* and leave what else they carry alone, which is right for a single run's lenient gate
  * and is the reason this one adds the rest rather than changing those.
  */
-const RULE_ROW_KEYS: readonly string[] = Object.freeze(['when', 'whenValue', 'then', 'thenValue']);
+const RULE_ROW_KEYS: readonly string[] = Object.freeze(['when', 'whenValue', 'and', 'then', 'thenValue']);
+/** A row's further conditions carry a condition and its value, and nothing else. */
+const RULE_AND_KEYS: readonly string[] = Object.freeze(['when', 'whenValue']);
 const INTERVENTION_KEYS: readonly string[] = Object.freeze(['atS', 'change']);
 const SWITCH_KEYS: readonly string[] = Object.freeze(['kind', 'toProfileId', 'ruleRows']);
 const BARE_CHANGE_KEYS: readonly string[] = Object.freeze(['kind']);
@@ -402,7 +404,12 @@ function objectsIn(value: unknown): readonly (readonly [number, Record<string, u
 /** Keys nothing reads, below a round: on rule rows, on an intervention, on its change and on a switch's rows. */
 function nestedKeyIssues(round: Record<string, unknown>, where: string): string[] {
   const rows = (value: unknown, at: string): string[] =>
-    objectsIn(value).flatMap(([index, row]) => keyIssues(row, RULE_ROW_KEYS, `${at}[${String(index)}]`));
+    objectsIn(value).flatMap(([index, row]) => [
+      ...keyIssues(row, RULE_ROW_KEYS, `${at}[${String(index)}]`),
+      ...objectsIn(row['and']).flatMap(([extra, fields]) =>
+        keyIssues(fields, RULE_AND_KEYS, `${at}[${String(index)}].and[${String(extra)}]`),
+      ),
+    ]);
   const issues = rows(round['ruleRows'], `${where}.ruleRows`);
   for (const [index, entry] of objectsIn(round['interventions'])) {
     const at = `${where}.interventions[${String(index)}]`;

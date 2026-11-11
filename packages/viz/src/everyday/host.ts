@@ -4476,6 +4476,7 @@ export function createEverydayHost(
           { spec: state.dispatcherSpec, levers: state.levers, selector: state.selectorSpec, rows: state.ruleRows },
           entry.id,
           entry.profile,
+          context,
         );
         return {
           kind: 'yours',
@@ -4523,6 +4524,7 @@ export function createEverydayHost(
         },
         id,
         source,
+        selectorContextFrom(b.resources.dispatcherProfiles, state.shiftLengthS),
       );
       // An industry design is what a first save is based on; a copy of a saved one keeps its line.
       const basedOn = entry === undefined ? source?.id : entry.basedOn;

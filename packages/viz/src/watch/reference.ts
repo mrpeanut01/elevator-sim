@@ -198,12 +198,24 @@ function asRuleRows(raw: unknown, where: string): readonly RuleRow[] {
     const row = asRecord(value, `${where}[${String(index)}]`);
     const when = asString(row['when'], `${where}[${String(index)}].when`);
     const then = asString(row['then'], `${where}[${String(index)}].then`);
+    const extras: readonly unknown[] = Array.isArray(row['and']) ? (row['and'] as readonly unknown[]) : [];
     return {
       when,
       ...(row['whenValue'] === undefined ? {} : { whenValue: row['whenValue'] }),
+      ...(extras.length === 0
+        ? {}
+        : {
+            and: extras.map((value, at) => {
+              const extra = asRecord(value, `${where}[${String(index)}].and[${String(at)}]`);
+              return {
+                when: asString(extra['when'], `${where}[${String(index)}].and[${String(at)}].when`),
+                ...(extra['whenValue'] === undefined ? {} : { whenValue: extra['whenValue'] }),
+              };
+            }),
+          }),
       then,
       ...(row['thenValue'] === undefined ? {} : { thenValue: row['thenValue'] }),
-    } as RuleRow;
+    } as unknown as RuleRow;
   });
 }
 

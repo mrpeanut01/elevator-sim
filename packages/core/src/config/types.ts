@@ -965,14 +965,63 @@ export interface DispatcherProfile extends Commented {
    * not tolerated — under any other policy. Absent everywhere in the shipped file.
    */
   readonly rules?: ProfileRulesConfig | undefined;
+  /**
+   * **This dispatcher's own answer to *which priorities under which traffic*** — pattern id to
+   * dispatcher-profile id, laid over the file-level `patternSwitching.weightSetsByPattern`.
+   *
+   * Partial on purpose: a pattern it does not name keeps the file's entry, so a profile states
+   * only where it differs. Before this field the map was one per file, so two dispatchers that
+   * both watched the traffic could not disagree about what to do when it turned, and a saved
+   * dispatcher could not carry its own answer at all.
+   *
+   * Read under `selection.policy` `fuzzy` and `contextual`, and inactive under `off` and `rules`
+   * exactly as the six selection scalars are — carried, and read by nothing, which
+   * `selectorIssues` says beside the control.
+   * `resolveWeightSets` refuses an entry naming a pattern the detector does not declare (it
+   * would be silently ignored) or a profile that does not exist (the regime would fall back
+   * silently). A section of its own beside `rules`, and not a seventh field of `selection`,
+   * because every field of a stage section is a declared tunable (invariant 8,
+   * `parameters.test.ts`) and this is not one: it is a categorical choice per pattern over a set
+   * that is itself data, the argument that keeps `patternSwitching` out of the search space.
+   */
+  readonly patternWeightSets?: Readonly<Record<string, string>> | undefined;
+  /**
+   * **Priorities this dispatcher writes for itself** — each a formula over the library's terms,
+   * added to the weighted sum at its own weight. `dispatch/formula.ts` states what a formula is,
+   * why its leaves are normalized, and the three properties `resolveFormulas` checks before a run
+   * (pure, non-negative, bounded). An array, like `hardConstraints`, and for its reason: a tree
+   * is structure, and a search over structure is not a search over a range, so none of it is a
+   * declared tunable.
+   */
+  readonly formulas?: readonly FormulaTermConfig[] | undefined;
+}
+
+/** One node of a formula: a library term's normalized value, a constant, or an operation. */
+export type FormulaNodeConfig =
+  | { readonly term: string }
+  | { readonly value: number }
+  | { readonly op: 'add' | 'multiply' | 'max' | 'min'; readonly of: readonly FormulaNodeConfig[] };
+
+/** One formula, as a profile authors it — `dispatch/formula.ts#FormulaSource`, with a comment. */
+export interface FormulaTermConfig extends Commented {
+  readonly id: string;
+  /** The author's own name for it, drawn wherever a breakdown shows its row. */
+  readonly name: string;
+  readonly weight: number;
+  readonly expression: FormulaNodeConfig;
 }
 
 /**
  * Stage 3's weight-set selection, as a profile authors it.
  *
- * Six scalars and no map: the arms are {@link PatternSwitchingConfig}, file-level, for the same
- * reason the cost-term library is. `dispatch/parameters.ts` declares every field here with a
- * type, a range, a default and an `activeWhen` (CLAUDE.md invariant 8).
+ * Six scalars, each declared in `dispatch/parameters.ts` with a type, a range, a default and an
+ * `activeWhen` (CLAUDE.md invariant 8).
+ *
+ * The arms and their signatures are {@link PatternSwitchingConfig}, file-level, for the same
+ * reason the cost-term library is: which traffic patterns exist and how each is recognised is a
+ * statement about the detector. **Which priorities a dispatcher runs under each pattern is a
+ * statement about the dispatcher**, and {@link DispatcherProfile.patternWeightSets} is where a
+ * profile makes it.
  */
 export interface SelectionStageConfig extends Commented {
   readonly policy?: WeightSetPolicy | undefined;
@@ -1260,12 +1309,72 @@ export const RULE_ACTION_WORDS: Readonly<Record<RuleActionId, RuleActionWords>> 
   }),
 });
 
-/** One when/then row, as a profile authors it. Values are refused at resolve, not coerced. */
+/**
+ * How many further conditions one row may AND onto its first — so a row reads *when A, and B, and
+ * C*, and no longer. A bound rather than a taste: the row is drawn as one sentence, and the
+ * leaderboard's gate (`server/leaderboard/submission.ts#ruleRowIssues`) sizes a submission by it.
+ */
+export const MAX_RULE_AND = 2;
+
+/** One further condition a row requires as well as its first. Same vocabulary, same value lists. */
+export interface RuleAndConfig {
+  readonly when: RuleConditionId;
+  readonly whenValue?: number | string | undefined;
+}
+
+/**
+ * One when/then row, as a profile authors it. Values are refused at resolve, not coerced.
+ *
+ * `and` makes the row a branch of a decision list: every condition must hold for the row to fire,
+ * and rows are still read top to bottom with the first match winning, which is what a decision
+ * tree is once it is written out as its root-to-leaf paths. `dispatch/selector.ts#RuleArm.clauses`
+ * has always ANDed its clauses (the *quiet stretch* condition is three of them), so this adds no
+ * evaluation path: `resolveRuleArms` concatenates the clauses each condition compiles to. Absent
+ * on every row written before it existed, and an absent `and` compiles to exactly the arm it did.
+ */
 export interface RuleRowConfig extends Commented {
   readonly when: RuleConditionId;
   readonly whenValue?: number | string | undefined;
+  readonly and?: readonly RuleAndConfig[] | undefined;
   readonly then: RuleActionId;
   readonly thenValue?: number | string | undefined;
+}
+
+/** The shape {@link ruleRowOf} reads: any row-like value, so a wire row needs no cast. */
+export interface RuleRowLike<When extends string = string, Then extends string = string> {
+  readonly when: When;
+  readonly whenValue?: number | string | undefined;
+  readonly and?: readonly { readonly when: When; readonly whenValue?: number | string | undefined }[] | undefined;
+  readonly then: Then;
+  readonly thenValue?: number | string | undefined;
+}
+
+/**
+ * **The one copy of a rule row** — every field a row may carry, absent keys left absent.
+ *
+ * Seven modules held their own four-key copy of this (the editor's round trip, the watch record,
+ * the posted run, the leaderboard's replay), which was harmless while a row had four keys and is
+ * the shape that silently drops a fifth: a row that lost its `and` on the way to a replay would
+ * fire more often than the run the player watched. They call this instead, so a field added to
+ * {@link RuleRowConfig} is carried everywhere or nowhere. An empty `and` is written as no `and`,
+ * so two documents that mean the same row are the same bytes.
+ */
+export function ruleRowOf<When extends string, Then extends string>(
+  row: RuleRowLike<When, Then>,
+): RuleRowLike<When, Then> {
+  const and = (row.and ?? []).map((extra) =>
+    Object.freeze({
+      when: extra.when,
+      ...(extra.whenValue === undefined ? {} : { whenValue: extra.whenValue }),
+    }),
+  );
+  return Object.freeze({
+    when: row.when,
+    ...(row.whenValue === undefined ? {} : { whenValue: row.whenValue }),
+    ...(and.length === 0 ? {} : { and: Object.freeze(and) }),
+    then: row.then,
+    ...(row.thenValue === undefined ? {} : { thenValue: row.thenValue }),
+  });
 }
 
 /**
