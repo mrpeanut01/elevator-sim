@@ -67,7 +67,7 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **1 128 352** | **606** | **80** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **1 151 823** | **606** | **80** | **0** | **green**, and the register is empty |
   | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 314 338** | **4 710** | **81** | **0** | **green**, and the register is empty |
 
   **How this row is kept.** Each rule below was learned the hard way at least once, and the log says

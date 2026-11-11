@@ -21,19 +21,20 @@ The always-on row is measured on the integrated head; the deep row is read from 
 
 ## Wave AY
 
-**Wave AY moves +1 653.45 strings a case always-on, with the surface set unchanged.** One lane, the
-Design a building board, in two merges. The base is wave AX's row, re-measured on `e134f2a` before the
-comparison and reproduced to the string. The first merge (#655) reached `main` unmeasured, so both steps
-are measured here and not split by quotient (§ D256). The same 80 surfaces speak: the move is the board's
-adapter in `EVERYDAY_STANDALONE_SCREENS`, which now draws every template, an opened building and its
-hand-made arms in both unit systems. No decision heading was spent (§ D405). The deep row still names
-`c181913` until the first nightly after wave AY merges.
+**Wave AY moves +1 657.45 strings a case always-on, with the surface set unchanged.** One lane, the
+Design a building board, in two merges. The base is wave AX's row, re-measured on `e134f2a` and
+reproduced to the string. The first merge (#655) and the Dispatcher Workshop (#656) both reached `main`
+unmeasured, so each tree is measured here and nothing is split by quotient (§ D256); #656's step is its
+own lane's and is shown, not claimed. The same 80 surfaces speak throughout: this wave's move is the
+board's adapter in `EVERYDAY_STANDALONE_SCREENS`. No decision heading was spent (§ D405). The deep row
+still names `c181913` until the first nightly after wave AY merges.
 
 | tree | strings | move | per case | surfaces |
 |---|---|---|---|---|
 | base, wave AX's row (re-measured on `e134f2a`) | 1 047 333 | | | 80 |
 | `main` after #655 (`6822ce0`) | 1 118 872 | +71 539 | +1 459.98 | 80, **same set** |
-| wave AY's head (`7a79900`) | **1 128 352** | **+9 480** | **+193.47** | 80, **same set** |
+| `main` after #656 (`457a1d4`), not this wave's | 1 142 147 | +23 275 | +475.00 | 80, **same set** |
+| wave AY's head (`398eed9`) | **1 151 823** | **+9 676** | **+197.47** | 80, **same set** |
 | cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
 
 ## Wave AX
