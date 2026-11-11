@@ -27,6 +27,7 @@ import {
   PARKING_STRATEGIES,
   REASSIGNMENT_POLICIES,
   RULE_ACTIONS,
+  MAX_RULE_AND,
   RULE_CONDITIONS,
   SERVICE_MODES,
   WEIGHT_SET_POLICIES,
@@ -1154,6 +1155,17 @@ const ruleRowSchema = z.strictObject({
   $comment: comment,
   when: z.enum(RULE_CONDITIONS),
   whenValue: z.union([z.number(), z.string()]).optional(),
+  // Further conditions the row requires as well: non-empty when present, for `rows`' own reason.
+  and: z
+    .array(
+      z.strictObject({
+        when: z.enum(RULE_CONDITIONS),
+        whenValue: z.union([z.number(), z.string()]).optional(),
+      }),
+    )
+    .min(1, 'an authored empty "and" adds no condition')
+    .max(MAX_RULE_AND)
+    .optional(),
   then: z.enum(RULE_ACTIONS),
   thenValue: z.union([z.number(), z.string()]).optional(),
 });

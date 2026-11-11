@@ -9491,7 +9491,51 @@ const RULES_EDITOR: SurfaceAdapter = {
         true,
       ],
       ['out-of-list', [{ when: 'call-waited', whenValue: 61, then: 'jump-queue' }], true],
+      // A row's further conditions: their own out-of-list and clockless refusals, the bound, and
+      // the whole-run ceiling that can carry none.
+      [
+        'and-out-of-list',
+        [{ when: 'shaft-out', and: [{ when: 'call-waited', whenValue: 61 }], then: 'jump-queue' }],
+        true,
+      ],
+      [
+        'and-clockless',
+        [{ when: 'shaft-out', and: [{ when: 'day-period', whenValue: 'lunch' }], then: 'jump-queue' }],
+        false,
+      ],
+      [
+        'and-too-many',
+        [
+          {
+            when: 'shaft-out',
+            and: [{ when: 'shaft-out' }, { when: 'shaft-out' }, { when: 'shaft-out' }],
+            then: 'jump-queue',
+          },
+        ],
+        true,
+      ],
+      [
+        'and-on-ceiling',
+        [{ when: 'car-fuller-than', whenValue: 0.8, and: [{ when: 'shaft-out' }], then: 'no-new-pickups' }],
+        true,
+      ],
     ];
+    // A row that asks for more than one thing, over every condition as its further one: the
+    // readback's "and" join and the provenance pill's, each from the same table.
+    RULE_CONDITIONS.forEach((when) => {
+      const value = RULE_CONDITION_WORDS[when].values?.[0]?.value;
+      const row: RuleRow = {
+        when: 'shaft-out',
+        and: [{ when, ...(value === undefined ? {} : { whenValue: value }) }],
+        then: 'jump-queue',
+      };
+      seeds.push({ field: `readback.and.${when}`, text: `Reads as: ${readbackOf(row)}`, role: 'label' });
+      seeds.push({
+        field: `provenance.and.${when}`,
+        text: ruleProvenanceName(`rule-1:shaft-out+${when}${value === undefined ? '' : `:${String(value)}`}`) ?? '',
+        role: 'label',
+      });
+    });
     for (const [name, rows, hasClock] of refusalArms) {
       for (const [index, issue] of ruleIssues(rows, { hasClock }).entries()) {
         seeds.push({

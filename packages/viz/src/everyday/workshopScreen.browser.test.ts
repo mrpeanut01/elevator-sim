@@ -479,6 +479,18 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     // Every row says what it reads as, and which lever it moves.
     expect(await page.textContent('.everyday-workshop-readback')).toContain('Reads as:');
     expect(await page.textContent('.everyday-workshop-rule-lever')).toContain('moves ');
+
+    // A row can require more than one thing: each “and…” adds a condition, up to core's bound,
+    // and the readback says the row as one sentence.
+    await page.click('.everyday-workshop-and-add');
+    await page.waitForSelector('.everyday-workshop-and');
+    expect(await page.textContent('.everyday-workshop-readback')).toMatch(/Reads as: when .+ and .+, /u);
+    await page.click('.everyday-workshop-and-add');
+    await page.waitForFunction(() => document.querySelectorAll('.everyday-workshop-and').length === 2);
+    expect(await page.locator('.everyday-workshop-and-add').count()).toBe(0);
+    await page.click('.everyday-workshop-and-drop');
+    await page.waitForFunction(() => document.querySelectorAll('.everyday-workshop-and').length === 1);
+    expect(await page.locator('.everyday-workshop-and-add').count()).toBe(1);
     await page.close();
   }, 120_000);
 

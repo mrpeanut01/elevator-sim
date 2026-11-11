@@ -73,7 +73,10 @@ import {
 import {
   defaultRuleRow,
   rowWithThen,
+  rowWithAndAt,
+  rowWithAnotherCondition,
   rowWithWhen,
+  rowWithoutAndAt,
   substituted,
   type RuleRow,
 } from '../authoring/ruleSpec.js';
@@ -1547,6 +1550,68 @@ function mountWorkshop(
           );
         });
         controls.append(valueSelect);
+      }
+
+      /*
+       * The row's further conditions — every one must hold as well as the first. Each is the same
+       * two selects the first condition is, filled from the same table, with a control to drop it;
+       * *and…* adds one while `ruleSpec.ts#canAddCondition` allows. A row with two reads as one
+       * branch of a decision list, and the readback below says it as one sentence.
+       */
+      const PILL = `cursor:pointer;border:1px solid ${C.rule};border-radius:${String(R.pill)}px;background:transparent;padding:4px 11px;font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
+      rowView.and.forEach((extra, extraAt) => {
+        const ordinal = `condition ${String(extraAt + 2)} of rule ${String(index + 1)}`;
+        const andSelect = el(doc, 'select', 'everyday-workshop-and');
+        andSelect.setAttribute('aria-label', `Further ${ordinal}`);
+        for (const option of view.whenOptions) {
+          andSelect.append(
+            new (doc.defaultView?.Option ?? Option)(substituted(RULE_CONDITION_WORDS[option.id as keyof typeof RULE_CONDITION_WORDS], undefined), option.id),
+          );
+        }
+        andSelect.value = extra.when;
+        andSelect.addEventListener('change', () => {
+          setRows(
+            rows.map((entry, at) =>
+              at === index ? rowWithAndAt(entry, extraAt, andSelect.value as RuleRow['when'], extra.whenValue) : entry,
+            ),
+          );
+        });
+        controls.append(el(doc, 'span', undefined, 'and'), andSelect);
+        const andValues = view.whenOptions.find((option) => option.id === extra.when)?.values;
+        if (andValues !== undefined) {
+          const valueSelect = el(doc, 'select', 'everyday-workshop-and-value');
+          valueSelect.setAttribute('aria-label', `Value for further ${ordinal}`);
+          for (const value of andValues) {
+            valueSelect.append(new (doc.defaultView?.Option ?? Option)(value.label, String(value.value)));
+          }
+          valueSelect.value = String(extra.whenValue);
+          valueSelect.addEventListener('change', () => {
+            const picked = andValues.find((value) => String(value.value) === valueSelect.value);
+            if (picked === undefined) return;
+            setRows(
+              rows.map((entry, at) => (at === index ? rowWithAndAt(entry, extraAt, extra.when, picked.value) : entry)),
+            );
+          });
+          controls.append(valueSelect);
+        }
+        const drop = el(doc, 'button', 'everyday-workshop-and-drop', 'drop');
+        drop.type = 'button';
+        drop.setAttribute('aria-label', `Drop ${ordinal}`);
+        drop.style.cssText = PILL;
+        drop.addEventListener('click', () => {
+          setRows(rows.map((entry, at) => (at === index ? rowWithoutAndAt(entry, extraAt) : entry)));
+        });
+        controls.append(drop);
+      });
+      if (rowView.canAddCondition) {
+        const more = el(doc, 'button', 'everyday-workshop-and-add', 'and…');
+        more.type = 'button';
+        more.setAttribute('aria-label', `Add a further condition to rule ${String(index + 1)}`);
+        more.style.cssText = PILL;
+        more.addEventListener('click', () => {
+          setRows(rows.map((entry, at) => (at === index ? rowWithAnotherCondition(entry) : entry)));
+        });
+        controls.append(more);
       }
 
       const thenSelect = el(doc, 'select', 'everyday-workshop-then');

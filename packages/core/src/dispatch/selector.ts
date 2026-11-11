@@ -90,6 +90,7 @@
 import {
   DAY_PERIOD_WINDOWS,
   RULE_ACTION_WORDS,
+  MAX_RULE_AND,
   RULE_CONDITION_WORDS,
   type RuleActionId,
   type RuleConditionId,
@@ -764,6 +765,9 @@ export interface CompiledRules {
 export interface RuleRowSource {
   readonly when: string;
   readonly whenValue?: number | string | undefined;
+  readonly and?:
+    | readonly { readonly when: string; readonly whenValue?: number | string | undefined }[]
+    | undefined;
   readonly then: string;
   readonly thenValue?: number | string | undefined;
 }
@@ -900,6 +904,36 @@ export function resolveRuleArms(
       profileId,
     );
 
+    /*
+     * The row's further conditions, each held to the first condition's own two refusals. Compiled
+     * before the static branch below so a row that cannot carry them is refused with its `and`
+     * known to be well-formed, rather than for the wrong reason.
+     */
+    const extras = row.and ?? [];
+    if (extras.length > MAX_RULE_AND) {
+      throw new DispatchError(
+        `Dispatcher "${profileId}" rules row ${String(index + 1)}: ${String(extras.length)} further conditions, and a row may carry at most ${String(MAX_RULE_AND)}. A longer test belongs in a second row.`,
+      );
+    }
+    const extraClauses: RuleClause[] = [];
+    let extraSuffix = '';
+    for (const extra of extras) {
+      if (!isRuleCondition(extra.when)) {
+        throw new DispatchError(
+          `Dispatcher "${profileId}" rules row ${String(index + 1)}: unknown further condition "${extra.when}". Known conditions: ${Object.keys(RULE_CONDITION_WORDS).join(', ')}. A condition that is silently dropped is a rule that fires more often than it says.`,
+        );
+      }
+      const extraValue = ruleValue(
+        extra.when,
+        RULE_CONDITION_WORDS[extra.when],
+        extra.whenValue,
+        index,
+        profileId,
+      );
+      extraClauses.push(...clausesFor(extra.when, extraValue));
+      extraSuffix += `+${extra.when}${extraValue === undefined ? '' : `:${String(extraValue)}`}`;
+    }
+
     if (row.then === 'no-new-pickups') {
       // The static compile. The engine's stage-2 load ceiling *is* the condition "a car is
       // fuller than v", evaluated per car per decision — so this row lands in
@@ -908,6 +942,13 @@ export function resolveRuleArms(
       if (row.when !== 'car-fuller-than') {
         throw new DispatchError(
           `Dispatcher "${profileId}" rules row ${String(index + 1)}: "no-new-pickups" only pairs with "car-fuller-than" — the action stops giving new pickups to *the car that is fuller than v*, so any other condition leaves "it" naming nothing.`,
+        );
+      }
+      if (extras.length > 0) {
+        // The stage-2 ceiling is one number for the whole run; it has nowhere to put "and only
+        // while the lobby is full", so the row would apply always while saying sometimes.
+        throw new DispatchError(
+          `Dispatcher "${profileId}" rules row ${String(index + 1)}: "no-new-pickups" carries a further condition. It compiles to a load ceiling that holds for the whole run, so a second condition would be read by nothing.`,
         );
       }
       if (maxLoadFactorForAssignment !== undefined) {
@@ -919,9 +960,12 @@ export function resolveRuleArms(
       return;
     }
 
-    const clauses = clausesFor(row.when, whenValue);
+    const clauses: readonly RuleClause[] =
+      extraClauses.length === 0
+        ? clausesFor(row.when, whenValue)
+        : [...clausesFor(row.when, whenValue), ...extraClauses];
     const suffix = whenValue === undefined ? '' : `:${String(whenValue)}`;
-    const patternId = `rule-${String(index + 1)}:${row.when}${suffix}`;
+    const patternId = `rule-${String(index + 1)}:${row.when}${suffix}${extraSuffix}`;
 
     switch (row.then) {
       case 'nearest-car':

@@ -1556,6 +1556,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         // The sentences a player reads about time rules are `ruleIssues`' clock refusal and the
         // row readbacks, both driven by the RULES_EDITOR adapter.
         'authoring/ruleSpec.ts#isTimeCondition',
+        // The same reading of an id as prose, four times over: each of these compares against or
+        // reaches the action id `no-new-pickups` and returns a row or a boolean. What a player
+        // reads about that action is its template, its lever line and `ruleIssues`' refusals,
+        // all driven by the RULES_EDITOR adapter — including the row with further conditions.
+        'authoring/ruleSpec.ts#canAddCondition',
+        'authoring/ruleSpec.ts#defaultRuleRow',
+        'authoring/ruleSpec.ts#rowWithAnotherCondition',
+        'authoring/ruleSpec.ts#rowWithThen',
       ],
     },
     {

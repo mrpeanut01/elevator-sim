@@ -1260,12 +1260,72 @@ export const RULE_ACTION_WORDS: Readonly<Record<RuleActionId, RuleActionWords>> 
   }),
 });
 
-/** One when/then row, as a profile authors it. Values are refused at resolve, not coerced. */
+/**
+ * How many further conditions one row may AND onto its first — so a row reads *when A, and B, and
+ * C*, and no longer. A bound rather than a taste: the row is drawn as one sentence, and the
+ * leaderboard's gate (`server/leaderboard/submission.ts#ruleRowIssues`) sizes a submission by it.
+ */
+export const MAX_RULE_AND = 2;
+
+/** One further condition a row requires as well as its first. Same vocabulary, same value lists. */
+export interface RuleAndConfig {
+  readonly when: RuleConditionId;
+  readonly whenValue?: number | string | undefined;
+}
+
+/**
+ * One when/then row, as a profile authors it. Values are refused at resolve, not coerced.
+ *
+ * `and` makes the row a branch of a decision list: every condition must hold for the row to fire,
+ * and rows are still read top to bottom with the first match winning, which is what a decision
+ * tree is once it is written out as its root-to-leaf paths. `dispatch/selector.ts#RuleArm.clauses`
+ * has always ANDed its clauses (the *quiet stretch* condition is three of them), so this adds no
+ * evaluation path: `resolveRuleArms` concatenates the clauses each condition compiles to. Absent
+ * on every row written before it existed, and an absent `and` compiles to exactly the arm it did.
+ */
 export interface RuleRowConfig extends Commented {
   readonly when: RuleConditionId;
   readonly whenValue?: number | string | undefined;
+  readonly and?: readonly RuleAndConfig[] | undefined;
   readonly then: RuleActionId;
   readonly thenValue?: number | string | undefined;
+}
+
+/** The shape {@link ruleRowOf} reads: any row-like value, so a wire row needs no cast. */
+export interface RuleRowLike<When extends string = string, Then extends string = string> {
+  readonly when: When;
+  readonly whenValue?: number | string | undefined;
+  readonly and?: readonly { readonly when: When; readonly whenValue?: number | string | undefined }[] | undefined;
+  readonly then: Then;
+  readonly thenValue?: number | string | undefined;
+}
+
+/**
+ * **The one copy of a rule row** — every field a row may carry, absent keys left absent.
+ *
+ * Seven modules held their own four-key copy of this (the editor's round trip, the watch record,
+ * the posted run, the leaderboard's replay), which was harmless while a row had four keys and is
+ * the shape that silently drops a fifth: a row that lost its `and` on the way to a replay would
+ * fire more often than the run the player watched. They call this instead, so a field added to
+ * {@link RuleRowConfig} is carried everywhere or nowhere. An empty `and` is written as no `and`,
+ * so two documents that mean the same row are the same bytes.
+ */
+export function ruleRowOf<When extends string, Then extends string>(
+  row: RuleRowLike<When, Then>,
+): RuleRowLike<When, Then> {
+  const and = (row.and ?? []).map((extra) =>
+    Object.freeze({
+      when: extra.when,
+      ...(extra.whenValue === undefined ? {} : { whenValue: extra.whenValue }),
+    }),
+  );
+  return Object.freeze({
+    when: row.when,
+    ...(row.whenValue === undefined ? {} : { whenValue: row.whenValue }),
+    ...(and.length === 0 ? {} : { and: Object.freeze(and) }),
+    then: row.then,
+    ...(row.thenValue === undefined ? {} : { thenValue: row.thenValue }),
+  });
 }
 
 /**

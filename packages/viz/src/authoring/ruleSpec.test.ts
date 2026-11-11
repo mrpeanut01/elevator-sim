@@ -9,6 +9,7 @@
  */
 
 import {
+  MAX_RULE_AND,
   RULE_ACTIONS,
   RULE_ACTION_WORDS,
   RULE_CONDITIONS,
@@ -28,8 +29,12 @@ import {
   ruleIssues,
   ruleProvenanceName,
   rulesFromProfile,
+  canAddCondition,
+  rowWithAndAt,
+  rowWithAnotherCondition,
   rowWithThen,
   rowWithWhen,
+  rowWithoutAndAt,
   substituted,
   templateHasClock,
   type RuleRow,
@@ -203,5 +208,65 @@ describe('the row helpers', () => {
     expect(parked.thenValue).toBe('lobby');
     // A valueless id drops the value rather than carrying a ghost.
     expect(rowWithWhen(queued, 'shaft-out').whenValue).toBeUndefined();
+  });
+});
+
+describe('further conditions — a row that asks for more than one thing', () => {
+  const both: RuleRow = {
+    when: 'lobby-queue-passes',
+    whenValue: 12,
+    and: [{ when: 'call-waited', whenValue: 60 }],
+    then: 'jump-queue',
+  };
+
+  it('round-trips through the profile with its further conditions, and reads as one sentence', () => {
+    expect(rulesFromProfile(profileWithRules(PROFILE, [both]))).toEqual([both]);
+    expect(readbackOf(both)).toBe(
+      'when the lobby queue passes 12 people and a call has waited 60 s, treat that call as urgent.'.replace(
+        'treat that call as urgent',
+        substituted(RULE_ACTION_WORDS['jump-queue'], undefined),
+      ),
+    );
+  });
+
+  it('names every condition of a compiled arm from its provenance id', () => {
+    expect(ruleProvenanceName('rule-2:lobby-queue-passes:12+call-waited:60+shaft-out')).toBe(
+      'rule 2 — the lobby queue passes 12 people and a call has waited 60 s and a shaft is out of service',
+    );
+    expect(ruleProvenanceName('rule-2:lobby-queue-passes:12+moon-is-full')).toBeUndefined();
+  });
+
+  it('adds up to core’s bound, edits one in place with its value snapped, and drops one', () => {
+    const one = rowWithAnotherCondition({ when: 'shaft-out', then: 'jump-queue' });
+    expect(one.and).toHaveLength(1);
+    const two = rowWithAnotherCondition(one);
+    expect(two.and).toHaveLength(MAX_RULE_AND);
+    expect(canAddCondition(two)).toBe(false);
+    expect(rowWithAnotherCondition(two)).toBe(two);
+
+    const edited = rowWithAndAt(two, 1, 'day-period', 999);
+    expect(edited.and?.[1]).toEqual({ when: 'day-period', whenValue: 'morning-rush' });
+    expect(rowWithAndAt(two, 0, 'shaft-out', 12).and?.[0]).toEqual({ when: 'shaft-out' });
+    expect(rowWithoutAndAt(edited, 0).and).toEqual([{ when: 'day-period', whenValue: 'morning-rush' }]);
+    // Dropping the last leaves no key at all, so the row is the bytes it was before.
+    expect(Object.hasOwn(rowWithoutAndAt(one, 0), 'and')).toBe(false);
+  });
+
+  it('the whole-run ceiling takes no further condition, and switching to it sheds them', () => {
+    const ceiling: RuleRow = { when: 'car-fuller-than', whenValue: 0.8, then: 'no-new-pickups' };
+    expect(canAddCondition(ceiling)).toBe(false);
+    expect(rowWithThen({ ...both, when: 'car-fuller-than', whenValue: 0.8 }, 'no-new-pickups').and).toBeUndefined();
+    const issues = ruleIssues([{ ...ceiling, and: [{ when: 'shaft-out' }] }], { hasClock: true });
+    expect(issues.map((issue) => issue.message).join(' ')).toContain('cannot wait on a further condition');
+  });
+
+  it('says a clockless time test on a further condition silences the whole row', () => {
+    const issues = ruleIssues(
+      [{ when: 'shaft-out', and: [{ when: 'day-period', whenValue: 'lunch' }], then: 'jump-queue' }],
+      { hasClock: false },
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.field).toBe('rows.0.and.0');
+    expect(issues[0]?.message).toContain('the whole row does nothing');
   });
 });

@@ -303,6 +303,64 @@ describe('the nine conditions, over hand-built observations', () => {
  * 3 — selection semantics
  * -------------------------------------------------------------------------- */
 
+describe('a row with further conditions fires only when every one of them holds', () => {
+  const row = {
+    when: 'lobby-queue-passes',
+    whenValue: 12,
+    and: [
+      { when: 'call-waited', whenValue: 60 },
+      { when: 'shaft-out' },
+    ],
+    then: 'jump-queue',
+  } as const;
+
+  it('ANDs its conditions, and names all of them in the provenance id', () => {
+    const [arm] = arms([row]);
+    expect(arm?.patternId).toBe('rule-1:lobby-queue-passes:12+call-waited:60+shaft-out');
+    const all = observed({ lobbyQueue: 20, longestWaitS: 60, carsOutOfService: 1 });
+    expect(ruleArmMatches(arm!, all)).toBe(true);
+    for (const missing of [{ lobbyQueue: 12 }, { longestWaitS: 59 }, { carsOutOfService: 0 }]) {
+      expect(ruleArmMatches(arm!, { ...all, ...missing })).toBe(false);
+    }
+  });
+
+  it('compiles a row with no further condition to exactly the arm it always did', () => {
+    const plain = { when: row.when, whenValue: row.whenValue, then: row.then };
+    expect(arms([plain])).toEqual(arms([{ ...plain, and: [] }]));
+    expect(arms([plain])[0]?.patternId).toBe('rule-1:lobby-queue-passes:12');
+  });
+
+  it('refuses an unknown or out-of-list further condition, a third one, and one on no-new-pickups', () => {
+    const base = { when: 'call-waited', whenValue: 30, then: 'jump-queue' };
+    expect(() => arms([{ ...base, and: [{ when: 'moon-is-full' }] }])).toThrow(/further condition "moon-is-full"/);
+    expect(() => arms([{ ...base, and: [{ when: 'lobby-queue-passes', whenValue: 13 }] }])).toThrow(/requires one of/);
+    expect(() =>
+      arms([{ ...base, and: [{ when: 'shaft-out' }, { when: 'shaft-out' }, { when: 'shaft-out' }] }]),
+    ).toThrow(/at most 2/);
+    expect(() =>
+      arms([
+        { when: 'car-fuller-than', whenValue: 0.8, and: [{ when: 'shaft-out' }], then: 'no-new-pickups' },
+      ]),
+    ).toThrow(/carries a further condition/);
+  });
+
+  it('round-trips through the profile schema, and the schema refuses an empty or over-long list', () => {
+    const authored = {
+      id: 'ruled',
+      name: 'Ruled',
+      weights: { waitTime: 1 },
+      selection: { policy: 'rules' },
+      rules: { rows: [row] },
+    };
+    expect(dispatcherProfileSchema.parse(authored)).toEqual(authored);
+    const withAnd = (and: unknown): unknown => ({ ...authored, rules: { rows: [{ ...row, and }] } });
+    expect(dispatcherProfileSchema.safeParse(withAnd([])).success).toBe(false);
+    expect(
+      dispatcherProfileSchema.safeParse(withAnd([row.and[0], row.and[0], row.and[0]])).success,
+    ).toBe(false);
+  });
+});
+
 describe('first match wins, ordering decides, and no match releases behind the dwell', () => {
   const twoRows = [
     { when: 'lobby-queue-passes', whenValue: 6, then: 'hold-at-lobby' },
@@ -680,7 +738,7 @@ beforeAll(async () => {
 
 function runConfig(
   buildingId: string,
-  rows: readonly { when: string; whenValue?: number | string; then: string; thenValue?: number | string }[],
+  rows: readonly Parameters<typeof resolveRuleArms>[0][number][],
   seed: number,
   overrides: Partial<SimulationConfig> = {},
   profileId = 'collective',
@@ -743,7 +801,7 @@ describe('every buildable action moves a run at a named measured cell (§ D112, 
 
   const moved = (
     buildingId: string,
-    rows: readonly { when: string; whenValue?: number | string; then: string; thenValue?: number | string }[],
+    rows: readonly Parameters<typeof resolveRuleArms>[0][number][],
     overrides: Partial<SimulationConfig> = {},
     profileId = 'collective',
   ): string => legsOf(runSimulation(runConfig(buildingId, rows, SEED, overrides, profileId)));
@@ -853,6 +911,35 @@ describe('every buildable action moves a run at a named measured cell (§ D112, 
       { when: 'car-fuller-than', whenValue: 0.5, then: 'emptiest-car' },
     ]);
     expect(forward).not.toBe(reversed);
+  }, 600_000);
+
+  /*
+   * The further conditions, on the legs (§ D177). Two halves, because one alone proves little: a
+   * further condition that holds for the whole run must change nothing — it is the same test —
+   * and one that seldom holds must change the run, or `and` is carried and read by nothing.
+   * midtown-office's morning starts at 08:30 and runs 1 800 s, so *the morning rush* is always on.
+   */
+  it('a further condition moves the run when it restricts, and leaves it alone when it always holds', () => {
+    const single = moved('midtown-office', [{ when: 'call-waited', whenValue: 30, then: 'jump-queue' }]);
+    const alwaysToo = moved('midtown-office', [
+      {
+        when: 'call-waited',
+        whenValue: 30,
+        and: [{ when: 'day-period', whenValue: 'morning-rush' }],
+        then: 'jump-queue',
+      },
+    ]);
+    const seldomToo = moved('midtown-office', [
+      {
+        when: 'call-waited',
+        whenValue: 30,
+        and: [{ when: 'day-period', whenValue: 'evening' }],
+        then: 'jump-queue',
+      },
+    ]);
+    expect(alwaysToo).toBe(single);
+    expect(seldomToo).not.toBe(single);
+    expect(seldomToo).toBe(midtownBase);
   }, 600_000);
 
   it('a rules run is deterministic: same config, same seed, same fingerprint (invariant 5)', () => {

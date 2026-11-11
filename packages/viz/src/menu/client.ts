@@ -152,6 +152,8 @@ export interface RunSubmission {
 export interface SubmittedRuleRow {
   readonly when: string;
   readonly whenValue?: number | string | undefined;
+  /** The row's further conditions, at most `core`'s `MAX_RULE_AND` of them. Absent on most rows. */
+  readonly and?: readonly { readonly when: string; readonly whenValue?: number | string | undefined }[] | undefined;
   readonly then: string;
   readonly thenValue?: number | string | undefined;
 }

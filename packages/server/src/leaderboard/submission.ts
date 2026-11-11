@@ -39,6 +39,7 @@ import {
   isInterventionKind,
   type RuleActionId,
   type RuleConditionId,
+  MAX_RULE_AND,
   type RuleRowConfig,
   type RunInterventionConfig,
   type WireIntervention,
@@ -467,6 +468,38 @@ export function ruleRowIssues(rows: readonly RuleRowConfig[] | undefined): reado
       issues.push(`ruleRows[${index}].when "${String(row.when)}" is not a declared rule condition`);
     } else if (!valueIsDeclared(condition.values, row.whenValue)) {
       issues.push(`ruleRows[${index}].whenValue is not one of the values "${String(row.when)}" declares`);
+    }
+    /*
+     * A row's further conditions, held to the first condition's own vocabulary and to `core`'s
+     * bound on how many a row may carry. The single-run gate reads them here; a sitting's closed
+     * key list is `rushSitting.ts#RULE_ROW_KEYS`, which names `and` beside the four.
+     */
+    const extras: unknown = row.and;
+    if (extras !== undefined) {
+      if (!Array.isArray(extras) || extras.length === 0 || extras.length > MAX_RULE_AND) {
+        issues.push(`ruleRows[${index}].and must hold between 1 and ${MAX_RULE_AND} conditions`);
+      } else {
+        for (const [at, extra] of (extras as readonly unknown[]).entries()) {
+          if (typeof extra !== 'object' || extra === null || Array.isArray(extra)) {
+            issues.push(`ruleRows[${index}].and[${at}] must be an object`);
+            continue;
+          }
+          const fields = extra as { readonly when?: unknown; readonly whenValue?: unknown };
+          const declared = RULE_CONDITION_WORDS[fields.when as RuleConditionId] as
+            | { readonly values?: readonly { readonly value: number | string }[] | undefined }
+            | undefined;
+          if (declared === undefined) {
+            issues.push(`ruleRows[${index}].and[${at}].when "${String(fields.when)}" is not a declared rule condition`);
+          } else if (!valueIsDeclared(declared.values, fields.whenValue)) {
+            issues.push(
+              `ruleRows[${index}].and[${at}].whenValue is not one of the values "${String(fields.when)}" declares`,
+            );
+          }
+        }
+        if (row.then === 'no-new-pickups') {
+          issues.push(`ruleRows[${index}].and cannot ride on "no-new-pickups", which holds for the whole run`);
+        }
+      }
     }
     const action = RULE_ACTION_WORDS[row.then as RuleActionId] as
       | { readonly values?: readonly { readonly value: number | string }[] | undefined }
