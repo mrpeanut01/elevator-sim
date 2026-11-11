@@ -1423,6 +1423,38 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A comparison, not a sentence. `sameProfile` serialises two dispatcher profiles to ' +
+        'key-sorted JSON and answers whether they are the same document; the template literals ' +
+        'the derivation found are that serialisation’s brackets. Nothing it builds is returned, ' +
+        'let alone drawn — `everyday/host.ts#workingDispatcherStatus` reads the boolean.',
+      ids: ['authoring/dispatcherShelf.ts#sameProfile'],
+    },
+    {
+      reason:
+        'The id the workshop’s working copy rides to the batch worker under, and the two ' +
+        'functions that put it on a request. It is a key, never a sentence: the arm is reported ' +
+        'under the name `testBedWorkingProfileOf` gives it, which is swept, and ' +
+        '`batch/report.ts` draws profile names and not ids on a Casual surface.',
+      ids: [
+        'everyday/testBedModel.ts#TEST_BED_WORKING_ID',
+        'everyday/testBedModel.ts#testBedProfilesOf',
+        'everyday/testBedModel.ts#testBedRequestOf',
+      ],
+    },
+    {
+      reason:
+        'A parser’s refusals, for whoever edits `data/dispatcher-families.json` by hand. Every ' +
+        'string it authors is an `Error` message thrown at module load, before any screen exists ' +
+        'to draw it; a malformed shipped file fails `authoring/dispatcherFamilies.test.ts` and the ' +
+        'build, and reaches no player. The headings and lines it returns are the file’s own and ' +
+        'are swept through `everyday/workshopModel.ts#shelfOf`.',
+      ids: [
+        'authoring/dispatcherFamilies.ts#parseDispatcherFamilies',
+        'authoring/dispatcherFamilies.ts#DISPATCHER_FAMILIES',
+      ],
+    },
+    {
+      reason:
         'The refusal sentences `provenanceLineOf` used to author itself, moved one layer down by ' +
         '`docs/16` S5 so the leaderboard’s submit path cannot grow a second copy of them. They ' +
         'reach `#status` through `copyProvenance` exactly as before, so this inherits the exclusion ' +

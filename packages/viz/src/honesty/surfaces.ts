@@ -112,20 +112,30 @@ import {
 } from '../everyday/benchModel.js';
 import {
   behaviourBlockOf,
-  carriedBlocksOf,
   constraintCardsOf,
-  libraryCardsOf,
   /* Aliased: `dev/leftRail.ts` and `dev/rightRail.ts` already export these two names. */
   mathsDisclosureOf as workshopMathsOf,
   nameplateOf as workshopNameplateOf,
-  playStyleAbsenceOf,
-  playStyleCardsOf,
+  discardQuestionOf as workshopDiscardQuestionOf,
+  removeQuestionOf as workshopRemoveQuestionOf,
+  saveBlockOf as workshopSaveBlockOf,
+  shelfOf as workshopShelfOf,
   rulesBlockOf,
   switchingBlockOf,
   termDisclosureOf,
   workshopLeversOf,
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
+import {
+  TEST_BED_COPY,
+  TEST_BED_CROWDS,
+  TEST_BED_VERDICT_WORDS,
+  testBedViewOf,
+  testBedWorkingProfileOf,
+} from '../everyday/testBedModel.js';
+import { JOURNEY_COPY, journeyOf } from '../everyday/workshopJourney.js';
+import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
+import { versionedNameOf } from '../authoring/dispatcherShelf.js';
 import {
   BRIEF_DRIVER_LOCKED,
   BRIEF_WAY_THROUGH_HEADING,
@@ -17022,24 +17032,33 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
   id: 'everyday/workshopModel.ts#WORKSHOP_COPY',
   covers: [
     'everyday/workshopModel.ts#WORKSHOP_COPY',
-    'everyday/workshopModel.ts#playStyleAbsenceOf',
+    'everyday/workshopModel.ts#shelfOf',
+    'everyday/workshopModel.ts#saveBlockOf',
+    'everyday/workshopModel.ts#removeQuestionOf',
+    'everyday/workshopModel.ts#discardQuestionOf',
+    // The names a save files — `My dispatcher`, `⟨name⟩ v2` — are read on the shelf and in every picker.
+    'authoring/dispatcherShelf.ts#versionedNameOf',
     'everyday/workshopModel.ts#termDisclosureOf',
     'everyday/workshopModel.ts#mathsDisclosureOf',
     'everyday/workshopModel.ts#behaviourBlockOf',
     'everyday/workshopModel.ts#constraintCardsOf',
-    'everyday/workshopModel.ts#carriedBlocksOf',
+    'everyday/workshopJourney.ts#JOURNEY_COPY',
+    'everyday/testBedModel.ts#TEST_BED_COPY',
+    'everyday/testBedModel.ts#TEST_BED_CROWDS',
+    'everyday/testBedModel.ts#TEST_BED_VERDICT_WORDS',
+    'everyday/testBedModel.ts#testBedVerdictWordOf',
+    'everyday/testBedModel.ts#testBedViewOf',
+    'everyday/testBedModel.ts#testBedWorkingProfileOf',
+    'everyday/workshopJourney.ts#journeyOf',
     'everyday/workshopModel.ts#switchingBlockOf',
     'everyday/workshopModel.ts#rulesBlockOf',
     'everyday/workshopModel.ts#nameplateOf',
     /*
-     * Three exports are deliberately **not** listed and are rendered anyway:
-     * `playStyleCardsOf`, `libraryCardsOf` and `workshopLeversOf`. The derivation does not find
-     * them, and it is right not to — none of them authors a phrase. The style cards carry
-     * `data/dispatcher-profiles.json`'s own `name` and `trade` (swept above, seed by seed), the
-     * library cards carry each profile's `name`, and the lever views are `mode/plainLevers.ts`'s,
-     * already driven by the editor adapter. Listing them would be a coverage claim about
-     * functions that produce no prose of their own, which is the stale-coverage half of
-     * `derive.test.ts`'s guard.
+     * `prioritiesOf` and `workshopLeversOf` are deliberately **not** listed and are rendered
+     * anyway. Neither authors a phrase: a priority bar carries `core`'s own player name for a
+     * term, and the lever views are `mode/plainLevers.ts`'s, already driven by the editor adapter.
+     * Listing them would be a coverage claim about functions that produce no prose of their own,
+     * which is the stale-coverage half of `derive.test.ts`'s guard.
      */
   ],
   render(context) {
@@ -17050,20 +17069,78 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       seeds.push({ field: `copy.${key}`, text, role: 'prose', provenance: 'authored' });
     }
 
-    /* ---- the left panel: six style cards, the rest of the shelf, the nameplate ---- */
-    for (const card of playStyleCardsOf(file, 'collective', DEFAULT_LEVERS, blankSpec([]))) {
-      seeds.push({ field: `style.${card.id}.name`, text: card.name, role: 'label', provenance: 'authored' });
-      seeds.push({ field: `style.${card.id}.trade`, text: card.trade, role: 'prose', provenance: 'authored' });
+    /* ---- the shelf: the player's own, then every industry design under its family ---- */
+    const firstProfile = file.profiles[0];
+    const shelved =
+      firstProfile === undefined
+        ? []
+        : [{ id: 'yours-1', profile: { ...firstProfile, id: 'yours-1', name: 'Morning patience' }, basedOn: firstProfile.id }];
+    for (const [state, saved] of [['empty', []], ['saved', shelved]] as const) {
+      const shelf = workshopShelfOf(file, DISPATCHER_FAMILIES, saved, firstProfile?.id ?? '');
+      seeds.push({ field: `shelf.${state}.industryHint`, text: shelf.industryHint, role: 'prose', provenance: 'authored' });
+      if (shelf.yoursEmpty !== undefined) {
+        seeds.push({ field: `shelf.${state}.yoursEmpty`, text: shelf.yoursEmpty, role: 'reason', provenance: 'authored' });
+      }
+      for (const card of shelf.yours) {
+        if (card.basedOn !== undefined) {
+          seeds.push({ field: `shelf.${state}.yours.${card.id}.basedOn`, text: `based on ${card.basedOn}`, role: 'label' });
+        }
+      }
+      for (const family of shelf.families) {
+        seeds.push({ field: `shelf.${state}.${family.id}.name`, text: family.name, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `shelf.${state}.${family.id}.line`, text: family.line, role: 'prose', provenance: 'authored' });
+        for (const card of family.cards) {
+          const at = `shelf.${state}.${family.id}.${card.profileId}`;
+          seeds.push({ field: `${at}.name`, text: card.name, role: 'label', provenance: 'authored' });
+          if (card.blurb !== undefined) {
+            seeds.push({ field: `${at}.blurb`, text: card.blurb, role: 'prose', provenance: 'authored' });
+          }
+          for (const alias of card.aliases) {
+            seeds.push({ field: `${at}.alias`, text: alias, role: 'label', provenance: 'authored' });
+          }
+          for (const variation of card.variations) {
+            seeds.push({ field: `${at}.${variation.styleId}.name`, text: variation.name, role: 'label', provenance: 'authored' });
+            seeds.push({ field: `${at}.${variation.styleId}.trade`, text: variation.trade, role: 'prose', provenance: 'authored' });
+          }
+          for (const bar of card.priorities) {
+            seeds.push({ field: `${at}.priority`, text: bar.name, role: 'label' });
+          }
+        }
+      }
     }
-    /* The refusal a build with no declared styles draws — reachable only through a file that has
-     * none, so it is manufactured here rather than left as a sentence no run has seen. */
-    const { playStyles: _styles, ...bare } = file;
-    const absence = playStyleAbsenceOf(bare);
-    if (absence !== undefined) {
-      seeds.push({ field: 'style.absent', text: absence, role: 'reason', provenance: 'authored' });
+    /* With no shelves declared the library is one unnamed shelf — manufactured, as the shipped file declares six. */
+    for (const family of workshopShelfOf(file, [], [], '').families) {
+      seeds.push({ field: `shelf.unfiled.${family.id}.name`, text: family.name, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `shelf.unfiled.${family.id}.line`, text: family.line, role: 'prose', provenance: 'authored' });
     }
-    for (const card of libraryCardsOf(file, 'collective')) {
-      seeds.push({ field: `library.${card.profileId}`, text: card.name, role: 'label', provenance: 'authored' });
+    seeds.push(
+      { field: 'shelf.removeQuestion', text: workshopRemoveQuestionOf('Morning patience'), role: 'prose', provenance: 'authored' },
+      { field: 'shelf.discardQuestion', text: workshopDiscardQuestionOf('Morning patience'), role: 'prose', provenance: 'authored' },
+    );
+
+    for (const [field, name, taken] of [
+      ['unnamed', '', []],
+      ['copy', 'Morning patience', ['Morning patience']],
+    ] as const) {
+      seeds.push({ field: `save.name.${field}`, text: versionedNameOf(name, taken), role: 'label' });
+    }
+
+    /* ---- the save block, in every state a dispatcher can stand in ---- */
+    for (const kind of ['industry', 'yours', 'gone'] as const) {
+      for (const unsaved of [false, true]) {
+        const block = workshopSaveBlockOf({
+          kind,
+          savedName: kind === 'yours' ? 'Morning patience' : undefined,
+          basedOn: kind === 'gone' ? undefined : firstProfile?.name,
+          unsaved,
+        });
+        const at = `save.${kind}.${unsaved ? 'unsaved' : 'clean'}`;
+        seeds.push({ field: `${at}.state`, text: block.state, role: 'label', provenance: 'authored' });
+        if (block.basedOn !== undefined) seeds.push({ field: `${at}.basedOn`, text: block.basedOn, role: 'label' });
+        if (block.save.replaces !== undefined) {
+          seeds.push({ field: `${at}.replaces`, text: block.save.replaces, role: 'prose', provenance: 'authored' });
+        }
+      }
     }
 
     /* ---- the ladder, once per shipped style, so every vector is swept ---- */
@@ -17120,9 +17197,6 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       for (const card of constraintCardsOf(profile)) {
         seeds.push({ field: `${label}.constraint.${card.id}`, text: `${card.name} — ${card.effect}`, role: 'reason' });
       }
-      for (const entry of carriedBlocksOf(profile)) {
-        seeds.push({ field: `${label}.carried.${entry.block}`, text: entry.words, role: 'reason', provenance: 'authored' });
-      }
     }
 
     /*
@@ -17135,10 +17209,89 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       if (!card.unnamed) continue;
       seeds.push({ field: 'constraint.unnamed', text: `${card.name} — ${card.effect}`, role: 'reason' });
     }
-    /* Every carried-block sentence, over a profile that carries all of them it can. */
+    /*
+     * ---- one call, start to finish: every stage's sentence, over every shipped profile ----
+     * Every shipped profile rather than the styled ones, because the sentences branch on settings
+     * only some designs hold — an auction, a panel, a reassignment budget, a forecast.
+     */
+    for (const text of [
+      JOURNEY_COPY.heading,
+      JOURNEY_COPY.hint,
+      JOURNEY_COPY.depthLabel,
+      ...Object.values(JOURNEY_COPY.depths),
+      ...Object.values(JOURNEY_COPY.depthNotes),
+      JOURNEY_COPY.unrunnable,
+    ]) {
+      seeds.push({ field: 'journey.copy', text, role: 'prose', provenance: 'authored' });
+    }
     for (const profile of file.profiles) {
-      for (const entry of carriedBlocksOf(profile)) {
-        seeds.push({ field: `carried.${entry.block}`, text: entry.words, role: 'reason', provenance: 'authored' });
+      for (const card of journeyOf(profile)) {
+        seeds.push({ field: `journey.${profile.id}.${card.stage}.title`, text: card.title, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `journey.${profile.id}.${card.stage}.readback`, text: card.readback, role: 'prose' });
+      }
+    }
+    /* ---- the test bed's own words; every sentence about a result is `batch/report.ts`'s, swept there ---- */
+    for (const [key, text] of Object.entries(TEST_BED_COPY)) {
+      seeds.push({ field: `testBed.copy.${key}`, text, role: 'prose', provenance: 'authored' });
+    }
+    for (const crowd of TEST_BED_CROWDS) {
+      seeds.push({ field: `testBed.crowd.${crowd.id}`, text: crowd.label, role: 'label', provenance: 'authored' });
+    }
+    for (const [key, text] of Object.entries(TEST_BED_VERDICT_WORDS)) {
+      seeds.push({ field: `testBed.verdict.${key}`, text, role: 'label', provenance: 'authored' });
+    }
+
+    /* What the dock composes itself: the line saying what ran, and the name the working copy is reported under. */
+    const bedProfile = file.profiles[0];
+    if (bedProfile !== undefined) {
+      seeds.push({
+        field: 'testBed.working.name',
+        text: testBedWorkingProfileOf(
+          {
+            spec: specFromProfile(bedProfile, bedProfile.name),
+            levers: DEFAULT_LEVERS,
+            selector: defaultSelectorSpec(selectorContextFrom(file, 900)),
+            rows: [],
+          },
+          bedProfile,
+        ).name,
+        role: 'label',
+      });
+    }
+    seeds.push({
+      field: 'testBed.ran',
+      text:
+        testBedViewOf({
+          buildingName: 'Midtown Office',
+          demandClause: 'at 2 % of population arriving per 5 minutes',
+          replications: 50,
+          crnSentence: '',
+          budgetNote: null,
+          arms: [],
+          comparisons: [{ rows: [], summary: { sentence: '' } }],
+        } as unknown as BatchReport)?.ran ?? '',
+      role: 'label',
+    });
+
+    /* The arms no shipped profile reaches, manufactured so each sentence has been rendered once. */
+    const journeyBase = file.profiles[0];
+    if (journeyBase !== undefined) {
+      const arms: readonly DispatcherProfile[] = [
+        { ...journeyBase, weights: {} },
+        { ...journeyBase, dispatch: { reassignmentPolicy: 'continuous', maxReassignmentsPerCall: 1 } },
+        { ...journeyBase, dispatch: { reassignmentPolicy: 'until-commitment', commitmentPoint: 'on-assignment' } },
+        { ...journeyBase, idle: { parkingStrategy: 'lobby' } },
+        { ...journeyBase, idle: { parkingStrategy: 'fixed-floor', parkingFloorIndex: 5 } },
+        { ...journeyBase, eligibility: { maxLoadFactorForAssignment: 0.7 } },
+        { ...journeyBase, answer: { bypassLoadThreshold: 0.8, dwellPolicy: 'adaptive' } },
+        { ...journeyBase, selection: { policy: 'fuzzy' } },
+        { ...journeyBase, selection: { policy: 'rules' }, rules: { rows: [{ when: 'shaft-out', then: 'nearest-car' }] } },
+        { ...journeyBase, engine: 'no-such-engine' },
+      ];
+      for (const [index, arm] of arms.entries()) {
+        for (const card of journeyOf(arm)) {
+          seeds.push({ field: `journey.arm${String(index)}.${card.stage}`, text: card.readback, role: 'prose' });
+        }
       }
     }
 

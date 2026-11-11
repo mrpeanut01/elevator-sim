@@ -51,8 +51,22 @@
 
 import { RULE_ACTION_WORDS, RULE_CONDITION_WORDS } from '@elevator-sim/core/browser';
 
+import type { DispatcherProfile } from '@elevator-sim/core/browser';
+
+import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
+import { batchLibraryOf, savedProfilesOf } from '../batch/library.js';
+import { batchReport, type BatchReport } from '../batch/report.js';
+import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
+import { builtProfileOf } from '../authoring/dispatcherShelf.js';
+import { applyControlEdit } from '../controls/controls.js';
+import { renderControls } from '../controls/render.js';
+import { familyValueFrom } from '../dev/dispatcherEditor.js';
+import { familyControlsViewOf, familyValuesOf, prunedFamilyMoves } from '../dev/familyControls.js';
+import { instantiateControlNode } from '../dev/parameterForm.js';
 import {
   DEFAULT_LEVERS,
+  familySpace,
+  profileFromSpec,
   specFromProfile,
   specIsDirty as dispatcherSpecIsDirty,
 } from '../authoring/dispatcherSpec.js';
@@ -74,6 +88,7 @@ import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { sideBySide } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
+import type { NameRefusal } from '../dev/dispatcherEditor.js';
 import type { EverydayHost } from './host.js';
 import type { EverydayState } from './types.js';
 import {
@@ -82,16 +97,36 @@ import {
   EVERYDAY_RADII as R,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
+import { BENCH_DEFAULT_REPLICATIONS, BENCH_REPLICATION_CHOICES, benchBudgetNoteOf } from './benchModel.js';
+import {
+  TEST_BED_COPY as TEST_BED,
+  TEST_BED_CROWDS,
+  TEST_BED_DEFAULT_CROWD,
+  testBedProfilesOf,
+  testBedRequestOf,
+  testBedViewOf,
+  testBedWorkingProfileOf,
+  type TestBedChoice,
+  type TestBedRow,
+} from './testBedModel.js';
+import {
+  JOURNEY_COPY as JOURNEY,
+  STAGE_FAMILIES,
+  WORKSHOP_DEPTHS,
+  journeyOf,
+  type JourneyStage,
+  type WorkshopDepth,
+} from './workshopJourney.js';
 import {
   behaviourBlockOf,
-  carriedBlocksOf,
   constraintCardsOf,
-  libraryCardsOf,
+  discardQuestionOf,
   mathsDisclosureOf,
   nameplateOf,
-  playStyleAbsenceOf,
-  playStyleCardsOf,
+  removeQuestionOf,
   rulesBlockOf,
+  saveBlockOf,
+  shelfOf,
   styleSelectionOf,
   switchingBlockOf,
   termDisclosureOf,
@@ -99,6 +134,7 @@ import {
   workshopReachOf,
   workshopWriteReachesRun,
   WORKSHOP_COPY as COPY,
+  type PriorityBar,
   type WorkshopReach,
   type WorkshopWrite,
 } from './workshopModel.js';
@@ -106,8 +142,33 @@ import {
 /** Which `<details>` a player has opened. Survives the redraw the DOM cannot. */
 const openDisclosures = new Set<string>();
 
-/** The last lever pressed, so `plainLeverEchoOf` has something to echo. Cleared by a style card. */
+/** The last lever pressed, so `plainLeverEchoOf` has something to echo. Cleared by opening a design. */
 let lastLeverId: string | undefined;
+
+/**
+ * Which of the workshop's two faces is drawn: the shelf, or the editor on the open dispatcher.
+ *
+ * Module-level for {@link openDisclosures}' reason — the screen redraws whole on every host
+ * notification, and the choice has to outlive the node it was made on. It also outlives an
+ * unmount, so a player who leaves to run a day comes back to the face they left.
+ */
+let view: 'shelf' | 'edit' = 'shelf';
+
+/** A question the screen has asked and is waiting on: nothing is discarded, replaced or deleted unasked. */
+type PendingQuestion =
+  | { readonly kind: 'open'; readonly key: string }
+  | { readonly kind: 'remove'; readonly id: string }
+  | { readonly kind: 'replace' };
+let pending: PendingQuestion | undefined;
+
+/** How much of each stage card is open. Remembered across redraws and mounts, as {@link view} is. */
+let depth: WorkshopDepth = 'simple';
+
+/** A family control's refused edit, drawn under its block until the next accepted one. */
+let familyRefusal: { readonly family: string; readonly reason: string } | undefined;
+
+/** Why the last save was refused, drawn under the button until the name changes or a save lands. */
+let refusal: NameRefusal | undefined;
 
 function el<K extends keyof HTMLElementTagNameMap>(
   doc: Document,
@@ -123,6 +184,8 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
 const NOTE = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;max-width:72ch`;
+/** A control inside a stage card: sunk, so the card is the object and the control is part of it. */
+const CONTROL_ROW = `border:1px solid ${C.ruleLight};border-radius:${String(R.row)}px;background:${C.cardSunk};padding:11px 13px`;
 const CARD = `border:1px solid ${C.rule};border-radius:${String(R.card)}px;background:${C.card};padding:16px 18px`;
 
 /** A `<details>` whose open state is remembered across redraws by {@link openDisclosures}. */
@@ -229,6 +292,18 @@ function mountWorkshop(
 
   const api = context.host;
 
+  /** The test bed's choices, run and result. In the mount's closure, so a redraw keeps them. */
+  const bed: {
+    choice: TestBedChoice | undefined;
+    running: boolean;
+    status: string;
+    report: BatchReport | undefined;
+    provedKey: string;
+    error: string | undefined;
+  } = { choice: undefined, running: false, status: '', report: undefined, provedKey: '', error: undefined };
+  let bedWorker: Worker | undefined;
+  let bedToken = 0;
+
   /** Write one weight, keeping every other field of the working copy. */
   function setWeight(termId: string, position: number): void {
     const spec = api.workingSpec();
@@ -249,202 +324,913 @@ function mountWorkshop(
   }
 
   /* ------------------------------------------------------------------ *
-   * The left panel — § 11.1
+   * Opening, saving and deleting — the shelf's verbs
+   * ------------------------------------------------------------------ */
+
+  /** The id the working copy was read from, or `''` when that design is gone. */
+  function openId(): string {
+    return api.editingSource()?.id ?? '';
+  }
+
+  /**
+   * Load a design into the editor and show it.
+   *
+   * The group levers are set, not inherited: a design opens as itself, with the lobby lever down
+   * unless a variation pulls it, so the last design's lever does not follow the player onto this
+   * one. `zone` is the design's own flag unless a variation says otherwise.
+   */
+  function openNow(profileId: string, styleId: string | undefined): void {
+    const file = api.dispatcherProfilesFile();
+    const picked = styleId === undefined ? undefined : styleSelectionOf(file, styleId);
+    const profile = api.dispatchers().find((entry) => entry.id === profileId);
+    if (profile === undefined) return;
+    view = 'edit';
+    pending = undefined;
+    refusal = undefined;
+    lastLeverId = undefined;
+    api.startFromDispatcher(profileId, {
+      parking: picked?.parking ?? false,
+      zone: picked?.zone ?? specFromProfile(profile, profile.name).flags.zone,
+    });
+    render();
+  }
+
+  /** Open a design, asking first when that would discard changes nobody has saved. */
+  function open(profileId: string, styleId?: string): void {
+    const key = `${profileId}/${styleId ?? ''}`;
+    if (styleId === undefined && profileId === openId()) {
+      view = 'edit';
+      pending = undefined;
+      render();
+      return;
+    }
+    if (api.workingDispatcherStatus().unsaved && !(pending?.kind === 'open' && pending.key === key)) {
+      pending = { kind: 'open', key };
+      render();
+      return;
+    }
+    openNow(profileId, styleId);
+  }
+
+  function save(mode: 'save' | 'copy'): void {
+    pending = undefined;
+    // A name refusal is drawn under the button; a held attempt's sentence is the bar's already.
+    const answer = api.saveWorkingDispatcher(mode);
+    refusal = answer === 'empty' || answer === 'taken' ? answer : undefined;
+    render();
+  }
+
+  function button(
+    className: string,
+    label: string,
+    weight: 'primary' | 'plain',
+    onPress: () => void,
+  ): HTMLButtonElement {
+    const node = el(doc, 'button', className, label);
+    node.type = 'button';
+    node.style.cssText = [
+      'cursor:pointer',
+      `border:1.5px solid ${weight === 'primary' ? C.ink : C.rule}`,
+      `background:${weight === 'primary' ? C.ink : C.card}`,
+      `color:${weight === 'primary' ? C.paper : C.ink}`,
+      `border-radius:${String(R.row)}px`,
+      'padding:7px 12px',
+      `font:600 12.5px ${TYPE.body}`,
+    ].join(';');
+    node.addEventListener('click', onPress);
+    return node;
+  }
+
+  /** A card's way into the editor. The open design's is marked, because going back to it writes nothing. */
+  function openButton(isOpen: boolean, label: string, id: string): HTMLButtonElement {
+    const node = button('everyday-workshop-open', isOpen ? COPY.keepWorking : label, 'primary', () => {
+      open(id);
+    });
+    if (isOpen) node.dataset['openNow'] = '';
+    return node;
+  }
+
+  function buttonRow(...nodes: HTMLElement[]): HTMLElement {
+    const row = el(doc, 'div');
+    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;align-items:center';
+    row.append(...nodes);
+    return row;
+  }
+
+  /** A question and its two answers, drawn in place of the control that raised it. */
+  function question(text: string, ...answers: HTMLElement[]): HTMLElement {
+    const box = el(doc, 'div', 'everyday-workshop-question');
+    box.setAttribute('role', 'alert');
+    box.style.cssText = `border:1px solid ${C.amberEdge};background:${C.amberWash};border-radius:${String(R.row)}px;padding:10px 12px;display:flex;flex-direction:column;gap:8px`;
+    const line = el(doc, 'div', undefined, text);
+    line.style.cssText = `font-size:12.5px;line-height:1.45;color:${C.inkSoft}`;
+    box.append(line, buttonRow(...answers));
+    return box;
+  }
+
+  function cancelButton(label: string): HTMLButtonElement {
+    return button('everyday-workshop-cancel', label, 'plain', () => {
+      pending = undefined;
+      render();
+    });
+  }
+
+  /** What a design weighs most, as bars. Relative within one design — see `prioritiesOf`. */
+  function priorityBars(bars: readonly PriorityBar[]): HTMLElement {
+    const grid = el(doc, 'div', 'everyday-workshop-priorities');
+    grid.style.cssText = 'display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 9px;align-items:center';
+    for (const bar of bars) {
+      const name = el(doc, 'span', undefined, bar.name);
+      name.style.cssText = `font:500 10.5px ${TYPE.mono};color:${C.label}`;
+      const track = el(doc, 'span');
+      track.style.cssText = `display:block;height:6px;border-radius:3px;background:${C.terracotta};width:${String(Math.max(6, Math.round(bar.share * 100)))}%`;
+      grid.append(name, track);
+    }
+    return grid;
+  }
+
+  function cardShell(className: string, mine: boolean, open_: boolean): HTMLElement {
+    const card = el(doc, 'article', className);
+    card.style.cssText = [
+      `border:${mine ? '1.5px dashed' : '1px solid'} ${open_ ? C.sun : mine ? C.terracotta : C.rule}`,
+      `border-radius:${String(R.card)}px`,
+      `background:${open_ ? C.amberWash : C.card}`,
+      'padding:14px 16px',
+      'display:flex',
+      'flex-direction:column',
+      'gap:9px',
+      'min-width:0',
+    ].join(';');
+    return card;
+  }
+
+  function cardHead(name: string, ...tags: (string | undefined)[]): HTMLElement {
+    const head = el(doc, 'div');
+    head.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;justify-content:space-between';
+    const title = el(doc, 'h3', undefined, name);
+    title.style.cssText = `font:600 15.5px ${TYPE.heading};margin:0`;
+    head.append(title);
+    for (const text of tags) {
+      if (text === undefined) continue;
+      const tag = el(doc, 'span', 'everyday-workshop-tag', text);
+      tag.style.cssText = `font:500 10px ${TYPE.mono};letter-spacing:.1em;color:${C.warmGrey};border:1px solid ${C.rule};border-radius:5px;padding:2px 6px;white-space:nowrap`;
+      if (text === COPY.baselineTag) tag.title = COPY.baselineHint;
+      head.append(tag);
+    }
+    return head;
+  }
+
+  function cardGrid(): HTMLElement {
+    const grid = el(doc, 'div');
+    grid.style.cssText = `display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:${String(GAP.block)}px`;
+    return grid;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The shelf — the workshop's front door
+   * ------------------------------------------------------------------ */
+
+  function drawShelf(): HTMLElement {
+    const wrap = el(doc, 'div', 'everyday-workshop-shelf');
+    wrap.style.cssText = 'min-width:0';
+    const shelf = shelfOf(api.dispatcherProfilesFile(), DISPATCHER_FAMILIES, api.savedDispatchers(), openId());
+    const openName = api.workingSpec().name;
+
+    const eyebrow = el(doc, 'div', undefined, COPY.eyebrow);
+    eyebrow.style.cssText = `font:500 10.5px ${TYPE.mono};letter-spacing:.16em;color:${C.label}`;
+    const title = el(doc, 'h1', undefined, COPY.shelfTitle);
+    title.style.cssText = `font-family:${TYPE.heading};font-size:32px;font-weight:700;letter-spacing:-.02em;margin:10px 0 0`;
+    const lede = el(doc, 'p', undefined, COPY.shelfLede);
+    lede.style.cssText = `font-size:16px;line-height:1.55;color:${C.inkSoft};margin:12px 0 0;max-width:64ch;text-wrap:pretty`;
+    wrap.append(eyebrow, title, lede);
+
+    const discard = (key: string, profileId: string, styleId?: string): HTMLElement | undefined =>
+      pending?.kind === 'open' && pending.key === key
+        ? question(
+            discardQuestionOf(openName),
+            button('everyday-workshop-discard', COPY.discardOpen, 'primary', () => {
+              openNow(profileId, styleId);
+            }),
+            cancelButton(COPY.discardCancel),
+          )
+        : undefined;
+
+    /* ---- YOURS ---- */
+    const yours = section(doc, COPY.yoursHeading, COPY.yoursHint);
+    if (shelf.yoursEmpty !== undefined) {
+      const line = el(doc, 'p', 'everyday-workshop-yours-empty', shelf.yoursEmpty);
+      line.style.cssText = NOTE;
+      yours.append(line);
+    } else {
+      const grid = cardGrid();
+      for (const card of shelf.yours) {
+        const node = cardShell('everyday-workshop-saved', true, card.open);
+        node.dataset['dispatcherId'] = card.id;
+        node.append(cardHead(card.name, card.open ? COPY.openTag : undefined));
+        if (card.basedOn !== undefined) {
+          const line = el(doc, 'div', undefined, `based on ${card.basedOn}`);
+          line.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.label}`;
+          node.append(line);
+        }
+        node.append(priorityBars(card.priorities));
+        const asked = discard(`${card.id}/`, card.id);
+        if (pending?.kind === 'remove' && pending.id === card.id) {
+          node.append(
+            question(
+              removeQuestionOf(card.name),
+              button('everyday-workshop-remove-confirm', COPY.removeConfirm, 'primary', () => {
+                pending = undefined;
+                api.deleteSavedDispatcher(card.id);
+                render();
+              }),
+              cancelButton(COPY.removeCancel),
+            ),
+          );
+        } else if (asked !== undefined) {
+          node.append(asked);
+        } else {
+          node.append(
+            buttonRow(
+              openButton(card.open, COPY.openYours, card.id),
+              button('everyday-workshop-duplicate', COPY.duplicate, 'plain', () => {
+                view = 'edit';
+                pending = undefined;
+                api.duplicateSavedDispatcher(card.id);
+                render();
+              }),
+              button('everyday-workshop-remove', COPY.remove, 'plain', () => {
+                pending = { kind: 'remove', id: card.id };
+                render();
+              }),
+            ),
+          );
+        }
+        grid.append(node);
+      }
+      yours.append(grid);
+    }
+    wrap.append(yours);
+
+    /* ---- INDUSTRY DESIGNS ---- */
+    const industry = section(doc, COPY.industryHeading, shelf.industryHint);
+    for (const family of shelf.families) {
+      const head = el(doc, 'h2', 'everyday-workshop-family', family.name);
+      head.style.cssText = `font:600 18px ${TYPE.heading};margin:${String(GAP.block)}px 0 2px`;
+      const line = el(doc, 'p', undefined, family.line);
+      line.style.cssText = `${NOTE};margin:0 0 10px`;
+      const grid = cardGrid();
+      for (const card of family.cards) {
+        const node = cardShell('everyday-workshop-industry', false, card.open);
+        node.dataset['profileId'] = card.profileId;
+        node.append(cardHead(card.name, card.tag, card.open ? COPY.openTag : undefined));
+        if (card.aliases.length > 0) {
+          const alias = el(doc, 'div', undefined, `${COPY.aliasLead} “${card.aliases.join('”, “')}”`);
+          alias.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.label}`;
+          node.append(alias);
+        }
+        if (card.blurb !== undefined) {
+          const blurb = el(doc, 'p', undefined, card.blurb);
+          blurb.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin:0`;
+          node.append(blurb);
+        }
+        node.append(priorityBars(card.priorities));
+        node.append(
+          discard(`${card.profileId}/`, card.profileId) ??
+            buttonRow(
+              openButton(card.open, COPY.openIndustry, card.profileId),
+            ),
+        );
+        for (const variation of card.variations) {
+          const box = el(doc, 'div', 'everyday-workshop-variation');
+          box.style.cssText = `border-top:1px dashed ${C.ruleLight};padding-top:9px;display:flex;flex-direction:column;gap:6px`;
+          const trade = el(doc, 'div', undefined, variation.trade);
+          trade.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45`;
+          const start = button('everyday-workshop-style', variation.name, 'plain', () => {
+            open(card.profileId, variation.styleId);
+          });
+          start.dataset['styleId'] = variation.styleId;
+          box.append(
+            discard(`${card.profileId}/${variation.styleId}`, card.profileId, variation.styleId) ??
+              buttonRow(start),
+            trade,
+          );
+          node.append(box);
+        }
+        grid.append(node);
+      }
+      industry.append(head, line, grid);
+    }
+    wrap.append(industry);
+    return wrap;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The editor's left panel — § 11.1's nameplate, with the save
    * ------------------------------------------------------------------ */
 
   function drawLeft(): HTMLElement {
     const panel = el(doc, 'aside', 'everyday-workshop-panel');
-    panel.style.cssText = `position:sticky;top:0;display:flex;flex-direction:column;gap:${String(GAP.block)}px`;
+    /*
+     * Bounded to the scrollport and scrolled inside it. A sticky box taller than its scrollport
+     * does not move, so whatever is below the fold stays there while focus lands on it — the one
+     * SC 2.4.11 finding this screen ever recorded. With the test bed's result open this panel is
+     * that tall, so it scrolls on its own rather than pinning.
+     */
+    panel.style.cssText = `position:sticky;top:0;align-self:flex-start;max-height:calc(100dvh - 120px);overflow-y:auto;display:flex;flex-direction:column;gap:${String(GAP.block)}px`;
 
-    const file = api.dispatcherProfilesFile();
-    const selection = api.selection();
     const levers = api.groupLevers();
     const spec = api.workingSpec();
+    const status = api.workingDispatcherStatus();
+    const block = saveBlockOf(status);
 
-    /* ---- the nameplate ---- */
+    panel.append(
+      button('everyday-workshop-back', COPY.backToShelf, 'plain', () => {
+        view = 'shelf';
+        pending = undefined;
+        render();
+      }),
+    );
+
+    /* ---- the name, and where this dispatcher stands ---- */
+    const plateCard = el(doc, 'div', 'everyday-workshop-nameplate');
+    plateCard.style.cssText = `${CARD};border-style:dashed;display:flex;flex-direction:column;gap:8px`;
+    const label = el(doc, 'label', undefined, COPY.nameLabel);
+    label.style.cssText = EYEBROW;
+    const name = el(doc, 'input', 'everyday-workshop-name');
+    name.type = 'text';
+    name.id = 'everyday-workshop-name';
+    label.htmlFor = name.id;
+    name.value = spec.name;
+    name.maxLength = 60;
+    name.style.cssText = `font:700 18px ${TYPE.heading};color:${C.ink};background:transparent;border:0;border-bottom:1.5px dashed ${C.rule};padding:2px 0;min-width:0;width:100%`;
+    // `change`, not `input`: this screen redraws whole on every host notification, and a redraw
+    // per keystroke would take the field's focus away mid-word.
+    name.addEventListener('change', () => {
+      refusal = undefined;
+      api.setWorkingSpec({ ...api.workingSpec(), name: name.value });
+    });
+    const state = el(doc, 'div', 'everyday-workshop-state', block.state);
+    state.style.cssText = `font:600 12.5px ${TYPE.body};color:${status.unsaved ? C.terracotta : C.inkSoft}`;
+    plateCard.append(label, name, state);
+
     /*
-     * The nameplate compares the working copy against **the profile it was read from with no
-     * group lever pulled**, which is what `DEFAULT_LEVERS` is. That makes *lobby anchor* read
-     * `levers moved 1 of 4` the moment it is pressed, and that is the honest reading rather than a
-     * rounding error: lobby anchor *is* the baseline vector with the lobby lever pulled, and a
-     * nameplate that reported zero would be describing a dispatcher the player is not running.
+     * The nameplate's derived rows compare the working copy against **the profile it was read from
+     * with no group lever pulled**, which is what `DEFAULT_LEVERS` is. A variation that pulls the
+     * lobby lever reads `levers moved 1 of 4` the moment it is opened, and that is the honest
+     * reading: it *is* the design with that lever pulled.
      */
     const source = api.editingSource();
     const plate = nameplateOf({
-      startedFrom: source?.name ?? spec.name,
+      startedFrom: status.basedOn ?? source?.name ?? spec.name,
       spec,
       levers,
       baseSpec: source === undefined ? spec : specFromProfile(source, source.name),
       baseLevers: DEFAULT_LEVERS,
       ruleRows: api.ruleRows(),
     });
-    const plateCard = el(doc, 'div', 'everyday-workshop-nameplate');
-    plateCard.style.cssText = `${CARD};border-style:dashed`;
-    if (plate.unchanged !== undefined) {
-      const line = el(doc, 'p', undefined, plate.unchanged);
-      line.style.cssText = `${NOTE};margin:0 0 10px`;
-      plateCard.append(line);
-    }
     for (const text of [plate.startedFrom, plate.leversMoved, plate.rules, plate.provedOnTheBench]) {
       const row = el(doc, 'div', undefined, text);
-      row.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey};padding:3px 0`;
+      row.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey};padding:1px 0`;
       plateCard.append(row);
     }
     panel.append(plateCard);
 
-    /* ---- START FROM A STYLE ---- */
-    const styles = section(doc, COPY.styleHeading, COPY.styleHint);
-    const absence = playStyleAbsenceOf(file);
-    if (absence !== undefined) {
-      const line = el(doc, 'p', 'everyday-workshop-style-absent', absence);
-      line.style.cssText = NOTE;
-      styles.append(line);
-    }
-    for (const card of playStyleCardsOf(file, selection.dispatcherId, levers, spec)) {
-      const button = el(doc, 'button', 'everyday-workshop-style');
-      button.type = 'button';
-      button.dataset['styleId'] = card.id;
-      button.style.cssText = [
-        'display:block',
-        'width:100%',
-        'text-align:left',
-        'cursor:pointer',
-        `border:1.5px solid ${card.selected ? C.sun : C.rule}`,
-        `border-radius:${String(R.tile)}px`,
-        `background:${card.selected ? C.amberWash : C.card}`,
-        'padding:11px 13px',
-        `margin-bottom:${String(GAP.row)}px`,
-        `font-family:${TYPE.body}`,
-        `color:${C.ink}`,
-      ].join(';');
-      const name = el(doc, 'div', undefined, card.name);
-      name.style.cssText = 'font-size:14px;font-weight:600';
-      const trade = el(doc, 'div', undefined, card.trade);
-      trade.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.45;margin-top:3px`;
-      button.append(name, trade);
-      button.addEventListener('click', () => {
-        const picked = styleSelectionOf(file, card.id);
-        if (picked === undefined) return;
-        lastLeverId = undefined;
-        api.startFromDispatcher(picked.profile.id, {
-          parking: picked.parking,
-          zone: picked.zone,
-        });
+    /* ---- the save ---- */
+    const saveCard = el(doc, 'div', 'everyday-workshop-save');
+    saveCard.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.row)}px`;
+    if (pending?.kind === 'replace' && block.save.replaces !== undefined) {
+      saveCard.append(
+        question(
+          block.save.replaces,
+          button('everyday-workshop-replace', COPY.replaceConfirm, 'primary', () => {
+            save('save');
+          }),
+          button('everyday-workshop-save-copy', COPY.saveCopy, 'plain', () => {
+            save('copy');
+          }),
+          cancelButton(COPY.discardCancel),
+        ),
+      );
+    } else {
+      const primary = button('everyday-workshop-save-primary', block.save.label, 'primary', () => {
+        if (block.save.replaces !== undefined) {
+          pending = { kind: 'replace' };
+          render();
+          return;
+        }
+        save('save');
       });
-      styles.append(button);
+      primary.disabled = !block.save.enabled;
+      if (primary.disabled) primary.style.opacity = '0.45';
+      const row = buttonRow(primary);
+      if (block.copy !== undefined) {
+        row.append(
+          button('everyday-workshop-save-copy', block.copy, 'plain', () => {
+            save('copy');
+          }),
+        );
+      }
+      if (block.revert.enabled) {
+        row.append(
+          button('everyday-workshop-revert', block.revert.label, 'plain', () => {
+            if (source !== undefined) openNow(source.id, undefined);
+          }),
+        );
+      }
+      saveCard.append(row);
     }
-    panel.append(styles);
-
-    /* ---- the rest of the shelf — § D299 § 2 ---- */
-    const library = section(doc, COPY.libraryHeading, COPY.libraryHint);
-    for (const card of libraryCardsOf(file, selection.dispatcherId)) {
-      const button = el(doc, 'button', 'everyday-workshop-library', card.name);
-      button.type = 'button';
-      button.dataset['profileId'] = card.profileId;
-      button.style.cssText = [
-        'display:block',
-        'width:100%',
-        'text-align:left',
-        'cursor:pointer',
-        `border:1px solid ${card.selected ? C.sun : C.ruleLight}`,
-        `border-radius:${String(R.row)}px`,
-        `background:${card.selected ? C.amberWash : C.cardSunk}`,
-        'padding:8px 11px',
-        'margin-bottom:6px',
-        `font:500 12.5px ${TYPE.body}`,
-        `color:${C.ink}`,
-      ].join(';');
-      button.addEventListener('click', () => {
-        lastLeverId = undefined;
-        api.startFromDispatcher(card.profileId);
-      });
-      library.append(button);
+    if (refusal !== undefined) {
+      const line = el(
+        doc,
+        'p',
+        'everyday-workshop-refusal',
+        refusal === 'empty' ? COPY.refusalEmpty : COPY.refusalTaken,
+      );
+      line.setAttribute('role', 'alert');
+      line.style.cssText = `${NOTE};margin:0;color:${C.alarm}`;
+      saveCard.append(line);
     }
-    panel.append(library);
-
-    /* ---- YOURS ---- */
-    const yours = section(doc, COPY.yoursHeading);
-    const saved = api.savedDispatchers();
-    if (saved.length === 0) {
-      const line = el(doc, 'p', 'everyday-workshop-yours-empty', COPY.yoursEmpty);
-      line.style.cssText = NOTE;
-      yours.append(line);
+    for (const text of block.notes) {
+      const line = el(doc, 'p', undefined, text);
+      line.style.cssText = `${NOTE};margin:0`;
+      saveCard.append(line);
     }
-    for (const entry of saved) {
-      const button = el(doc, 'button', 'everyday-workshop-saved', entry.profile.name);
-      button.type = 'button';
-      button.style.cssText = [
-        'display:block',
-        'width:100%',
-        'text-align:left',
-        'cursor:pointer',
-        `border:1px dashed ${C.rule}`,
-        `border-radius:${String(R.row)}px`,
-        'background:transparent',
-        'padding:8px 11px',
-        'margin-bottom:6px',
-        `font:500 12.5px ${TYPE.body}`,
-        `color:${C.ink}`,
-      ].join(';');
-      button.addEventListener('click', () => {
-        api.startFromDispatcher(entry.id);
-      });
-      yours.append(button);
-    }
-    panel.append(yours);
+    panel.append(saveCard, drawTestBed());
     return panel;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The test bed — `testBedModel.ts`, docked under the save
+   * ------------------------------------------------------------------ */
+
+  /** The working copy as the worker will run it, and the profile it was read from. */
+  function workingProfile(): DispatcherProfile {
+    return testBedWorkingProfileOf(
+      { spec: api.workingSpec(), levers: api.groupLevers(), selector: api.selectorSpec(), rows: api.ruleRows() },
+      api.editingSource(),
+    );
+  }
+
+  /** The dock's choices, defaulted the first time it is drawn and kept across redraws. */
+  function bedChoice(): TestBedChoice {
+    if (bed.choice !== undefined) return bed.choice;
+    const shipped = api.shippedBuildingIds();
+    const standing = api.selection().buildingId;
+    const source = api.editingSource();
+    // The natural rival is the design this one was made from: *did my changes help* is asked of it.
+    const basedOn = api.savedDispatchers().find((entry) => entry.id === source?.id)?.basedOn;
+    const rival = api.dispatcherById(basedOn ?? source?.id ?? '') ?? api.dispatchers()[0];
+    bed.choice = {
+      buildingId: shipped.includes(standing) ? standing : (shipped[0] ?? standing),
+      crowdId: TEST_BED_DEFAULT_CROWD,
+      rivalId: rival?.id ?? '',
+      replications: BENCH_DEFAULT_REPLICATIONS,
+    };
+    return bed.choice;
+  }
+
+  function stopBed(): void {
+    bedWorker?.terminate();
+    bedWorker = undefined;
+  }
+
+  const bedStatus = el(doc, 'p', 'everyday-workshop-bed-status');
+  bedStatus.setAttribute('role', 'status');
+  bedStatus.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+
+  /**
+   * Run the working copy against the rival.
+   *
+   * One worker, `dev/batchWorker.ts`, as the bench runs one per test. The shelf is admitted by
+   * `batchLibraryOf` before the worker starts, so a profile the engine would refuse is refused
+   * here in that function's words rather than from inside a run.
+   */
+  function prove(): void {
+    const choice = bedChoice();
+    const working = workingProfile();
+    const profiles = testBedProfilesOf(savedProfilesOf(api.savedDispatchers()), working);
+    const library = batchLibraryOf(api.dispatcherProfilesFile(), profiles);
+    stopBed();
+    bedToken += 1;
+    const token = bedToken;
+    bed.report = undefined;
+    bed.error = library.ok ? undefined : library.reason;
+    bed.running = library.ok;
+    bed.status = '';
+    bed.provedKey = JSON.stringify(working);
+    render();
+    if (!library.ok) return;
+
+    const worker = new Worker(new URL('../dev/batchWorker.ts', import.meta.url), { type: 'module' });
+    bedWorker = worker;
+    const total = choice.replications * 2;
+    worker.addEventListener('message', (event: MessageEvent) => {
+      if (token !== bedToken || !alive) return;
+      const message = event.data as BatchWorkerMessage;
+      if (message.kind === 'progress') {
+        // Written to its own node: a whole redraw per run would take focus off the dock.
+        bed.status = `${TEST_BED.running} — ${String(message.progress.completed)} of ${String(total)}`;
+        bedStatus.textContent = bed.status;
+        return;
+      }
+      bed.running = false;
+      bed.status = '';
+      if (message.kind === 'failed') bed.error = message.message;
+      else bed.report = batchReport(message.result as BatchResult);
+      stopBed();
+      render();
+    });
+    worker.addEventListener('error', (event: ErrorEvent) => {
+      if (token !== bedToken || !alive) return;
+      bed.running = false;
+      bed.error = event.message;
+      stopBed();
+      render();
+    });
+    worker.postMessage({
+      kind: 'run',
+      request: testBedRequestOf(choice, api.seed()),
+      savedProfiles: profiles,
+    } satisfies BatchWorkerRequest);
+  }
+
+  function bedSelect(
+    id: string,
+    labelText: string,
+    options: readonly { readonly value: string; readonly label: string }[],
+    value: string,
+    onPick: (next: string) => void,
+  ): HTMLElement {
+    const row = el(doc, 'div');
+    row.style.cssText = 'display:grid;grid-template-columns:86px minmax(0,1fr);gap:8px;align-items:center';
+    const label = el(doc, 'label', undefined, labelText);
+    label.style.cssText = EYEBROW;
+    const select = el(doc, 'select', 'everyday-workshop-bed-select');
+    select.id = `everyday-workshop-bed-${id}`;
+    label.htmlFor = select.id;
+    select.style.cssText = `font:500 12.5px ${TYPE.body};color:${C.ink};background:${C.card};border:1.5px solid ${C.rule};border-radius:${String(R.row)}px;padding:5px 6px;min-width:0;width:100%`;
+    for (const option of options) {
+      const node = el(doc, 'option', undefined, option.label);
+      node.value = option.value;
+      node.selected = option.value === value;
+      select.append(node);
+    }
+    select.disabled = bed.running;
+    select.addEventListener('change', () => {
+      onPick(select.value);
+      render();
+    });
+    row.append(label, select);
+    return row;
+  }
+
+  function drawTestBed(): HTMLElement {
+    const choice = bedChoice();
+    const wrap = el(doc, 'section', 'everyday-workshop-bed');
+    wrap.style.cssText = `${CARD};display:flex;flex-direction:column;gap:${String(GAP.row)}px;border-color:${C.ink}`;
+    const head = el(doc, 'h2', undefined, TEST_BED.heading);
+    head.style.cssText = `${EYEBROW};margin:0;color:${C.ink}`;
+    const hint = el(doc, 'p', undefined, TEST_BED.hint);
+    hint.style.cssText = `${NOTE};margin:0`;
+    const pick = (patch: Partial<TestBedChoice>): void => {
+      bed.choice = { ...choice, ...patch };
+    };
+    wrap.append(
+      head,
+      hint,
+      bedSelect(
+        'building',
+        TEST_BED.buildingLabel,
+        api.shippedBuildingIds().map((id) => ({ value: id, label: api.buildingById(id)?.name ?? id })),
+        choice.buildingId,
+        (next) => {
+          pick({ buildingId: next });
+        },
+      ),
+      bedSelect(
+        'crowd',
+        TEST_BED.crowdLabel,
+        TEST_BED_CROWDS.map((crowd) => ({ value: crowd.id, label: crowd.label })),
+        choice.crowdId,
+        (next) => {
+          pick({ crowdId: next });
+        },
+      ),
+      bedSelect(
+        'rival',
+        TEST_BED.rivalLabel,
+        api.dispatchers().map((profile) => ({ value: profile.id, label: profile.name })),
+        choice.rivalId,
+        (next) => {
+          pick({ rivalId: next });
+        },
+      ),
+      bedSelect(
+        'runs',
+        TEST_BED.runsLabel,
+        BENCH_REPLICATION_CHOICES.map((count) => ({ value: String(count), label: String(count) })),
+        String(choice.replications),
+        (next) => {
+          pick({ replications: Number(next) });
+        },
+      ),
+    );
+    const line = el(doc, 'p', undefined, TEST_BED.runLine);
+    line.style.cssText = `${NOTE};margin:0`;
+    wrap.append(line);
+    const budget = benchBudgetNoteOf(choice.replications);
+    if (budget !== undefined) {
+      const note = el(doc, 'p', 'everyday-workshop-bed-budget', budget);
+      note.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+      wrap.append(note);
+    }
+    wrap.append(
+      buttonRow(
+        bed.running
+          ? button('everyday-workshop-bed-stop', TEST_BED.stop, 'plain', () => {
+              bedToken += 1;
+              bed.running = false;
+              bed.status = '';
+              stopBed();
+              render();
+            })
+          : button('everyday-workshop-bed-run', TEST_BED.run, 'primary', prove),
+      ),
+    );
+    bedStatus.textContent = bed.status;
+    bedStatus.hidden = !bed.running;
+    wrap.append(bedStatus);
+
+    if (bed.error !== undefined) {
+      const failed = el(doc, 'p', 'everyday-workshop-bed-error', `${TEST_BED.failed} ${bed.error}`);
+      failed.setAttribute('role', 'alert');
+      failed.style.cssText = `${NOTE};margin:0;color:${C.alarm}`;
+      wrap.append(failed);
+    }
+    const view = bed.report === undefined ? undefined : testBedViewOf(bed.report);
+    if (view !== undefined) {
+      const result = el(doc, 'div', 'everyday-workshop-bed-result');
+      result.style.cssText = `display:flex;flex-direction:column;gap:6px;border-top:1px solid ${C.ruleLight};padding-top:10px`;
+      if (JSON.stringify(workingProfile()) !== bed.provedKey) {
+        const stale = el(doc, 'p', 'everyday-workshop-bed-stale', TEST_BED.stale);
+        stale.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+        result.append(stale);
+        result.style.opacity = '0.75';
+      }
+      const small = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey};margin:0;overflow-wrap:anywhere`;
+      const ran = el(doc, 'p', undefined, view.ran);
+      ran.style.cssText = small;
+      result.append(ran);
+      const rowNode = (row: TestBedRow, full: boolean): HTMLElement => {
+        const node = el(doc, 'div', 'everyday-workshop-bed-row');
+        node.dataset['metric'] = row.metric;
+        node.style.cssText = 'display:flex;flex-direction:column;gap:2px;min-width:0';
+        const top = el(doc, 'div');
+        top.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;justify-content:space-between';
+        const label = el(doc, 'span', undefined, row.label);
+        label.style.cssText = 'font-size:12.5px;font-weight:600';
+        const pill = el(doc, 'span', 'everyday-workshop-bed-word', row.word);
+        const tone = row.tone === 'good' ? C.moss : row.tone === 'bad' ? C.alarm : undefined;
+        pill.style.cssText =
+          `font:500 10px ${TYPE.mono};letter-spacing:.06em;border-radius:${String(R.pill)}px;padding:2px 8px;white-space:nowrap;` +
+          (tone === undefined ? `border:1px solid ${C.rule};color:${C.warmGrey}` : `background:${tone};color:${C.card}`);
+        top.append(label, pill);
+        node.append(top);
+        if (full) {
+          const sentence = el(doc, 'p', undefined, row.sentence);
+          sentence.style.cssText = `${NOTE};margin:0`;
+          const note = el(doc, 'p', undefined, row.note);
+          note.style.cssText = `${NOTE};margin:0;color:${C.label}`;
+          node.append(sentence, note);
+        }
+        return node;
+      };
+      for (const row of view.headline) result.append(rowNode(row, false));
+      const summary = el(doc, 'p', 'everyday-workshop-bed-summary', view.summary);
+      summary.style.cssText = `${NOTE};margin:4px 0 0`;
+      result.append(summary);
+      if (view.noFigure !== undefined) {
+        const hint = el(doc, 'p', 'everyday-workshop-bed-no-figure', view.noFigure);
+        hint.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+        result.append(hint);
+      }
+      const detail = disclosure(doc, 'bed-detail', TEST_BED.detailSummary);
+      detail.style.marginTop = '0';
+      for (const text of [view.crn, ...(view.budgetNote === undefined ? [] : [view.budgetNote]), ...view.arms]) {
+        const line = el(doc, 'p', undefined, text);
+        line.style.cssText = `${NOTE};margin:0 0 6px`;
+        detail.append(line);
+      }
+      for (const row of [...view.headline, ...view.rest]) {
+        const node = rowNode(row, true);
+        node.style.marginBottom = '8px';
+        detail.append(node);
+      }
+      result.append(detail);
+      wrap.append(result);
+    }
+    const watch = el(doc, 'p', undefined, TEST_BED.watchNote);
+    watch.style.cssText = `${NOTE};margin:0`;
+    wrap.append(watch);
+    return wrap;
   }
 
   /* ------------------------------------------------------------------ *
    * The column — layers 2 to 6
    * ------------------------------------------------------------------ */
 
-  function drawLevers(): HTMLElement {
-    const wrap = section(doc, COPY.leversHeading, COPY.leversHint);
+  /** One plain lever, and under it the echo of what the last press wrote. */
+  function leverNodes(id: string): HTMLElement[] {
+    const view = workshopLeversOf(api.workingSpec(), api.groupLevers()).find((lever) => lever.id === id);
+    if (view === undefined) return [];
+    const row = el(doc, 'div', 'everyday-workshop-lever');
+    row.style.cssText = `${CONTROL_ROW};display:flex;align-items:center;gap:14px`;
+    row.title = plainLeverHelp(view);
+    const text = el(doc, 'div');
+    text.style.cssText = 'min-width:0;flex:1';
+    const label = el(doc, 'div', undefined, view.label);
+    label.style.cssText = 'font-size:14px;font-weight:600';
+    const sub = el(doc, 'div', undefined, plainLeverSub(view));
+    sub.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px`;
+    text.append(label, sub);
+    if (view.serves !== undefined) {
+      const serves = el(doc, 'div', undefined, view.serves);
+      serves.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label};margin-top:3px`;
+      text.append(serves);
+    }
+    row.append(text);
+    if (view.kind === 'slider') {
+      const control = slider(doc, typeof view.value === 'number' ? view.value : 0, (next) => {
+        lastLeverId = view.id;
+        api.setPlainLever(view.id, next);
+      });
+      control.setAttribute('aria-label', view.label);
+      const figure = el(doc, 'span', undefined, String(view.value));
+      figure.style.cssText = `font:500 13px ${TYPE.mono};color:${C.terracotta};width:3ch;text-align:right`;
+      row.append(control, figure);
+    } else {
+      row.append(
+        toggle(doc, view.value === true, view.value === true ? view.atFull : view.atZero, () => {
+          lastLeverId = view.id;
+          api.setPlainLever(view.id, view.value !== true);
+        }),
+      );
+    }
+    if (lastLeverId !== view.id) return [row];
+    const echo = el(doc, 'p', 'everyday-workshop-echo', plainLeverEchoOf(view));
+    echo.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+    return [row, echo];
+  }
+
+  /** A labelled on/off row — a behaviour flag or a group lever. */
+  function switchRow(
+    className: string,
+    words: { readonly label: string; readonly hint: string; readonly help: string; readonly on: boolean },
+    onPress: () => void,
+  ): HTMLElement {
+    const row = el(doc, 'div', className);
+    row.style.cssText = `${CONTROL_ROW};display:flex;align-items:center;gap:14px`;
+    row.title = words.help;
+    const text = el(doc, 'div');
+    text.style.cssText = 'min-width:0;flex:1';
+    const label = el(doc, 'div', undefined, words.label);
+    label.style.cssText = 'font-size:14px;font-weight:600';
+    const hint = el(doc, 'div', undefined, words.hint);
+    hint.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px`;
+    text.append(label, hint);
+    row.append(text, toggle(doc, words.on, words.on ? 'on' : 'off', onPress));
+    return row;
+  }
+
+  function flagNodes(key: 'pool' | 'zone' | 'bypass'): HTMLElement[] {
+    const flag = behaviourBlockOf(api.workingSpec(), api.groupLevers()).flags.find((row) => row.key === key);
+    if (flag === undefined) return [];
+    return [
+      switchRow('everyday-workshop-flag', flag, () => {
+        setFlag(flag.key, !flag.on);
+      }),
+    ];
+  }
+
+  function groupLeverNodes(key: string): HTMLElement[] {
+    const levers = api.groupLevers();
+    const lever = behaviourBlockOf(api.workingSpec(), levers).groupLevers.find((row) => row.key === key);
+    if (lever === undefined) return [];
+    return [
+      switchRow('everyday-workshop-group-lever', lever, () => {
+        api.setGroupLevers({ ...levers, [lever.key]: !lever.on });
+      }),
+    ];
+  }
+
+  /** The filters no weight can buy past, named — drawn in the card about which cars may answer. */
+  function constraintNodes(): HTMLElement[] {
+    const constraints = constraintCardsOf(api.editingSource());
+    if (constraints.length === 0) return [];
+    const head = el(doc, 'div', undefined, COPY.constraintsHeading);
+    head.style.cssText = EYEBROW;
+    const hint = el(doc, 'p', undefined, COPY.constraintsHint);
+    hint.style.cssText = `${NOTE};margin:0`;
+    return [
+      head,
+      hint,
+      ...constraints.map((card) => {
+        const row = el(doc, 'div', 'everyday-workshop-constraint');
+        row.style.cssText = CONTROL_ROW;
+        const name = el(doc, 'div', undefined, card.name);
+        name.style.cssText = 'font-size:13.5px;font-weight:600';
+        const effect = el(doc, 'div', undefined, card.effect);
+        effect.style.cssText = `${NOTE};margin-top:2px`;
+        row.append(name, effect);
+        return row;
+      }),
+    ];
+  }
+
+  /**
+   * The schema's own controls for the families a card owns — drawn at *Detailed* and *Engineer*.
+   *
+   * These are `dev/familyControls.ts`'s blocks, generated from the dimensions `core` declares, so a
+   * control here has the range, the default and the gate an optimizer would search — and is the
+   * same control the Engineer editor draws, over the same working copy. *Engineer* adds what that
+   * editor says beside each block: the function that reads it on a real run.
+   *
+   * An edit is validated by `controls/controls.ts#applyControlEdit` before it is written, and a
+   * refused one is said under the block with the schema's own reason. Moves are pruned on the way
+   * in (`prunedFamilyMoves`), so a control put back to what the design held leaves no trace.
+   */
+  function familyNodes(stage: JourneyStage): HTMLElement[] {
+    if (depth === 'simple') return [];
     const spec = api.workingSpec();
     const levers = api.groupLevers();
-    for (const view of workshopLeversOf(spec, levers)) {
-      const row = el(doc, 'div', 'everyday-workshop-lever');
-      row.style.cssText = `${CARD};display:flex;align-items:center;gap:14px;margin-bottom:${String(GAP.row)}px`;
-      row.title = plainLeverHelp(view);
-      const text = el(doc, 'div');
-      text.style.cssText = 'min-width:0;flex:1';
-      const label = el(doc, 'div', undefined, view.label);
-      label.style.cssText = 'font-size:14px;font-weight:600';
-      const sub = el(doc, 'div', undefined, plainLeverSub(view));
-      sub.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px`;
-      text.append(label, sub);
-      if (view.serves !== undefined) {
-        const serves = el(doc, 'div', undefined, view.serves);
-        serves.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label};margin-top:3px`;
-        text.append(serves);
+    const source = api.editingSource();
+    const space = familySpace();
+    const draft = profileFromSpec(spec, { id: source?.id ?? 'draft', levers, ...(source === undefined ? {} : { base: source }) });
+    const view = familyControlsViewOf({ space, spec, levers, draft, base: source });
+    const nodes: HTMLElement[] = [];
+    for (const block of view.blocks) {
+      if (!STAGE_FAMILIES[stage].includes(block.family)) continue;
+      const box = el(doc, 'div', 'everyday-workshop-family-block');
+      box.dataset['family'] = block.family;
+      box.style.cssText = `border-top:1px dashed ${C.ruleLight};padding-top:10px;display:flex;flex-direction:column;gap:6px;min-width:0`;
+      const title = el(doc, 'div', undefined, block.title);
+      title.style.cssText = EYEBROW;
+      box.append(title);
+      if (depth === 'engineer') {
+        const caller = el(doc, 'div', 'everyday-workshop-family-caller', block.caller);
+        caller.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label};overflow-wrap:anywhere`;
+        box.append(caller);
       }
-      row.append(text);
-      if (view.kind === 'slider') {
-        const control = slider(doc, typeof view.value === 'number' ? view.value : 0, (next) => {
-          lastLeverId = view.id;
-          api.setPlainLever(view.id, next);
-        });
-        control.setAttribute('aria-label', view.label);
-        const figure = el(doc, 'span', undefined, String(view.value));
-        figure.style.cssText = `font:500 13px ${TYPE.mono};color:${C.terracotta};width:3ch;text-align:right`;
-        row.append(control, figure);
-      } else {
-        row.append(
-          toggle(doc, view.value === true, view.value === true ? view.atFull : view.atZero, () => {
-            lastLeverId = view.id;
-            api.setPlainLever(view.id, view.value !== true);
-          }),
-        );
+      const controls = instantiateControlNode(doc, renderControls(block.rows.map((row) => row.control)));
+      controls.style.minWidth = '0';
+      /*
+       * The schema renderer's markup is the Engineer shell's; these are § 19's values over it, so
+       * the block reads as part of this card. The group's legend is the schema's section key —
+       * an engine word — so it is drawn only at the depth that names things the engine's way.
+       */
+      for (const group of controls.querySelectorAll<HTMLElement>('fieldset')) {
+        group.style.cssText = `border:1px solid ${C.ruleLight};border-radius:${String(R.row)}px;background:${C.cardSunk};padding:8px 12px;margin:0;min-width:0`;
       }
-      wrap.append(row);
-      if (lastLeverId === view.id) {
-        const echo = el(doc, 'p', 'everyday-workshop-echo', plainLeverEchoOf(view));
-        echo.style.cssText = `${NOTE};margin:-4px 0 ${String(GAP.row)}px;color:${C.terracotta}`;
-        wrap.append(echo);
+      for (const legend of controls.querySelectorAll<HTMLElement>('legend')) {
+        legend.style.cssText = `font:500 10.5px ${TYPE.mono};color:${C.label};padding:0 4px`;
+        legend.hidden = depth !== 'engineer';
       }
+      box.append(controls);
+      for (const row of block.rows) {
+        if (row.overriddenBy === undefined) continue;
+        const note = el(doc, 'p', undefined, `${row.control.label} — ${row.overriddenBy}`);
+        note.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+        box.append(note);
+      }
+      if (familyRefusal?.family === block.family) {
+        const line = el(doc, 'p', 'everyday-workshop-family-refusal', familyRefusal.reason);
+        line.setAttribute('role', 'alert');
+        line.style.cssText = `${NOTE};margin:0;color:${C.alarm}`;
+        box.append(line);
+      }
+      box.addEventListener('change', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
+        const id = target.dataset['parameter'];
+        const row = block.rows.find((candidate) => candidate.control.id === id);
+        if (id === undefined || row === undefined) return;
+        const values = familyValuesOf(space, draft, spec.families);
+        const edit = applyControlEdit(space, values, id, familyValueFrom(row.control, target));
+        if (!edit.accepted) {
+          familyRefusal = { family: block.family, reason: edit.reason };
+          render();
+          return;
+        }
+        const value = edit.values.get(id);
+        if (value === undefined) return;
+        familyRefusal = undefined;
+        if (api.setWorkingSpec({ ...spec, families: prunedFamilyMoves(space, source, { ...spec.families, [id]: value }) }) !== undefined) {
+          render();
+        }
+      });
+      nodes.push(box);
     }
-    return wrap;
+    return nodes;
   }
 
   function drawTerms(): HTMLElement {
@@ -513,83 +1299,78 @@ function mountWorkshop(
     return box;
   }
 
-  function drawBehaviour(): HTMLElement {
-    const spec = api.workingSpec();
-    const levers = api.groupLevers();
-    const view = behaviourBlockOf(spec, levers);
-    const wrap = section(doc, view.heading, view.boundary);
-    for (const flag of view.flags) {
-      const row = el(doc, 'div', 'everyday-workshop-flag');
-      row.style.cssText = `${CARD};display:flex;align-items:center;gap:14px;margin-bottom:${String(GAP.row)}px`;
-      row.title = flag.help;
-      const text = el(doc, 'div');
-      text.style.cssText = 'min-width:0;flex:1';
-      const label = el(doc, 'div', undefined, flag.label);
-      label.style.cssText = 'font-size:14px;font-weight:600';
-      const hint = el(doc, 'div', undefined, flag.hint);
-      hint.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px`;
-      text.append(label, hint);
-      row.append(
-        text,
-        toggle(doc, flag.on, flag.on ? 'on' : 'off', () => {
-          setFlag(flag.key, !flag.on);
-        }),
-      );
-      wrap.append(row);
+  /** The depth switch: three ways of reading one dispatcher. */
+  function drawDepth(): HTMLElement {
+    const wrap = el(doc, 'div', 'everyday-workshop-depth');
+    wrap.style.cssText = `margin-top:${String(GAP.wide)}px;display:flex;flex-direction:column;gap:6px`;
+    const label = el(doc, 'div', undefined, JOURNEY.depthLabel);
+    label.style.cssText = EYEBROW;
+    const row = el(doc, 'div');
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', JOURNEY.depthLabel);
+    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px';
+    for (const option of WORKSHOP_DEPTHS) {
+      const pill = toggle(doc, depth === option, JOURNEY.depths[option], () => {
+        depth = option;
+        familyRefusal = undefined;
+        render();
+      });
+      pill.dataset['depth'] = option;
+      row.append(pill);
     }
-    const groupHead = el(doc, 'div', undefined, view.groupHeading);
-    groupHead.style.cssText = `${EYEBROW};margin:${String(GAP.section)}px 0 8px`;
-    wrap.append(groupHead);
-    for (const lever of view.groupLevers) {
-      const row = el(doc, 'div', 'everyday-workshop-group-lever');
-      row.style.cssText = `${CARD};display:flex;align-items:center;gap:14px;margin-bottom:${String(GAP.row)}px`;
-      row.title = lever.help;
-      const text = el(doc, 'div');
-      text.style.cssText = 'min-width:0;flex:1';
-      const label = el(doc, 'div', undefined, lever.label);
-      label.style.cssText = 'font-size:14px;font-weight:600';
-      const hint = el(doc, 'div', undefined, lever.hint);
-      hint.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px`;
-      text.append(label, hint);
-      row.append(
-        text,
-        toggle(doc, lever.on, lever.on ? 'on' : 'off', () => {
-          api.setGroupLevers({ ...levers, [lever.key]: !lever.on });
-        }),
-      );
-      wrap.append(row);
-    }
-    /* The filters the weights cannot argue with, and what this document carries and cannot draw. */
+    const note = el(doc, 'p', 'everyday-workshop-depth-note', JOURNEY.depthNotes[depth]);
+    note.style.cssText = `${NOTE};margin:0`;
+    wrap.append(label, row, note);
+    return wrap;
+  }
+
+  /**
+   * The editor: one card per stage of a call, each headed by what this dispatcher does there.
+   *
+   * Every control the page had is still here, in the card for the moment it acts on. The sentence
+   * is `workshopJourney.ts#journeyOf` over the profile a save would write, so it moves with every
+   * control on the page.
+   */
+  function drawJourney(): HTMLElement {
+    const wrap = section(doc, JOURNEY.heading, JOURNEY.hint);
     const source = api.editingSource();
-    const constraints = constraintCardsOf(source);
-    if (constraints.length > 0) {
-      const head = el(doc, 'div', undefined, COPY.constraintsHeading);
-      head.style.cssText = `${EYEBROW};margin:${String(GAP.section)}px 0 6px`;
-      const hint = el(doc, 'p', undefined, COPY.constraintsHint);
-      hint.style.cssText = `${NOTE};margin:0 0 8px`;
-      wrap.append(head, hint);
-      for (const card of constraints) {
-        const row = el(doc, 'div', 'everyday-workshop-constraint');
-        row.style.cssText = `${CARD};margin-bottom:${String(GAP.row)}px`;
-        const name = el(doc, 'div', undefined, card.name);
-        name.style.cssText = 'font-size:13.5px;font-weight:600';
-        const effect = el(doc, 'div', undefined, card.effect);
-        effect.style.cssText = `${NOTE};margin-top:2px`;
-        row.append(name, effect);
-        wrap.append(row);
+    const built = builtProfileOf(
+      { spec: api.workingSpec(), levers: api.groupLevers(), selector: api.selectorSpec(), rows: api.ruleRows() },
+      source?.id ?? 'draft',
+      source,
+    );
+    const boundary = el(doc, 'p', 'everyday-workshop-boundary', COPY.zoningBoundary);
+    boundary.style.cssText = `${NOTE};margin:0`;
+    const body: Readonly<Record<JourneyStage, () => HTMLElement[]>> = {
+      calling: () => flagNodes('pool'),
+      eligible: () => constraintNodes(),
+      priorities: () => [...leverNodes('patience'), ...leverNodes('room'), drawTerms(), drawMaths()],
+      deciding: () => [...leverNodes('spread'), ...groupLeverNodes('express'), boundary],
+      rethinking: () => [],
+      landing: () => flagNodes('bypass'),
+      idle: () => leverNodes('lobby'),
+      day: () => [drawSwitching(), drawRules()],
+    };
+    for (const card of journeyOf(built)) {
+      const node = el(doc, 'section', 'everyday-workshop-stage');
+      node.dataset['stage'] = card.stage;
+      node.style.cssText = `${CARD};display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 12px;margin-bottom:${String(GAP.block)}px`;
+      const mark = el(doc, 'div', undefined, card.mark);
+      mark.setAttribute('aria-hidden', 'true');
+      mark.style.cssText = `grid-row:1 / span 2;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:${C.ink};color:${C.paper};font:500 12px ${TYPE.mono}`;
+      const title = el(doc, 'h2', undefined, card.title);
+      title.style.cssText = `font:600 16.5px ${TYPE.heading};margin:0;align-self:center`;
+      const readback = el(doc, 'p', 'everyday-workshop-readback-stage', card.readback);
+      readback.style.cssText = `font-size:13.5px;line-height:1.5;color:${C.inkSoft};margin:0;max-width:68ch`;
+      const controls = el(doc, 'div');
+      controls.style.cssText = `grid-column:2;display:flex;flex-direction:column;gap:${String(GAP.row)}px;min-width:0`;
+      controls.append(...body[card.stage](), ...familyNodes(card.stage));
+      node.append(mark, title, readback);
+      if (controls.childElementCount > 0) {
+        controls.style.marginTop = '8px';
+        node.append(controls);
       }
-    }
-    const carried = carriedBlocksOf(source);
-    if (carried.length > 0) {
-      const head = el(doc, 'div', undefined, COPY.carriedHeading);
-      head.style.cssText = `${EYEBROW};margin:${String(GAP.section)}px 0 6px`;
-      const hint = el(doc, 'p', undefined, COPY.carriedHint);
-      hint.style.cssText = `${NOTE};margin:0 0 8px`;
-      wrap.append(head, hint);
-      const list = el(doc, 'ul', 'everyday-workshop-carried');
-      list.style.cssText = `margin:0;padding-left:18px;${NOTE}`;
-      for (const entry of carried) list.append(el(doc, 'li', undefined, entry.words));
-      wrap.append(list);
+      wrap.append(node);
     }
     return wrap;
   }
@@ -848,6 +1629,23 @@ function mountWorkshop(
   function render(): void {
     if (!alive) return;
     root.replaceChildren();
+    // `sideBySide` writes the row onto the root on every editor draw, so the shelf resets it.
+    root.style.cssText = 'display:flex;flex-direction:column;min-width:0';
+    if (view === 'shelf') {
+      root.append(drawShelf());
+      /*
+       * § D1360 on the shelf: opening another design, duplicating and deleting each change who
+       * drives, and each is refused while the attempt stands — so they are drawn disabled. Going
+       * back to the design already open writes nothing and stays live.
+       */
+      if (api.attemptHold() !== undefined) {
+        for (const control of root.querySelectorAll<HTMLButtonElement>('button')) {
+          control.disabled = !control.matches('.everyday-workshop-open[data-open-now]');
+        }
+      }
+      context.refreshBar();
+      return;
+    }
     const left = drawLeft();
     root.append(left);
 
@@ -872,11 +1670,7 @@ function mountWorkshop(
       line.style.cssText = `${NOTE};margin:12px 0 0;max-width:64ch;color:${C.ink}`;
       column.append(line);
     }
-    column.append(drawLevers());
-    const optimising = section(doc, COPY.optimisingHeading);
-    optimising.append(drawTerms(), drawMaths());
-    column.append(optimising);
-    column.append(drawBehaviour(), drawSwitching(), drawRules());
+    column.append(drawDepth(), drawJourney());
     root.append(column);
     sideBySide(root, { fixed: left, fluid: column, fixedPx: WORKSHOP_RAIL_PX, gapPx: GAP.wide });
     /*
@@ -888,18 +1682,28 @@ function mountWorkshop(
       for (const control of root.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement>(
         'input, button, select, textarea',
       )) {
-        control.disabled = true;
+        // The way back to the shelf is not a write.
+        // Neither is running the test bed: it changes nothing the attempt runs on.
+        control.disabled =
+          !control.matches('.everyday-workshop-back') && control.closest('.everyday-workshop-bed') === null;
       }
     }
     context.refreshBar();
   }
 
+  // Somebody with work in hand is taken back to it; everybody else meets the shelf.
+  const arriving = api.workingDispatcherStatus();
+  if (arriving.kind === 'yours' || arriving.unsaved) view = 'edit';
+  pending = undefined;
+  refusal = undefined;
   render();
   const stop = api.subscribe(render);
 
   return {
     unmount: () => {
       alive = false;
+      bedToken += 1;
+      stopBed();
       stop();
     },
     /*
