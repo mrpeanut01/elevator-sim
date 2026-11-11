@@ -199,12 +199,12 @@ const MARGIN_BOTTOM = 14;
 
 function geometryOf(plan: TowerPlan, layout: TowerLayout): Geometry {
   const lowest = planLowestFloor(plan);
-  const rows = plan.floors - lowest + 1;
-  const floor = Math.max(5, Math.min(30, 540 / rows));
+  const storeys = plan.floors - lowest + 1;
+  const floor = Math.max(5, Math.min(30, 540 / storeys));
   const bay = Math.max(16, Math.min(50, 620 / layout.width));
   return {
     width: GUTTER_LEFT + layout.width * bay + GUTTER_RIGHT,
-    height: MARGIN_TOP + rows * floor + MARGIN_BOTTOM,
+    height: MARGIN_TOP + storeys * floor + MARGIN_BOTTOM,
     left: GUTTER_LEFT,
     top: MARGIN_TOP,
     bay,
