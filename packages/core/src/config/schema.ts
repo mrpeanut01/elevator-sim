@@ -1206,6 +1206,14 @@ export const dispatcherProfileSchema = z.strictObject({
   auction: auctionStageSchema.optional(),
   selection: selectionStageSchema.optional(),
   rules: rulesSchema.optional(),
+  /*
+   * This dispatcher's own pattern-to-priorities entries, over the file-level map. A record, so
+   * `DISPATCHER_PROFILE_OBJECT_SECTIONS` rightly does not find it: it is not a section of
+   * tunables. Whether a key is a declared pattern and a value an authored profile is
+   * `resolveWeightSets`' refusal, for the reason the file-level map's is — one profile cannot see
+   * the library it is read against.
+   */
+  patternWeightSets: z.record(identifier, identifier).optional(),
 });
 
 /**

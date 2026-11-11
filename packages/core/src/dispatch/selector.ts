@@ -384,6 +384,7 @@ export function resolveWeightSets(
   source: WeightSetSource | undefined,
   selection: ResolvedSelection,
   profileId: string,
+  ownWeightSets: Readonly<Record<string, string>> = {},
 ): ResolvedWeightSets | undefined {
   if (selection.policy === 'off') return undefined;
   if (source === undefined) {
@@ -392,7 +393,20 @@ export function resolveWeightSets(
     );
   }
 
-  const { patternDetector: detector, weightSetsByPattern } = source.patternSwitching;
+  const { patternDetector: detector, weightSetsByPattern: shared } = source.patternSwitching;
+  /*
+   * The profile's own entries over the file's — `DispatcherProfile.patternWeightSets`. An
+   * entry for a pattern the detector does not declare is refused rather than merged: the loop
+   * below walks `detector.patterns`, so it would be carried and read by nothing, and the profile
+   * would say it does something under traffic the detector can never report.
+   */
+  for (const patternId of Object.keys(ownWeightSets)) {
+    if (detector.patterns.includes(patternId)) continue;
+    throw new DispatchError(
+      `Dispatcher "${profileId}" names priorities for pattern "${patternId}" in patternWeightSets, and the detector declares no such pattern. Declared: ${detector.patterns.join(', ')}. An entry for traffic the detector cannot report is read by nothing.`,
+    );
+  }
+  const weightSetsByPattern: Readonly<Record<string, string>> = { ...shared, ...ownWeightSets };
   for (const input of detector.inputs) {
     if (isSelectorInput(input)) continue;
     throw new DispatchError(

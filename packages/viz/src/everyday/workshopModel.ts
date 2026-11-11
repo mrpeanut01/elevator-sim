@@ -204,7 +204,8 @@ export const WORKSHOP_COPY = Object.freeze({
   switchingHeading: 'TRAFFIC-PATTERN SWITCHING',
   switchingHint:
     'The one thing that can change mid-shift: whether the dispatcher may notice the traffic has ' +
-    'turned over and swap what it is optimising for.',
+    'turned over and swap what it is optimising for. Which design it swaps to for each kind of ' +
+    'traffic is this dispatcher’s own choice, and is saved with it.',
   rulesHeading: 'ADVANCED: WRITE YOUR OWN RULES',
   rulesHint:
     'Read top to bottom, first match wins. A row can ask for more than one thing at once with ' +

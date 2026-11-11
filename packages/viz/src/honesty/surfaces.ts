@@ -17298,6 +17298,7 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
             rows: [],
           },
           bedProfile,
+          selectorContextFrom(file, 900),
         ).name,
         role: 'label',
       });
@@ -17329,6 +17330,8 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
         { ...journeyBase, eligibility: { maxLoadFactorForAssignment: 0.7 } },
         { ...journeyBase, answer: { bypassLoadThreshold: 0.8, dwellPolicy: 'adaptive' } },
         { ...journeyBase, selection: { policy: 'fuzzy' } },
+        { ...journeyBase, selection: { policy: 'fuzzy' }, patternWeightSets: { 'up-peak': journeyBase.id } },
+        { ...journeyBase, selection: { policy: 'fuzzy' }, patternWeightSets: { 'up-peak': journeyBase.id, idle: journeyBase.id } },
         { ...journeyBase, selection: { policy: 'rules' }, rules: { rows: [{ when: 'shaft-out', then: 'nearest-car' }] } },
         { ...journeyBase, engine: 'no-such-engine' },
       ];

@@ -771,6 +771,7 @@ function mountWorkshop(
     return testBedWorkingProfileOf(
       { spec: api.workingSpec(), levers: api.groupLevers(), selector: api.selectorSpec(), rows: api.ruleRows() },
       api.editingSource(),
+      api.selectorContext(),
     );
   }
 
@@ -1341,6 +1342,7 @@ function mountWorkshop(
       { spec: api.workingSpec(), levers: api.groupLevers(), selector: api.selectorSpec(), rows: api.ruleRows() },
       source?.id ?? 'draft',
       source,
+      api.selectorContext(),
     );
     const boundary = el(doc, 'p', 'everyday-workshop-boundary', COPY.zoningBoundary);
     boundary.style.cssText = `${NOTE};margin:0`;

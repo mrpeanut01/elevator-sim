@@ -952,3 +952,49 @@ describe('every buildable action moves a run at a named measured cell (§ D112, 
     expect(fingerprint(runSimulation(config()))).toBe(fingerprint(runSimulation(config())));
   }, 300_000);
 });
+
+/* -------------------------------------------------------------------------- *
+ * A dispatcher's own pattern-to-priorities map, on the legs
+ * -------------------------------------------------------------------------- */
+
+describe('patternWeightSets moves a run (§ D177), and is inert where it says it is', () => {
+  const SEED = 20260726;
+
+  /** `collective` watching the traffic, with or without entries of its own. */
+  const watching = (own: Readonly<Record<string, string>> | undefined, policy = 'fuzzy'): string => {
+    const building = loaded.buildingsById.get('midtown-office');
+    const base = loaded.dispatcherProfilesById.get('collective');
+    if (building === undefined || base === undefined) throw new Error('fixture missing');
+    return legsOf(
+      runSimulation({
+        building,
+        dispatcherProfile: {
+          ...base,
+          selection: { policy },
+          ...(own === undefined ? {} : { patternWeightSets: own }),
+        } as typeof base,
+        dispatcherProfiles: loaded.dispatcherProfiles,
+        trafficProfiles: loaded.trafficProfiles,
+        elevatorSpecs: loaded.elevatorSpecs,
+        seed: SEED,
+        onTimeout: 'report',
+      }),
+    );
+  };
+
+  it('changes the legs when it names different priorities for every pattern, and not when it restates the file', () => {
+    const shared = loaded.dispatcherProfiles.patternSwitching;
+    if (shared === undefined) throw new Error('the shipped file declares no patternSwitching');
+    const filesOwn = watching(undefined);
+    expect(watching({ ...shared.weightSetsByPattern })).toBe(filesOwn);
+    const everyPattern = Object.fromEntries(
+      shared.patternDetector.patterns.map((pattern) => [pattern, 'nearest-car']),
+    );
+    expect(watching(everyPattern)).not.toBe(filesOwn);
+  }, 600_000);
+
+  it('is carried and read by nothing while the policy is off, like the six scalars beside it', () => {
+    const off = watching(undefined, 'off');
+    expect(watching({ 'up-peak': 'nearest-car' }, 'off')).toBe(off);
+  }, 600_000);
+});

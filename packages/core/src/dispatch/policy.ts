@@ -279,7 +279,12 @@ export function resolveDispatchConfig(
   const weightSets =
     selection.policy === 'rules'
       ? undefined
-      : resolveWeightSets(options.weightSets, selection, source.id);
+      : resolveWeightSets(
+          options.weightSets,
+          selection,
+          source.id,
+          source.patternWeightSets ?? {},
+        );
   const waitTimeReference = options.normalization?.waitTimeS ?? source.normalization?.waitTimeS;
   const distanceReference = options.normalization?.distanceM ?? source.normalization?.distanceM;
 

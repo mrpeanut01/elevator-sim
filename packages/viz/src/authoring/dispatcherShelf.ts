@@ -23,7 +23,7 @@ import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
 import { profileFromSpec, type DispatcherSpec, type GroupLevers } from './dispatcherSpec.js';
 import { profileWithRules, type RuleRow } from './ruleSpec.js';
-import { profileWithSelector, type SelectorSpec } from './selectorSpec.js';
+import { profileWithSelector, type SelectorContext, type SelectorSpec } from './selectorSpec.js';
 
 /** Everything the workshop holds about the dispatcher being built. */
 export interface BuiltDispatcher {
@@ -36,6 +36,9 @@ export interface BuiltDispatcher {
 /**
  * The profile a save writes.
  *
+ * `context` is the shipped file's detector and map, against which the working copy's
+ * pattern-to-priorities choices are compared: only the ones that differ are written.
+ *
  * `base` is the profile the working copy was read from, so a field no workshop control draws —
  * `auction.rounds`, a reassignment budget — survives the save instead of resetting to the
  * resolver's default (`profileFromSpec`'s own argument for the option).
@@ -44,11 +47,16 @@ export function builtProfileOf(
   built: BuiltDispatcher,
   id: string,
   base: DispatcherProfile | undefined,
+  context: SelectorContext,
 ): DispatcherProfile {
   return profileWithRules(
     profileWithSelector(
       profileFromSpec(built.spec, { id, levers: built.levers, ...(base === undefined ? {} : { base }) }),
       built.selector,
+      // With the context, so the dispatcher's own pattern-to-priorities entries are written onto
+      // it rather than left with the session's library — a save that dropped them would be a
+      // save of a different dispatcher from the one the player had been running.
+      context,
     ),
     built.rows,
   );

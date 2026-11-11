@@ -241,9 +241,15 @@ function dayOf(profile: DispatcherProfile): string {
       ? 'It follows one rule of yours, and falls back to the settings above when the rule does not fit.'
       : `It follows ${String(count)} rules of yours, first match first, and falls back to the settings above when none fits.`;
   }
-  return policy === 'off'
-    ? 'One setting, all day. It does not watch the traffic.'
-    : 'It watches the traffic and changes what it weighs when the pattern turns over.';
+  if (policy === 'off') return 'One setting, all day. It does not watch the traffic.';
+  // Its own answer to *which priorities under which traffic*, where it has one — counted off the
+  // profile a save would write, so the sentence and the save cannot disagree.
+  const own = Object.keys(profile.patternWeightSets ?? {}).length;
+  const watching = 'It watches the traffic and changes what it weighs when the pattern turns over';
+  if (own === 0) return `${watching}, the way every shipped design does.`;
+  return own === 1
+    ? `${watching}, with its own choice for one kind of traffic.`
+    : `${watching}, with its own choice for ${String(own)} kinds of traffic.`;
 }
 
 /**

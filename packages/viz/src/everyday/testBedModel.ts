@@ -31,6 +31,7 @@
 import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
 import { builtProfileOf, type BuiltDispatcher } from '../authoring/dispatcherShelf.js';
+import type { SelectorContext } from '../authoring/selectorSpec.js';
 import type { BatchReport, BatchVerdict } from '../batch/report.js';
 import type { BatchMetric, BatchRequest } from '../batch/types.js';
 
@@ -163,8 +164,9 @@ export function testBedRequestOf(choice: TestBedChoice, seed: bigint): BatchRequ
 export function testBedWorkingProfileOf(
   built: BuiltDispatcher,
   source: DispatcherProfile | undefined,
+  context: SelectorContext,
 ): DispatcherProfile {
-  const profile = builtProfileOf(built, TEST_BED_WORKING_ID, source);
+  const profile = builtProfileOf(built, TEST_BED_WORKING_ID, source, context);
   // Reported as *yours*: beside a rival that may be the design it was copied from, its own name
   // would put the same words on both arms.
   return { ...profile, name: `Yours (${profile.name})` };

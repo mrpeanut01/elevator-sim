@@ -965,14 +965,39 @@ export interface DispatcherProfile extends Commented {
    * not tolerated — under any other policy. Absent everywhere in the shipped file.
    */
   readonly rules?: ProfileRulesConfig | undefined;
+  /**
+   * **This dispatcher's own answer to *which priorities under which traffic*** — pattern id to
+   * dispatcher-profile id, laid over the file-level `patternSwitching.weightSetsByPattern`.
+   *
+   * Partial on purpose: a pattern it does not name keeps the file's entry, so a profile states
+   * only where it differs. Before this field the map was one per file, so two dispatchers that
+   * both watched the traffic could not disagree about what to do when it turned, and a saved
+   * dispatcher could not carry its own answer at all.
+   *
+   * Read under `selection.policy` `fuzzy` and `contextual`, and inactive under `off` and `rules`
+   * exactly as the six selection scalars are — carried, and read by nothing, which
+   * `selectorIssues` says beside the control.
+   * `resolveWeightSets` refuses an entry naming a pattern the detector does not declare (it
+   * would be silently ignored) or a profile that does not exist (the regime would fall back
+   * silently). A section of its own beside `rules`, and not a seventh field of `selection`,
+   * because every field of a stage section is a declared tunable (invariant 8,
+   * `parameters.test.ts`) and this is not one: it is a categorical choice per pattern over a set
+   * that is itself data, the argument that keeps `patternSwitching` out of the search space.
+   */
+  readonly patternWeightSets?: Readonly<Record<string, string>> | undefined;
 }
 
 /**
  * Stage 3's weight-set selection, as a profile authors it.
  *
- * Six scalars and no map: the arms are {@link PatternSwitchingConfig}, file-level, for the same
- * reason the cost-term library is. `dispatch/parameters.ts` declares every field here with a
- * type, a range, a default and an `activeWhen` (CLAUDE.md invariant 8).
+ * Six scalars, each declared in `dispatch/parameters.ts` with a type, a range, a default and an
+ * `activeWhen` (CLAUDE.md invariant 8).
+ *
+ * The arms and their signatures are {@link PatternSwitchingConfig}, file-level, for the same
+ * reason the cost-term library is: which traffic patterns exist and how each is recognised is a
+ * statement about the detector. **Which priorities a dispatcher runs under each pattern is a
+ * statement about the dispatcher**, and {@link DispatcherProfile.patternWeightSets} is where a
+ * profile makes it.
  */
 export interface SelectionStageConfig extends Commented {
   readonly policy?: WeightSetPolicy | undefined;

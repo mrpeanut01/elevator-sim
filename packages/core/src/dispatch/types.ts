@@ -1314,10 +1314,18 @@ export interface DispatcherProfileSource {
           | readonly {
               readonly when: RuleConditionId;
               readonly whenValue?: number | string | undefined;
+              readonly and?:
+                | readonly {
+                    readonly when: RuleConditionId;
+                    readonly whenValue?: number | string | undefined;
+                  }[]
+                | undefined;
               readonly then: RuleActionId;
               readonly thenValue?: number | string | undefined;
             }[]
           | undefined;
       }
     | undefined;
+  /** The profile's own pattern-to-priorities entries — `DispatcherProfile.patternWeightSets`. */
+  readonly patternWeightSets?: Readonly<Record<string, string>> | undefined;
 }

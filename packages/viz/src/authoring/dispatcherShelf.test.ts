@@ -36,8 +36,8 @@ describe('a save is a fixed point', () => {
   it.each(FILE.profiles.map((profile) => [profile.id, profile] as const))(
     'saving %s, reopening it and saving again writes the same document',
     (_id, shipped) => {
-      const first = builtProfileOf(reopened(shipped), 'yours-1', shipped);
-      const second = builtProfileOf(reopened(first), 'yours-1', first);
+      const first = builtProfileOf(reopened(shipped), 'yours-1', shipped, CONTEXT);
+      const second = builtProfileOf(reopened(first), 'yours-1', first, CONTEXT);
       expect(sameProfile(second, first)).toBe(true);
     },
   );
@@ -45,20 +45,44 @@ describe('a save is a fixed point', () => {
   it('sees a moved weight, a pulled lever and an added rule as a different document', () => {
     const shipped = FILE.profiles.find((profile) => profile.id === 'collective');
     if (shipped === undefined) throw new Error('data/ lost collective');
-    const saved = builtProfileOf(reopened(shipped), 'yours-1', shipped);
+    const saved = builtProfileOf(reopened(shipped), 'yours-1', shipped, CONTEXT);
     const held = reopened(saved);
 
     const weighted = { ...held, spec: { ...held.spec, weights: { ...held.spec.weights, starvation: 80 } } };
-    expect(sameProfile(builtProfileOf(weighted, 'yours-1', saved), saved)).toBe(false);
+    expect(sameProfile(builtProfileOf(weighted, 'yours-1', saved, CONTEXT), saved)).toBe(false);
 
     const parked = { ...held, levers: { ...held.levers, parking: true } };
-    expect(sameProfile(builtProfileOf(parked, 'yours-1', saved), saved)).toBe(false);
+    expect(sameProfile(builtProfileOf(parked, 'yours-1', saved, CONTEXT), saved)).toBe(false);
 
     const ruled = { ...held, rows: [defaultRuleRow()] };
-    const withRule = builtProfileOf(ruled, 'yours-1', saved);
+    const withRule = builtProfileOf(ruled, 'yours-1', saved, CONTEXT);
     expect(sameProfile(withRule, saved)).toBe(false);
     // The rule is in the saved document, which is the difference from the Engineer editor's save.
     expect(rulesFromProfile(withRule)).toHaveLength(1);
+  });
+
+  it('carries the dispatcher’s own pattern-to-priorities choices, and only where they differ from the file', () => {
+    const shipped = FILE.profiles.find((profile) => profile.id === 'collective');
+    const pattern = FILE.patternSwitching?.patternDetector.patterns[0];
+    if (shipped === undefined || pattern === undefined) throw new Error('data/ lost collective or its patterns');
+    const held = reopened(shipped);
+    // Untouched, a save writes no map: the file's own is the dispatcher's.
+    expect(builtProfileOf(held, 'yours-1', shipped, CONTEXT).patternWeightSets).toBeUndefined();
+
+    const other = FILE.profiles.find((profile) => profile.id !== held.selector.weightSetsByPattern[pattern]);
+    if (other === undefined) throw new Error('data/ ships one profile');
+    const chosen = {
+      ...held,
+      selector: {
+        ...held.selector,
+        weightSetsByPattern: { ...held.selector.weightSetsByPattern, [pattern]: other.id },
+      },
+    };
+    const saved = builtProfileOf(chosen, 'yours-1', shipped, CONTEXT);
+    expect(saved.patternWeightSets).toEqual({ [pattern]: other.id });
+    // And it comes back out on reopening, so the save is still a fixed point.
+    expect(reopened(saved).selector.weightSetsByPattern[pattern]).toBe(other.id);
+    expect(sameProfile(builtProfileOf(reopened(saved), 'yours-1', saved, CONTEXT), saved)).toBe(true);
   });
 
   it('ignores key order, which a spread does not promise', () => {
