@@ -51,7 +51,12 @@
 
 import { RULE_ACTION_WORDS, RULE_CONDITION_WORDS } from '@elevator-sim/core/browser';
 
+import type { DispatcherProfile } from '@elevator-sim/core/browser';
+
 import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
+import { batchLibraryOf, savedProfilesOf } from '../batch/library.js';
+import { batchReport, type BatchReport } from '../batch/report.js';
+import type { BatchResult, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import { builtProfileOf } from '../authoring/dispatcherShelf.js';
 import { applyControlEdit } from '../controls/controls.js';
 import { renderControls } from '../controls/render.js';
@@ -92,6 +97,18 @@ import {
   EVERYDAY_RADII as R,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
+import { BENCH_DEFAULT_REPLICATIONS, BENCH_REPLICATION_CHOICES, benchBudgetNoteOf } from './benchModel.js';
+import {
+  TEST_BED_COPY as TEST_BED,
+  TEST_BED_CROWDS,
+  TEST_BED_DEFAULT_CROWD,
+  testBedProfilesOf,
+  testBedRequestOf,
+  testBedViewOf,
+  testBedWorkingProfileOf,
+  type TestBedChoice,
+  type TestBedRow,
+} from './testBedModel.js';
 import {
   JOURNEY_COPY as JOURNEY,
   STAGE_FAMILIES,
@@ -274,6 +291,18 @@ function mountWorkshop(
   host.append(root);
 
   const api = context.host;
+
+  /** The test bed's choices, run and result. In the mount's closure, so a redraw keeps them. */
+  const bed: {
+    choice: TestBedChoice | undefined;
+    running: boolean;
+    status: string;
+    report: BatchReport | undefined;
+    provedKey: string;
+    error: string | undefined;
+  } = { choice: undefined, running: false, status: '', report: undefined, provedKey: '', error: undefined };
+  let bedWorker: Worker | undefined;
+  let bedToken = 0;
 
   /** Write one weight, keeping every other field of the working copy. */
   function setWeight(termId: string, position: number): void {
@@ -601,7 +630,13 @@ function mountWorkshop(
 
   function drawLeft(): HTMLElement {
     const panel = el(doc, 'aside', 'everyday-workshop-panel');
-    panel.style.cssText = `position:sticky;top:0;display:flex;flex-direction:column;gap:${String(GAP.block)}px`;
+    /*
+     * Bounded to the scrollport and scrolled inside it. A sticky box taller than its scrollport
+     * does not move, so whatever is below the fold stays there while focus lands on it — the one
+     * SC 2.4.11 finding this screen ever recorded. With the test bed's result open this panel is
+     * that tall, so it scrolls on its own rather than pinning.
+     */
+    panel.style.cssText = `position:sticky;top:0;align-self:flex-start;max-height:calc(100dvh - 120px);overflow-y:auto;display:flex;flex-direction:column;gap:${String(GAP.block)}px`;
 
     const levers = api.groupLevers();
     const spec = api.workingSpec();
@@ -720,8 +755,284 @@ function mountWorkshop(
       line.style.cssText = `${NOTE};margin:0`;
       saveCard.append(line);
     }
-    panel.append(saveCard);
+    panel.append(saveCard, drawTestBed());
     return panel;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The test bed — `testBedModel.ts`, docked under the save
+   * ------------------------------------------------------------------ */
+
+  /** The working copy as the worker will run it, and the profile it was read from. */
+  function workingProfile(): DispatcherProfile {
+    return testBedWorkingProfileOf(
+      { spec: api.workingSpec(), levers: api.groupLevers(), selector: api.selectorSpec(), rows: api.ruleRows() },
+      api.editingSource(),
+    );
+  }
+
+  /** The dock's choices, defaulted the first time it is drawn and kept across redraws. */
+  function bedChoice(): TestBedChoice {
+    if (bed.choice !== undefined) return bed.choice;
+    const shipped = api.shippedBuildingIds();
+    const standing = api.selection().buildingId;
+    const source = api.editingSource();
+    // The natural rival is the design this one was made from: *did my changes help* is asked of it.
+    const basedOn = api.savedDispatchers().find((entry) => entry.id === source?.id)?.basedOn;
+    const rival = api.dispatcherById(basedOn ?? source?.id ?? '') ?? api.dispatchers()[0];
+    bed.choice = {
+      buildingId: shipped.includes(standing) ? standing : (shipped[0] ?? standing),
+      crowdId: TEST_BED_DEFAULT_CROWD,
+      rivalId: rival?.id ?? '',
+      replications: BENCH_DEFAULT_REPLICATIONS,
+    };
+    return bed.choice;
+  }
+
+  function stopBed(): void {
+    bedWorker?.terminate();
+    bedWorker = undefined;
+  }
+
+  const bedStatus = el(doc, 'p', 'everyday-workshop-bed-status');
+  bedStatus.setAttribute('role', 'status');
+  bedStatus.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+
+  /**
+   * Run the working copy against the rival.
+   *
+   * One worker, `dev/batchWorker.ts`, as the bench runs one per test. The shelf is admitted by
+   * `batchLibraryOf` before the worker starts, so a profile the engine would refuse is refused
+   * here in that function's words rather than from inside a run.
+   */
+  function prove(): void {
+    const choice = bedChoice();
+    const working = workingProfile();
+    const profiles = testBedProfilesOf(savedProfilesOf(api.savedDispatchers()), working);
+    const library = batchLibraryOf(api.dispatcherProfilesFile(), profiles);
+    stopBed();
+    bedToken += 1;
+    const token = bedToken;
+    bed.report = undefined;
+    bed.error = library.ok ? undefined : library.reason;
+    bed.running = library.ok;
+    bed.status = '';
+    bed.provedKey = JSON.stringify(working);
+    render();
+    if (!library.ok) return;
+
+    const worker = new Worker(new URL('../dev/batchWorker.ts', import.meta.url), { type: 'module' });
+    bedWorker = worker;
+    const total = choice.replications * 2;
+    worker.addEventListener('message', (event: MessageEvent) => {
+      if (token !== bedToken || !alive) return;
+      const message = event.data as BatchWorkerMessage;
+      if (message.kind === 'progress') {
+        // Written to its own node: a whole redraw per run would take focus off the dock.
+        bed.status = `${TEST_BED.running} — ${String(message.progress.completed)} of ${String(total)}`;
+        bedStatus.textContent = bed.status;
+        return;
+      }
+      bed.running = false;
+      bed.status = '';
+      if (message.kind === 'failed') bed.error = message.message;
+      else bed.report = batchReport(message.result as BatchResult);
+      stopBed();
+      render();
+    });
+    worker.addEventListener('error', (event: ErrorEvent) => {
+      if (token !== bedToken || !alive) return;
+      bed.running = false;
+      bed.error = event.message;
+      stopBed();
+      render();
+    });
+    worker.postMessage({
+      kind: 'run',
+      request: testBedRequestOf(choice, api.seed()),
+      savedProfiles: profiles,
+    } satisfies BatchWorkerRequest);
+  }
+
+  function bedSelect(
+    id: string,
+    labelText: string,
+    options: readonly { readonly value: string; readonly label: string }[],
+    value: string,
+    onPick: (next: string) => void,
+  ): HTMLElement {
+    const row = el(doc, 'div');
+    row.style.cssText = 'display:grid;grid-template-columns:86px minmax(0,1fr);gap:8px;align-items:center';
+    const label = el(doc, 'label', undefined, labelText);
+    label.style.cssText = EYEBROW;
+    const select = el(doc, 'select', 'everyday-workshop-bed-select');
+    select.id = `everyday-workshop-bed-${id}`;
+    label.htmlFor = select.id;
+    select.style.cssText = `font:500 12.5px ${TYPE.body};color:${C.ink};background:${C.card};border:1.5px solid ${C.rule};border-radius:${String(R.row)}px;padding:5px 6px;min-width:0;width:100%`;
+    for (const option of options) {
+      const node = el(doc, 'option', undefined, option.label);
+      node.value = option.value;
+      node.selected = option.value === value;
+      select.append(node);
+    }
+    select.disabled = bed.running;
+    select.addEventListener('change', () => {
+      onPick(select.value);
+      render();
+    });
+    row.append(label, select);
+    return row;
+  }
+
+  function drawTestBed(): HTMLElement {
+    const choice = bedChoice();
+    const wrap = el(doc, 'section', 'everyday-workshop-bed');
+    wrap.style.cssText = `${CARD};display:flex;flex-direction:column;gap:${String(GAP.row)}px;border-color:${C.ink}`;
+    const head = el(doc, 'h2', undefined, TEST_BED.heading);
+    head.style.cssText = `${EYEBROW};margin:0;color:${C.ink}`;
+    const hint = el(doc, 'p', undefined, TEST_BED.hint);
+    hint.style.cssText = `${NOTE};margin:0`;
+    const pick = (patch: Partial<TestBedChoice>): void => {
+      bed.choice = { ...choice, ...patch };
+    };
+    wrap.append(
+      head,
+      hint,
+      bedSelect(
+        'building',
+        TEST_BED.buildingLabel,
+        api.shippedBuildingIds().map((id) => ({ value: id, label: api.buildingById(id)?.name ?? id })),
+        choice.buildingId,
+        (next) => {
+          pick({ buildingId: next });
+        },
+      ),
+      bedSelect(
+        'crowd',
+        TEST_BED.crowdLabel,
+        TEST_BED_CROWDS.map((crowd) => ({ value: crowd.id, label: crowd.label })),
+        choice.crowdId,
+        (next) => {
+          pick({ crowdId: next });
+        },
+      ),
+      bedSelect(
+        'rival',
+        TEST_BED.rivalLabel,
+        api.dispatchers().map((profile) => ({ value: profile.id, label: profile.name })),
+        choice.rivalId,
+        (next) => {
+          pick({ rivalId: next });
+        },
+      ),
+      bedSelect(
+        'runs',
+        TEST_BED.runsLabel,
+        BENCH_REPLICATION_CHOICES.map((count) => ({ value: String(count), label: String(count) })),
+        String(choice.replications),
+        (next) => {
+          pick({ replications: Number(next) });
+        },
+      ),
+    );
+    const line = el(doc, 'p', undefined, TEST_BED.runLine);
+    line.style.cssText = `${NOTE};margin:0`;
+    wrap.append(line);
+    const budget = benchBudgetNoteOf(choice.replications);
+    if (budget !== undefined) {
+      const note = el(doc, 'p', 'everyday-workshop-bed-budget', budget);
+      note.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+      wrap.append(note);
+    }
+    wrap.append(
+      buttonRow(
+        bed.running
+          ? button('everyday-workshop-bed-stop', TEST_BED.stop, 'plain', () => {
+              bedToken += 1;
+              bed.running = false;
+              bed.status = '';
+              stopBed();
+              render();
+            })
+          : button('everyday-workshop-bed-run', TEST_BED.run, 'primary', prove),
+      ),
+    );
+    bedStatus.textContent = bed.status;
+    bedStatus.hidden = !bed.running;
+    wrap.append(bedStatus);
+
+    if (bed.error !== undefined) {
+      const failed = el(doc, 'p', 'everyday-workshop-bed-error', `${TEST_BED.failed} ${bed.error}`);
+      failed.setAttribute('role', 'alert');
+      failed.style.cssText = `${NOTE};margin:0;color:${C.alarm}`;
+      wrap.append(failed);
+    }
+    const view = bed.report === undefined ? undefined : testBedViewOf(bed.report);
+    if (view !== undefined) {
+      const result = el(doc, 'div', 'everyday-workshop-bed-result');
+      result.style.cssText = `display:flex;flex-direction:column;gap:6px;border-top:1px solid ${C.ruleLight};padding-top:10px`;
+      if (JSON.stringify(workingProfile()) !== bed.provedKey) {
+        const stale = el(doc, 'p', 'everyday-workshop-bed-stale', TEST_BED.stale);
+        stale.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+        result.append(stale);
+        result.style.opacity = '0.75';
+      }
+      const small = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey};margin:0;overflow-wrap:anywhere`;
+      const ran = el(doc, 'p', undefined, view.ran);
+      ran.style.cssText = small;
+      result.append(ran);
+      const rowNode = (row: TestBedRow, full: boolean): HTMLElement => {
+        const node = el(doc, 'div', 'everyday-workshop-bed-row');
+        node.dataset['metric'] = row.metric;
+        node.style.cssText = 'display:flex;flex-direction:column;gap:2px;min-width:0';
+        const top = el(doc, 'div');
+        top.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;justify-content:space-between';
+        const label = el(doc, 'span', undefined, row.label);
+        label.style.cssText = 'font-size:12.5px;font-weight:600';
+        const pill = el(doc, 'span', 'everyday-workshop-bed-word', row.word);
+        const tone = row.tone === 'good' ? C.moss : row.tone === 'bad' ? C.alarm : undefined;
+        pill.style.cssText =
+          `font:500 10px ${TYPE.mono};letter-spacing:.06em;border-radius:${String(R.pill)}px;padding:2px 8px;white-space:nowrap;` +
+          (tone === undefined ? `border:1px solid ${C.rule};color:${C.warmGrey}` : `background:${tone};color:${C.card}`);
+        top.append(label, pill);
+        node.append(top);
+        if (full) {
+          const sentence = el(doc, 'p', undefined, row.sentence);
+          sentence.style.cssText = `${NOTE};margin:0`;
+          const note = el(doc, 'p', undefined, row.note);
+          note.style.cssText = `${NOTE};margin:0;color:${C.label}`;
+          node.append(sentence, note);
+        }
+        return node;
+      };
+      for (const row of view.headline) result.append(rowNode(row, false));
+      const summary = el(doc, 'p', 'everyday-workshop-bed-summary', view.summary);
+      summary.style.cssText = `${NOTE};margin:4px 0 0`;
+      result.append(summary);
+      if (view.noFigure !== undefined) {
+        const hint = el(doc, 'p', 'everyday-workshop-bed-no-figure', view.noFigure);
+        hint.style.cssText = `${NOTE};margin:0;color:${C.terracotta}`;
+        result.append(hint);
+      }
+      const detail = disclosure(doc, 'bed-detail', TEST_BED.detailSummary);
+      detail.style.marginTop = '0';
+      for (const text of [view.crn, ...(view.budgetNote === undefined ? [] : [view.budgetNote]), ...view.arms]) {
+        const line = el(doc, 'p', undefined, text);
+        line.style.cssText = `${NOTE};margin:0 0 6px`;
+        detail.append(line);
+      }
+      for (const row of [...view.headline, ...view.rest]) {
+        const node = rowNode(row, true);
+        node.style.marginBottom = '8px';
+        detail.append(node);
+      }
+      result.append(detail);
+      wrap.append(result);
+    }
+    const watch = el(doc, 'p', undefined, TEST_BED.watchNote);
+    watch.style.cssText = `${NOTE};margin:0`;
+    wrap.append(watch);
+    return wrap;
   }
 
   /* ------------------------------------------------------------------ *
@@ -1372,7 +1683,9 @@ function mountWorkshop(
         'input, button, select, textarea',
       )) {
         // The way back to the shelf is not a write.
-        control.disabled = !control.matches('.everyday-workshop-back');
+        // Neither is running the test bed: it changes nothing the attempt runs on.
+        control.disabled =
+          !control.matches('.everyday-workshop-back') && control.closest('.everyday-workshop-bed') === null;
       }
     }
     context.refreshBar();
@@ -1389,6 +1702,8 @@ function mountWorkshop(
   return {
     unmount: () => {
       alive = false;
+      bedToken += 1;
+      stopBed();
       stop();
     },
     /*

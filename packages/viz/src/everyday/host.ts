@@ -1211,6 +1211,13 @@ export interface EverydayHost {
    */
   tomorrowBriefing(): TomorrowBriefing | undefined;
 
+  /**
+   * The buildings this build ships, in `data/`'s order — without the player's saved ones. The
+   * workshop's test bed offers these: `dev/batchWorker.ts` loads a building by id from `data/`,
+   * so a saved tower is one it cannot run yet.
+   */
+  shippedBuildingIds(): readonly string[];
+
   /** Every building id on offer — shipped plus saved. Read-only. */
   buildingIds(): readonly string[];
 
@@ -4351,6 +4358,7 @@ export function createEverydayHost(
     resolvedBuilding: () => resolvedBuildingOf(b.resources, b.state()),
     dayAhead: () => plannedDayOf(b.resources, { ...b.state(), ...dayPatchFor(b) }),
     tomorrowBriefing: () => b.state().tomorrow,
+    shippedBuildingIds: () => allBuildingIds(b.resources, []),
     buildingIds: () => allBuildingIds(b.resources, b.state().savedBuildings),
     buildingById: (id) => buildingConfigOf(b.resources, b.state().savedBuildings, id),
     dispatchers: () => allDispatchers(b.resources, b.state().savedDispatchers),

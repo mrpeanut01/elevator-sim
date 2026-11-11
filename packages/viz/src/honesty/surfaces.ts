@@ -119,6 +119,13 @@ import {
   workshopLeversOf,
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
+import {
+  TEST_BED_COPY,
+  TEST_BED_CROWDS,
+  TEST_BED_VERDICT_WORDS,
+  testBedViewOf,
+  testBedWorkingProfileOf,
+} from '../everyday/testBedModel.js';
 import { JOURNEY_COPY, journeyOf } from '../everyday/workshopJourney.js';
 import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
 import { versionedNameOf } from '../authoring/dispatcherShelf.js';
@@ -16889,6 +16896,12 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
     'everyday/workshopModel.ts#behaviourBlockOf',
     'everyday/workshopModel.ts#constraintCardsOf',
     'everyday/workshopJourney.ts#JOURNEY_COPY',
+    'everyday/testBedModel.ts#TEST_BED_COPY',
+    'everyday/testBedModel.ts#TEST_BED_CROWDS',
+    'everyday/testBedModel.ts#TEST_BED_VERDICT_WORDS',
+    'everyday/testBedModel.ts#testBedVerdictWordOf',
+    'everyday/testBedModel.ts#testBedViewOf',
+    'everyday/testBedModel.ts#testBedWorkingProfileOf',
     'everyday/workshopJourney.ts#journeyOf',
     'everyday/workshopModel.ts#switchingBlockOf',
     'everyday/workshopModel.ts#rulesBlockOf',
@@ -17070,6 +17083,49 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
         seeds.push({ field: `journey.${profile.id}.${card.stage}.readback`, text: card.readback, role: 'prose' });
       }
     }
+    /* ---- the test bed's own words; every sentence about a result is `batch/report.ts`'s, swept there ---- */
+    for (const [key, text] of Object.entries(TEST_BED_COPY)) {
+      seeds.push({ field: `testBed.copy.${key}`, text, role: 'prose', provenance: 'authored' });
+    }
+    for (const crowd of TEST_BED_CROWDS) {
+      seeds.push({ field: `testBed.crowd.${crowd.id}`, text: crowd.label, role: 'label', provenance: 'authored' });
+    }
+    for (const [key, text] of Object.entries(TEST_BED_VERDICT_WORDS)) {
+      seeds.push({ field: `testBed.verdict.${key}`, text, role: 'label', provenance: 'authored' });
+    }
+
+    /* What the dock composes itself: the line saying what ran, and the name the working copy is reported under. */
+    const bedProfile = file.profiles[0];
+    if (bedProfile !== undefined) {
+      seeds.push({
+        field: 'testBed.working.name',
+        text: testBedWorkingProfileOf(
+          {
+            spec: specFromProfile(bedProfile, bedProfile.name),
+            levers: DEFAULT_LEVERS,
+            selector: defaultSelectorSpec(selectorContextFrom(file, 900)),
+            rows: [],
+          },
+          bedProfile,
+        ).name,
+        role: 'label',
+      });
+    }
+    seeds.push({
+      field: 'testBed.ran',
+      text:
+        testBedViewOf({
+          buildingName: 'Midtown Office',
+          demandClause: 'at 2 % of population arriving per 5 minutes',
+          replications: 50,
+          crnSentence: '',
+          budgetNote: null,
+          arms: [],
+          comparisons: [{ rows: [], summary: { sentence: '' } }],
+        } as unknown as BatchReport)?.ran ?? '',
+      role: 'label',
+    });
+
     /* The arms no shipped profile reaches, manufactured so each sentence has been rendered once. */
     const journeyBase = file.profiles[0];
     if (journeyBase !== undefined) {

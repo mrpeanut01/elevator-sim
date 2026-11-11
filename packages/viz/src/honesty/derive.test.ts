@@ -1431,6 +1431,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The id the workshop’s working copy rides to the batch worker under, and the two ' +
+        'functions that put it on a request. It is a key, never a sentence: the arm is reported ' +
+        'under the name `testBedWorkingProfileOf` gives it, which is swept, and ' +
+        '`batch/report.ts` draws profile names and not ids on a Casual surface.',
+      ids: [
+        'everyday/testBedModel.ts#TEST_BED_WORKING_ID',
+        'everyday/testBedModel.ts#testBedProfilesOf',
+        'everyday/testBedModel.ts#testBedRequestOf',
+      ],
+    },
+    {
+      reason:
         'A parser’s refusals, for whoever edits `data/dispatcher-families.json` by hand. Every ' +
         'string it authors is an `Error` message thrown at module load, before any screen exists ' +
         'to draw it; a malformed shipped file fails `authoring/dispatcherFamilies.test.ts` and the ' +

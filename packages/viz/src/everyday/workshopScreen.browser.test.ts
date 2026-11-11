@@ -404,6 +404,40 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     await page.close();
   }, 120_000);
 
+  /**
+   * The test bed, on the page: the working copy runs **unsaved** against a rival, and what comes
+   * back is the batch report's own comparison — a word per measure and never a score.
+   *
+   * Ten runs, which the dock itself says is too few to tell anything apart. That is the point of
+   * using it here: the case is about the seam, and the budget note is part of what it checks.
+   */
+  it('proves an unsaved working copy against a rival on matched runs', async () => {
+    const page = await openWorkshop();
+    await drag(page, '90');
+    await stateReads(page, 'Your copy — not saved yet');
+    // A building with enough riders to measure at the dock's default flow.
+    await page.selectOption('#everyday-workshop-bed-building', 'midtown-office');
+    await page.selectOption('#everyday-workshop-bed-runs', '10');
+    await page.waitForSelector('.everyday-workshop-bed-budget');
+    await page.click('.everyday-workshop-bed-run');
+    await page.waitForSelector('.everyday-workshop-bed-result', { timeout: 90_000 });
+
+    expect(await page.textContent('.everyday-workshop-bed-result')).toContain('10 runs');
+    const words = await page.$$eval('.everyday-workshop-bed-result > .everyday-workshop-bed-row .everyday-workshop-bed-word', (nodes) =>
+      nodes.map((node) => node.textContent ?? ''),
+    );
+    expect(words).toHaveLength(5);
+    // Energy is drawn and never ranked — § D106, on this dock as everywhere.
+    expect(words).toContain('SHOWN, NOT RANKED');
+    // Nothing was saved to run it.
+    expect(await page.textContent('.everyday-workshop-state')).toBe('Your copy — not saved yet');
+
+    // A result is about the dispatcher it ran; changing that says so.
+    await drag(page, '20');
+    await page.waitForSelector('.everyday-workshop-bed-stale');
+    await page.close();
+  }, 120_000);
+
   it('offers only the actions the model declares — the two § 11.5 omits are unbuildable', async () => {
     const page = await openWorkshop();
     await page.click('.everyday-workshop-rule-add');

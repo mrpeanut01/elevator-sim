@@ -104,6 +104,7 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   careerNotice: 'reads',
   savedDispatchers: 'reads',
   workingDispatcherStatus: 'reads',
+  shippedBuildingIds: 'reads',
   saveWorkingDispatcher: 'held',
   duplicateSavedDispatcher: 'held',
   deleteSavedDispatcher: 'held',
