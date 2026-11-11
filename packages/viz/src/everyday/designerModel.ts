@@ -721,6 +721,27 @@ export function designerWarnings(
     });
   }
 
+  /*
+   * A pair beside ordinary shafts loads and runs, and in this build it locks. Measured 2026-11-11
+   * on `zonedTowerPlan` with one shaft paired, 1 800 s, every shipped profile: under up/down
+   * buttons a rider's floor is not known until they board, so each car of the pair takes riders
+   * the other stands in the way of, and 8 of 13 profiles left riders unboarded where the same
+   * building without the pair left none. `docs/11` § 3.2 names the remedy (a sectored shaft) and
+   * says it is not built. Said once, for the shafts that are not already in a blocker above.
+   */
+  const pairedOnly = new Set(pairedOnlyGroupsOf(plan).flatMap((group) => group.shafts));
+  const mixedPairs = plan.shafts.flatMap((shaft, index) => (shaft.cars === 2 && !pairedOnly.has(index) ? [index] : []));
+  if (mixedPairs.length > 0) {
+    const labels = mixedPairs.map(shaftLabelOf).join(', ');
+    const keys = mixedPairs.map((index) => plan.shafts[index]?.key ?? '');
+    warnings.push({
+      severity: 'class',
+      text:
+        `${mixedPairs.length === 1 ? `Shaft ${labels} has` : `Shafts ${labels} have`} a pair of cars. In this build a pair locks against itself: ` +
+        'each car takes riders the other is in the way of, and in test runs riders on the group were left waiting. One car to a shaft avoids it.',
+      fix: { label: mixedPairs.length === 1 ? 'Leave one car in it' : 'Leave one car in each', apply: (current) => withCars(current, keys, 1) },
+    });
+  }
   for (const group of pairedOnlyGroupsOf(plan)) {
     const letters = groupLettersOf(group);
     const lastKey = plan.shafts[group.shafts.at(-1) ?? 0]?.key ?? '';
