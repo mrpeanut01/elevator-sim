@@ -1773,6 +1773,10 @@ function mountWorkshop(
       controls.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center';
 
       const whenSelect = el(doc, 'select', 'everyday-workshop-when');
+      // Named for a non-visual reader — WCAG SC 4.1.2, found by the editor's own sweep in
+      // `accessibilitySweep.browser.test.ts`: the words *when* and *then* beside these are sibling
+      // spans, which name nothing, so all four were announced only as *combo box*.
+      whenSelect.setAttribute('aria-label', `Condition of rule ${String(index + 1)}`);
       for (const option of view.whenOptions) {
         whenSelect.append(
           new (doc.defaultView?.Option ?? Option)(substituted(RULE_CONDITION_WORDS[option.id as keyof typeof RULE_CONDITION_WORDS], undefined), option.id),
@@ -1791,6 +1795,7 @@ function mountWorkshop(
       const whenValues = view.whenOptions.find((option) => option.id === rowView.when)?.values;
       if (whenValues !== undefined) {
         const valueSelect = el(doc, 'select', 'everyday-workshop-when-value');
+        valueSelect.setAttribute('aria-label', `Value for the condition of rule ${String(index + 1)}`);
         for (const value of whenValues) {
           valueSelect.append(
             new (doc.defaultView?.Option ?? Option)(value.label, String(value.value)),
@@ -1870,6 +1875,7 @@ function mountWorkshop(
       }
 
       const thenSelect = el(doc, 'select', 'everyday-workshop-then');
+      thenSelect.setAttribute('aria-label', `Action of rule ${String(index + 1)}`);
       for (const option of view.thenOptions) {
         thenSelect.append(
           new (doc.defaultView?.Option ?? Option)(substituted(RULE_ACTION_WORDS[option.id as keyof typeof RULE_ACTION_WORDS], undefined), option.id),
@@ -1888,6 +1894,7 @@ function mountWorkshop(
       const thenValues = view.thenOptions.find((option) => option.id === rowView.then)?.values;
       if (thenValues !== undefined) {
         const valueSelect = el(doc, 'select', 'everyday-workshop-then-value');
+        valueSelect.setAttribute('aria-label', `Value for the action of rule ${String(index + 1)}`);
         for (const value of thenValues) {
           valueSelect.append(
             new (doc.defaultView?.Option ?? Option)(value.label, String(value.value)),
