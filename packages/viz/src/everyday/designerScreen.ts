@@ -66,13 +66,24 @@ import {
   withBasements,
   withCars,
   withDecks,
+  stairsAbove,
+  stairsAreValid,
+  withAccessZoneAdded,
+  withAccessZoneRemoved,
+  withDescentSpeed,
+  withEscalatorSeconds,
   withEscalatorToggled,
+  withPanel,
+  withStairsAdded,
+  withTransportModeRemoved,
+  type PlanStairs,
   withFloors,
   withPopulation,
   withShaftAdded,
   withShaftCopied,
   withShafts,
   withShaftsRemoved,
+  withWing,
   withSkyLobbyToggled,
   withStopToggled,
   withUse,
@@ -103,6 +114,7 @@ import {
   DESIGNER_COPY as COPY,
   DESIGNER_DUTY_COPY,
   DESIGNER_KIND_COPY,
+  DESIGNER_PANEL_COPY,
   DESIGNER_PROFILE_BY_KIND,
   DESIGNER_SERVICE_COPY,
   DESIGNER_STEPS,
@@ -244,6 +256,9 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   let step: DesignerStep['id'] = 'shape';
   let pickedShafts: readonly string[] = [];
   let pickedFloors: readonly [number, number] | undefined;
+  /* What is typed and not yet committed. Kept here so a redraw does not empty a half-filled form. */
+  const stairsDraft = { upS: '', downS: '', up: '', down: '' };
+  let groupDraft = '';
   let analysis: PlanAnalysis = planAnalysisOf(plan, specs);
   let documentOpen = false;
 
@@ -527,6 +542,28 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     return input;
   }
 
+  /** A field whose text is kept in the caller's draft and commits nothing by itself. */
+  function draftField(
+    parent: HTMLElement,
+    label: string,
+    kind: 'number' | 'text',
+    value: string,
+    onInput: (next: string) => void,
+  ): HTMLInputElement {
+    const input = el(doc, 'input', 'everyday-designer-draft');
+    input.type = kind;
+    input.value = value;
+    input.dataset['k'] = `draft:${label}`;
+    input.setAttribute('aria-label', label);
+    input.placeholder = label;
+    input.style.cssText = `width:${kind === 'text' ? '100%' : '148px'};flex:${kind === 'text' ? '1 1 140px' : 'none'};box-sizing:border-box;border:1px solid ${C.rule};border-radius:${String(R.tight)}px;background:${C.paper};padding:5px 7px;font:500 12.5px ${TYPE.mono};color:${C.ink}`;
+    input.addEventListener('input', () => {
+      onInput(input.value);
+    });
+    parent.append(input);
+    return input;
+  }
+
   function inlineRow(parent: HTMLElement): HTMLDivElement {
     const row = el(doc, 'div');
     row.style.cssText = `display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:${C.warmGrey}`;
@@ -667,6 +704,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
           stroke: C.terracotta,
           'stroke-width': 2,
           'stroke-linecap': 'round',
+          /* A stair is the same stroke broken into steps: never told apart by colour alone. */
+          ...(mode.kind === 'stairs' ? { 'stroke-dasharray': '2 4' } : {}),
         }),
       );
     }
@@ -962,6 +1001,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     key(C.sky, COPY.legendSky, 0.55);
     key(GROUP_COLORS[0] ?? C.sky, COPY.legendStop, 0.85);
     key(C.terracotta, COPY.legendEscalator);
+    if (plan.transportModes.some((mode) => mode.kind === 'stairs')) key(C.terracotta, COPY.legendStairs, 0.55);
     key(C.moss, COPY.legendPeople, 0.75);
   }
 
@@ -1089,6 +1129,16 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     button(quick, 'everyday-designer-remove', COPY.removeShaft, 'remove', () => {
       edit(withShaftsRemoved(plan, keys));
     });
+    /* Only a shaft that stops below the roof is in a wing; the core is one structure. */
+    const roof = plan.shafts.reduce((best, shaft) => Math.max(best, shaft.top), 0);
+    if (chosen.every((shaft) => shaft.top < roof)) {
+      const apart = chosen.every((shaft) => (shaft.wing ?? 0) !== 0);
+      const wingRow = inlineRow(shafts);
+      button(wingRow, 'everyday-designer-wing', apart ? COPY.wingRejoin : COPY.wingApart, 'wing', () => {
+        edit(withWing(plan, keys, apart ? 0 : 1));
+      });
+      hint(shafts, COPY.wingHint);
+    }
   }
 
   function drawLiftsStep(): void {
@@ -1235,6 +1285,25 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
         },
       );
       hint(car, COPY.pressureHint);
+      if (machineClass !== undefined) {
+        fieldName(car, COPY.descentLabel);
+        chipRow(
+          car,
+          'everyday-designer-descent',
+          'descent',
+          [
+            { value: 0, label: COPY.descentSame },
+            ...speedStepsFor(machineClass)
+              .filter((value) => value < first.machine.ratedSpeedMps)
+              .map((value) => ({ value, label: speedFigure(value, unitsNow()) })),
+          ],
+          shared((shaft) => shaft.descentSpeedMps ?? 0),
+          (next) => {
+            edit(withDescentSpeed(plan, keys, next === 0 ? undefined : next));
+          },
+        );
+        hint(car, COPY.descentHint);
+      }
     }
 
     const wide = block(side, 'everyday-designer-equipment');
@@ -1376,7 +1445,105 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
         },
       );
       hint(panel, COPY.escalatorHint);
+      if (facts.escalatorSeconds !== undefined) {
+        const ride = inlineRow(panel);
+        ride.append(el(doc, 'span', undefined, COPY.escalatorSecondsLabel));
+        numberField(ride, COPY.escalatorSecondsLabel, Math.round(facts.escalatorSeconds), (next) => {
+          edit(withEscalatorSeconds(plan, low, next));
+        });
+      }
+
+      fieldName(panel, COPY.stairsLabel);
+      const stair = stairsAbove(plan, low);
+      if (stair !== undefined) {
+        const said = el(doc, 'div', 'everyday-designer-stairs-line', facts.stairs);
+        said.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey};line-height:1.5`;
+        panel.append(said);
+        const take = button(panel, 'everyday-designer-stairs-remove', COPY.stairsRemove, 'stairs-remove', () => {
+          edit(withTransportModeRemoved(plan, stair.id));
+        });
+        take.style.justifySelf = 'start';
+      } else {
+        const typed = (): PlanStairs => ({
+          upS: stairsDraft.upS.trim() === '' ? Number.NaN : Number(stairsDraft.upS),
+          downS: stairsDraft.downS.trim() === '' ? Number.NaN : Number(stairsDraft.downS),
+          up: stairsDraft.up.trim() === '' ? Number.NaN : Number(stairsDraft.up) / 100,
+          down: stairsDraft.down.trim() === '' ? Number.NaN : Number(stairsDraft.down) / 100,
+        });
+        const form = inlineRow(panel);
+        const refused = el(doc, 'div', 'everyday-designer-stairs-refused', '');
+        refused.style.cssText = `font-size:12px;color:${C.terracotta};line-height:1.45`;
+        const fields: readonly [keyof typeof stairsDraft, string][] = [
+          ['upS', COPY.stairsUpSeconds],
+          ['downS', COPY.stairsDownSeconds],
+          ['up', COPY.stairsUpShare],
+          ['down', COPY.stairsDownShare],
+        ];
+        for (const [field, label] of fields) {
+          draftField(form, label, 'number', stairsDraft[field], (next) => {
+            stairsDraft[field] = next;
+            refused.textContent = '';
+          });
+        }
+        const add = button(panel, 'everyday-designer-stairs-add', COPY.stairsAdd, 'stairs-add', () => {
+          const stairs = typed();
+          if (!stairsAreValid(stairs)) {
+            refused.textContent = COPY.stairsRefused;
+            return;
+          }
+          stairsDraft.upS = '';
+          stairsDraft.downS = '';
+          stairsDraft.up = '';
+          stairsDraft.down = '';
+          edit(withStairsAdded(plan, low, stairs));
+        });
+        add.style.justifySelf = 'start';
+        panel.append(refused);
+      }
+      hint(panel, COPY.stairsHint);
     }
+
+    fieldName(panel, COPY.panelLabel);
+    chipRow(
+      panel,
+      'everyday-designer-panel',
+      'panel',
+      (['controller', 'up-down-buttons', 'destination-entry', 'mobile-credential'] as const).map((value) => ({
+        value,
+        label: DESIGNER_PANEL_COPY[value],
+      })),
+      facts.panel,
+      (next) => {
+        edit(withPanel(plan, floors, next === 'controller' ? undefined : next));
+      },
+    );
+    hint(panel, COPY.panelHint);
+
+    fieldName(panel, COPY.accessLabel);
+    if (facts.zones.length === 0) {
+      const open = el(doc, 'div', 'everyday-designer-access-open', COPY.accessOpen);
+      open.style.cssText = `font-size:12.5px;color:${C.warmGrey}`;
+      panel.append(open);
+    }
+    for (const zone of facts.zones) {
+      const row = inlineRow(panel);
+      row.className = 'everyday-designer-access-zone';
+      row.append(el(doc, 'span', undefined, zone.line));
+      button(row, 'everyday-designer-access-lift', COPY.accessLift, `access-lift:${zone.id}`, () => {
+        edit(withAccessZoneRemoved(plan, zone.id));
+      });
+    }
+    const keepFor = inlineRow(panel);
+    draftField(keepFor, COPY.accessGroupName, 'text', groupDraft, (next) => {
+      groupDraft = next;
+    });
+    button(keepFor, 'everyday-designer-access-add', COPY.accessAdd, 'access-add', () => {
+      if (groupDraft.trim() === '') return;
+      const group = groupDraft;
+      groupDraft = '';
+      edit(withAccessZoneAdded(plan, floors, group));
+    });
+    hint(panel, COPY.accessHint);
     void autoPopulationAt;
   }
 

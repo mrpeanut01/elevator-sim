@@ -230,6 +230,14 @@ describe('the warnings, most serious first, and the fixes some of them carry', (
     const key = keyAt(SIZED, 0);
     /* Twelve floors above the lobby is thirteen landings: one is left over. */
     const decked = withDecks(SIZED, [key], 2);
+    /* One pair beside ordinary shafts is not a blocker, and is still said, with the way out. */
+    const one = withCars(SIZED, [keyAt(SIZED, 0)], 2);
+    const locked = warningsOf(one).find((warning) => warning.text.includes('a pair of cars'));
+    expect(locked?.severity).toBe('class');
+    expect(warningsOf(one).some((warning) => warning.severity === 'blocker')).toBe(false);
+    expect((locked?.fix?.apply(one) as TowerPlan).shafts.every((shaft) => shaft.cars === 1)).toBe(true);
+    expect(warningsOf(SIZED).some((warning) => warning.text.includes('a pair of cars'))).toBe(false);
+
     const unpaired = warningsOf(decked).find((warning) => warning.text.includes('double-deck'));
     expect(unpaired?.text).toContain('12 has no floor beside it');
     expect((unpaired?.fix?.apply(decked) as TowerPlan).shafts[0]?.decks).toBe(1);
