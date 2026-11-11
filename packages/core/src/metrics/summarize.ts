@@ -57,6 +57,7 @@
 import type { SimTime } from '../kernel/types.js';
 
 import { diagnoseAwtValidity } from './awtValidity.js';
+import { summarizeTransportQueues } from './transportQueue.js';
 import {
   linearTrend,
   mean as meanOf,
@@ -289,10 +290,12 @@ export function buildJourneys(records: readonly PassengerRecord[]): readonly Jou
     // the leg rather than an event, because nothing a dispatcher does can change them — but
     // dropping them would make removing a spurious lift leg look like free time saved.
     const alightedAt = last.alightedAt;
-    const isComplete = last.isFinalLeg && alightedAt !== undefined;
+    // § D1631: a rider the drain deadline cut on a closing escalator finished their lift ride and
+    // not their journey, so it has no completion instant and no time-to-destination.
+    const isComplete = last.isFinalLeg && alightedAt !== undefined && last.egressCut !== true;
     const completedAt =
       isComplete && alightedAt !== undefined
-        ? alightedAt + (last.egressTransitSeconds ?? 0)
+        ? alightedAt + (last.egressQueueSeconds ?? 0) + (last.egressTransitSeconds ?? 0)
         : undefined;
     const timeToDestinationSeconds = completedAt === undefined ? undefined : completedAt - startedAt;
     const transferSeconds =
@@ -1866,7 +1869,14 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
    * second answer to a question this line has already answered. The ground now travels beside the
    * sentence, and both come from the same table entry.
    */
+  const transportQueues = summarizeTransportQueues(
+    record.transportQueues,
+    window,
+    options.maxWaitHorizonS ?? DEFAULT_MAX_WAIT_HORIZON_S,
+  );
+
   const awtInvalidity = diagnoseAwtValidity({
+    transportQueues,
     waiting,
     saturation,
     serviceLevel,
@@ -1914,6 +1924,9 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
     ...(awtInvalidity === undefined
       ? {}
       : { awtInvalidReason: awtInvalidity.reason, awtInvalidGround: awtInvalidity.ground }),
+    // Present exactly when the record carries escalator queues (§ D1631), so a summary of a
+    // building that declares no capacity is the object it was.
+    ...(record.transportQueues === undefined ? {} : { transportQueues }),
   });
 }
 

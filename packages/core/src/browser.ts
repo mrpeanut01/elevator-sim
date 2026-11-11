@@ -349,6 +349,8 @@ export type {
   ResolvedBuilding,
   ResolvedCar,
   ShaftFootprintTable,
+  EscalatorCapacityReference,
+  EscalatorCapacityRow,
   ResolvedServiceDerateEvent,
   ResolvedServiceEvent,
   ResolvedServiceModeEvent,

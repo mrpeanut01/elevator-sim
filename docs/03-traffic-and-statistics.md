@@ -346,7 +346,9 @@ Saturation detection: test for a positive trend in queue length across the run. 
 result `SATURATED` and suppress the AWT confidence interval.
 
 **But the trend test is not the only ground, and this section used to say it was.** `RunSummary`
-carries `awtIsValid` with **four** grounds, evaluated in the order below. A run tripping more than
+carries `awtIsValid` with **four** grounds, evaluated in the order below (a fifth and a sixth
+have landed since, and each has its own paragraph: abandonment in `CLAUDE.md`, and an escalator
+that could not keep up at the end of this section). A run tripping more than
 one reports the most fundamental reason, so adding a ground never changes an existing message.
 
 | # | ground | the shape it sees |
@@ -398,6 +400,37 @@ Three things about ground 4 are deliberate:
   to, and `benchmark/saturationCensus.test.ts` re-measures all of it so none of those figures can go
   stale. **A suppression rule that fires everywhere computes nothing**; this one fires nowhere it
   should not.
+
+#### A sixth ground: an escalator that could not carry its demand
+
+`transport-saturated` ([`DECISIONS.md` § D1631](../DECISIONS.md)) fires when any escalator queue in
+the window is saturated. It can only fire on a building that declares
+`capacityPersonsPerHour`, which no shipped building does, so no existing verdict moves.
+
+It sits third, after `saturated` and `empty-window` and ahead of `abandoned`, for `abandoned`'s
+reason. A saturated escalator **meters** the lifts behind it. The riders it holds have not reached a
+lift landing, so they are in no lift queue and are not unserved legs, and lift waiting time
+**falls** as the escalator gets worse. `censored` cannot see it, because a rider who never reached
+the landing never became a leg.
+
+A queue is saturated on any of three grounds, the lift gate's own shapes:
+
+| ground | the shape it sees | why it needs no threshold, or which one it reuses |
+|---|---|---|
+| `over-capacity` | more riders joined in the window than the escalator can board in a window that long | **exact**. The server is deterministic, so a window of `T` seconds boards at most `floor(T / headway) + 1` riders |
+| `not-cleared` | a rider who joined in the window had not got through at the drain deadline | exact |
+| `starved` | a rider stood in the queue past the 900 s horizon | the horizon ground 4 already uses. A `full-run` window includes the drain tail, which dilutes the count exactly as a hump dilutes the trend test |
+
+The closed form is a test (`sim/escalatorCapacity.test.ts`): offered more than it can carry, the
+queue boards one rider per headway without a gap and grows at `arrival rate − capacity`; offered
+less, everybody gets through.
+
+**The queue wait is published beside AWT and never inside it**, on abandonment's footing
+([§ D106](../DECISIONS.md)). `RunSummary.transportQueues` has one row per direction of each
+capacity-bearing escalator: riders entered, cleared and not cleared, the most the window could
+board, utilisation, peak queue length, longest wait, and a mean wait that is **absent when the
+queue is saturated**. The wait is on time-to-destination. A rider still at an escalator at the
+drain deadline is `undelivered` with the reason `on-transport`, and the run is `timed-out`.
 
 The gate is **per-window**, which is correct — a window statistic is a statement about its window —
 but it means a `peak-5min` report cannot see a passenger starved at minute 25. Phase 8's whole-record

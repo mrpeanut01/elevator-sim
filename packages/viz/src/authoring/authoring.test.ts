@@ -39,6 +39,7 @@ import {
   canExpress,
   credentialGroupsOf,
   designMachineOf,
+  escalatorCapacityChoices,
   escalatorSecondsFor,
   floorIdOf,
   machineAt,
@@ -54,6 +55,7 @@ import {
   transportModesOf,
   unreachableFloors,
   validateSpec,
+  withTransportCapacity,
   withTransportEnd,
   withTransportSeconds,
   withZoneFloor,
@@ -1687,6 +1689,73 @@ describe('the building editor is not decoration', () => {
     expect(partsOf(slow)[0]).toStrictEqual(partsOf(ESCALATOR)[0]);
     expect((partsOf(slow)[1] as unknown[]).length).toBe((partsOf(ESCALATOR)[1] as unknown[]).length);
     expect(JSON.stringify(partsOf(slow)[1])).not.toBe(JSON.stringify(partsOf(ESCALATOR)[1]));
+  });
+
+  it('a carrying capacity changes the run on the clock, survives the round trip, and is cited or labelled', () => {
+    /*
+     * § D1631, and `docs/14 § 5` criterion 2 again: the route and the leg count are the uncapped
+     * arm's, and the leg *times* are not, because riders who reach the escalator together now
+     * step on one at a time. Lifting the limit restores the run exactly.
+     */
+    const row = escalatorCapacityChoices(SPECS.escalatorCapacity)[0];
+    if (row === undefined) throw new Error('the reference table has no 0.5 m/s row');
+    const capped: BuildingSpec = {
+      ...ESCALATOR,
+      transportModes: withTransportCapacity(ESCALATOR, 'escalator-1', row.personsPerHour),
+    };
+    expect(capped.transportModes[0]?.capacityPersonsPerHour).toBe(row.personsPerHour);
+    expect(partsOf(capped)[0]).toStrictEqual(partsOf(ESCALATOR)[0]);
+    expect((partsOf(capped)[1] as unknown[]).length).toBe((partsOf(ESCALATOR)[1] as unknown[]).length);
+    expect(JSON.stringify(partsOf(capped)[1])).not.toBe(JSON.stringify(partsOf(ESCALATOR)[1]));
+    const lifted: BuildingSpec = {
+      ...capped,
+      transportModes: withTransportCapacity(capped, 'escalator-1', undefined),
+    };
+    expect(lifted.transportModes[0]).not.toHaveProperty('capacityPersonsPerHour');
+    expect(JSON.stringify(partsOf(lifted)[1])).toBe(JSON.stringify(partsOf(ESCALATOR)[1]));
+
+    // The document: the field, and a comment that says which of three things the figure is.
+    const cited = transportModesOf(capped, SPECS.escalatorCapacity)[0];
+    expect(cited?.capacityPersonsPerHour).toBe(row.personsPerHour);
+    expect(cited?.$comment).toContain(`Carrying capacity DECLARED: ${String(row.personsPerHour)} persons per hour in EACH direction`);
+    expect(cited?.$comment).toContain('CITED as the row');
+    expect(cited?.$comment).toContain('EN 115-1 itself was not opened');
+    const byHand = transportModesOf(
+      { ...ESCALATOR, transportModes: withTransportCapacity(ESCALATOR, 'escalator-1', 1234) },
+      SPECS.escalatorCapacity,
+    )[0];
+    expect(byHand?.$comment).toContain('SET BY HAND and NOT cited: it is not a row');
+    expect(transportModesOf(capped)[0]?.$comment).toContain('NOT CHECKED against');
+    // And an escalator that declares none is written exactly as it was before the field existed.
+    const plain = transportModesOf(ESCALATOR, SPECS.escalatorCapacity)[0];
+    expect(plain).not.toHaveProperty('capacityPersonsPerHour');
+    expect(plain?.$comment).not.toContain('Carrying capacity');
+    expect(plain?.$comment).toBe(transportModesOf(ESCALATOR)[0]?.$comment);
+
+    // Round trip through a real document: the loader takes it and the spec reads it back.
+    const document = buildingFromSpec(capped, { specs: SPECS });
+    const reread = specFromBuilding(parseBuilding(document as unknown), 'capped');
+    expect(reread.transportModes[0]?.capacityPersonsPerHour).toBe(row.personsPerHour);
+  });
+
+  it('refuses a capacity on a stair, and a figure that is not a positive number', () => {
+    const stair: BuildingSpec = {
+      ...SKY,
+      transportModes: [
+        { id: 'stair-1', kind: 'stairs', connects: [5, 6], traversalTimeS: { upS: 17, downS: 11 }, use: { up: 0.2, down: 0.4 } },
+      ],
+    };
+    expect(withTransportCapacity(stair, 'stair-1', 3600)[0]).toBe(stair.transportModes[0]);
+    for (const bad of [0, -3600, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(withTransportCapacity(ESCALATOR, 'escalator-1', bad)[0]).not.toHaveProperty('capacityPersonsPerHour');
+    }
+    // The designer's choices are the table's rows at the speed the seconds are derived at.
+    expect(escalatorCapacityChoices(SPECS.escalatorCapacity).map((entry) => [entry.stepWidthM, entry.personsPerHour])).toStrictEqual([
+      [0.6, 3600],
+      [0.8, 4800],
+      [1, 6000],
+    ]);
+    expect(escalatorCapacityChoices(undefined)).toStrictEqual([]);
   });
 
   it('refuses the one pair the loader will not take, at the control rather than on save', () => {

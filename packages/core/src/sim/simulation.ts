@@ -162,6 +162,7 @@ import {
 } from '../metrics/comparability.js';
 import { MetricsRecorder } from '../metrics/recorder.js';
 import { PEAK_WINDOW_S, departureGapBracket, summarizeRun } from '../metrics/summarize.js';
+import { describeTransportSaturation } from '../metrics/transportQueue.js';
 import { DEFAULT_ENERGY_CONVENTION, MetricsError } from '../metrics/types.js';
 import type {
   CarTimings,
@@ -239,12 +240,14 @@ import {
   serviceChangeEvent,
   transferArrivalEvent,
   transportArrivalEvent,
+  transportClearedEvent,
 } from './events.js';
 import {
   drawStairsChoices,
   stairsIndexOf,
   type StairsOffer,
 } from './stairs.js';
+import { EscalatorQueues, type EscalatorTurn } from './escalatorQueue.js';
 import {
   drawPatienceTable,
   patienceKeyOf,
@@ -804,6 +807,28 @@ export class Simulation {
   #lateArrivalHoldMaxCohort = 0;
   /** How often the drain deadline refused to schedule something. `> 0` means it really bit. */
   #deadlineTruncations = 0;
+
+  /* ---- escalator carrying capacity (§ D1631, `sim/escalatorQueue.ts`) ---- */
+
+  /**
+   * The queue at each boarding landing of every escalator that declares a capacity.
+   *
+   * Empty on every building that declares none, which is every shipped building: `join` then
+   * answers `undefined` for every hop and each of the three call sites takes the branch it took
+   * before this field existed.
+   */
+  readonly #escalators: EscalatorQueues;
+  /**
+   * Journeys the drain deadline cut while they were queued for, or riding, such an escalator,
+   * by journey id. They are in no lift queue and no car, and `#reconcile` names each one as
+   * `undelivered: 'on-transport'` — which is what stops a rider held at an escalator from being
+   * either a conservation failure (an opening hop has no leg yet) or a delivery (a closing hop's
+   * lift leg has already finished).
+   */
+  readonly #cutOnTransport = new Map<string, EscalatorTurn>();
+  /** Riders who joined an escalator queue, and of those, how many stepped off at the far end. */
+  #transportQueueEntered = 0;
+  #transportQueueCleared = 0;
   /** Runs cut short en route. Zero under every profile leaving `enRouteDiversion` off. */
   #diversions = 0;
 
@@ -1366,6 +1391,7 @@ export class Simulation {
     // the golden runs are what hold "supplied and unread is byte-identical" as a measurement.
     this.#startOfDayS = this.#trace.startOfDayS;
     this.#deadlineS = this.#trace.durationS + this.#options.drainGraceS;
+    this.#escalators = new EscalatorQueues(this.#resolved);
     this.#reportWindow = traceReportWindow(this.#trace);
     this.#windowSelection = config.reportWindow;
     this.#summarizeOptions = config.summarize;
@@ -1426,6 +1452,9 @@ export class Simulation {
       ...(config.replication === undefined ? {} : { replication: config.replication }),
       ...(config.metadata === undefined ? {} : { metadata: config.metadata }),
     });
+    // Declared up front, in the order the record lists them, so a queue nobody joins is still a
+    // row. No-op on every building that declares no escalator capacity.
+    for (const header of this.#escalators.headers()) this.#recorder.declareTransportQueue(header);
   }
 
   /**
@@ -2912,6 +2941,18 @@ export class Simulation {
       // A journey that opens on the building's escalator is not standing at a lift landing yet.
       // Its leg 0 is admitted when the hop finishes; until then it is neither waiting nor
       // visible to a dispatcher, which is the whole difference between a hop and a leg.
+      //
+      // § D1631: where that escalator declares a carrying capacity the rider first takes their
+      // turn in its queue — in trace order within the batch — and the hop ends when the queue
+      // says it does. `#joinEscalator` answers `undefined` for every other escalator, and the
+      // branch below it is the one this method has always taken.
+      const openingHop = this.#escalators.isEmpty ? undefined : transportHopBefore(record, 0);
+      const openingTurn =
+        openingHop === undefined ? undefined : this.#joinEscalator(openingHop, record.journeyId, at);
+      if (openingTurn !== undefined) {
+        this.#scheduleOpeningArrival(record, openingTurn.arrivesAt);
+        continue;
+      }
       const openingHopS = leadingTransitSecondsOf(record);
       if (openingHopS > 0) {
         this.#scheduleOpeningTransport(record, at, openingHopS);
@@ -2935,7 +2976,11 @@ export class Simulation {
    * the run had no time to finish is work the deadline cut, not a passenger who vanished.
    */
   #scheduleOpeningTransport(record: GeneratedPassenger, at: SimTime, traversalS: number): void {
-    const arrivedAt = at + traversalS;
+    this.#scheduleOpeningArrival(record, at + traversalS);
+  }
+
+  /** {@link #scheduleOpeningTransport}, given the instant the rider reaches the far landing. */
+  #scheduleOpeningArrival(record: GeneratedPassenger, arrivedAt: SimTime): void {
     if (arrivedAt > this.#deadlineS) {
       this.#deadlineTruncations += 1;
       return;
@@ -2964,7 +3009,15 @@ export class Simulation {
         `Trace passenger ${passengerIndex} does not exist; the schedule and the trace disagree.`,
       );
     }
-    const passenger = new Passenger(toPassengerInit(record));
+    // `toPassengerInit` states the leg's `arrivedAt` as the batch instant plus the traversal
+    // time, which is this instant exactly unless the rider also stood in an escalator queue
+    // (§ D1631). Then the leg begins waiting *now*, and saying otherwise would report the time
+    // they spent at the foot of the escalator as time spent waiting for a lift.
+    const init = toPassengerInit(record);
+    const openingHop = transportHopBefore(record, 0);
+    const queued = openingHop !== undefined && this.#escalators.governs(openingHop);
+    const passenger = new Passenger(queued ? { ...init, arrivedAt: at } : init);
+    if (queued) this.#transportQueueCleared += 1;
     this.#transportHops += 1;
     this.#admit(passenger);
 
@@ -4337,7 +4390,10 @@ export class Simulation {
           // off the lift. The seconds are already on the leg (`egressTransitS`, added to
           // time-to-destination); this is the hop being *counted*, so the audit's hop total is
           // every hop taken and not only the ones that needed an event.
-          if (passenger.egressTransitS > 0) this.#transportHops += 1;
+          if (passenger.egressTransitS > 0) {
+            this.#transportHops += 1;
+            this.#queueForClosingEscalator(passenger, at);
+          }
         } else {
           this.#scheduleTransfer(passenger, at);
         }
@@ -5350,8 +5406,12 @@ export class Simulation {
     // A change of lift made on the building's escalator costs the escalator's declared
     // landing-to-landing time **instead of** the sky-lobby walk, not on top of it: both numbers
     // are door-to-door times for the same movement, and charging both would double it.
+    //
+    // § D1631: an escalator that declares a carrying capacity is queued for first, and the
+    // rider reaches the far landing when their turn plus the ride says so.
     const hop = this.#transportHopAfter(passenger);
-    const arrivedAt = at + (hop?.traversalTimeS ?? this.#options.transferWalkS);
+    const turn = hop === undefined ? undefined : this.#joinEscalator(hop, passenger.journeyId, at);
+    const arrivedAt = turn?.arrivesAt ?? at + (hop?.traversalTimeS ?? this.#options.transferWalkS);
     if (arrivedAt > this.#deadlineS) {
       this.#deadlineTruncations += 1;
       return;
@@ -5420,11 +5480,74 @@ export class Simulation {
       ...(egressTransitS === 0 ? {} : { egressTransitS }),
     });
     this.#transfers += 1;
-    if (hop !== undefined) this.#transportHops += 1;
+    if (hop !== undefined) {
+      this.#transportHops += 1;
+      if (this.#escalators.governs(hop)) this.#transportQueueCleared += 1;
+    }
     this.#admit(next);
 
     const floor = this.#building.requireFloor(next.originFloorId);
     for (const bankId of this.#openCalls(floor, at)) this.#dispatchBank(bankId, at);
+  }
+
+  /**
+   * Take a rider's turn at the queue for `hop`, and write it down — § D1631.
+   *
+   * `undefined` when the escalator declares no capacity, which is every escalator of every
+   * shipped building: the caller then does the arithmetic it always did, and nothing here has
+   * touched the recorder or a counter.
+   *
+   * A turn whose far landing lies past the drain deadline is **cut**: it is recorded with the
+   * flag, the journey is remembered so `#reconcile` can name it, and the caller schedules
+   * nothing. The caller counts the truncation, because two of the three already do.
+   */
+  #joinEscalator(
+    hop: TraceTransportHop,
+    journeyId: string,
+    at: SimTime,
+  ): (EscalatorTurn & { readonly cut: boolean }) | undefined {
+    const turn = this.#escalators.join(hop, at);
+    if (turn === undefined) return undefined;
+    const cut = turn.arrivesAt > this.#deadlineS;
+    this.#transportQueueEntered += 1;
+    this.#recorder.recordTransportBoarding(turn.modeId, turn.direction, {
+      journeyId,
+      enteredAt: turn.enteredAt,
+      boardedAt: turn.boardedAt,
+      ...(cut ? { cut: true as const } : {}),
+    });
+    if (cut) this.#cutOnTransport.set(journeyId, turn);
+    return { ...turn, cut };
+  }
+
+  /**
+   * The escalator that ends a journey, when it declares a capacity — § D1631.
+   *
+   * Without one this hop is a constant on the leg and needs nothing here. With one, the rider
+   * who has just stepped off the lift takes their turn like anybody else: the wait goes on the
+   * leg's record beside the traversal time, so time-to-destination spans it, and an event marks
+   * the instant they step off so the run does not end while somebody it calls delivered is still
+   * standing at the foot of an escalator.
+   */
+  #queueForClosingEscalator(passenger: Passenger, at: SimTime): void {
+    if (this.#escalators.isEmpty) return;
+    const record = this.#recordsByJourney.get(passenger.journeyId);
+    const hop = record === undefined ? undefined : transportHopBefore(record, record.legs.length);
+    if (hop === undefined) return;
+    const turn = this.#joinEscalator(hop, passenger.journeyId, at);
+    if (turn === undefined) return;
+    this.#recorder.recordEgressQueue(passenger, turn.waitS, turn.cut);
+    if (turn.cut) {
+      this.#deadlineTruncations += 1;
+      return;
+    }
+    this.#kernel.schedule(
+      turn.arrivesAt,
+      transportClearedEvent({ legId: passenger.id }, (_payload, context) => {
+        this.#transportQueueCleared += 1;
+        this.#recorder.noteTransportCleared(context.time);
+      }),
+    );
   }
 
   /**
@@ -6173,6 +6296,16 @@ export class Simulation {
 
     const { audit, undelivered, problems } = this.#reconcile(bareRecord);
 
+    // An escalator that did not keep up says so in the run's own warnings as well as in the
+    // summary's verdict (§ D1631), because a caller that reads only AWT and `warnings` — the CLI
+    // does — would otherwise see a suppressed mean and no account of what was suppressed.
+    for (const queue of summary.transportQueues ?? []) {
+      if (!queue.saturated) continue;
+      this.#warnings.push(
+        `${describeTransportSaturation(queue, summary.windowSeconds)} Riders are not re-routed around a full escalator and do not give up in its queue, so it grows for as long as demand exceeds the declared capacity; read summary.transportQueues beside the lift figures.`,
+      );
+    }
+
     /*
      * Warnings are final only here — `#diagnoseStuckCalls` and `#reconcile` both raise them —
      * so the record is completed after the audit rather than by the recorder. The recorder has
@@ -6518,6 +6651,38 @@ export class Simulation {
         continue;
       }
       const legs = this.#legsByJourney.get(record.journeyId) ?? [];
+      /*
+       * **A rider the deadline cut at an escalator is still in the system** (§ D1631), so they
+       * are `undelivered` — unlike the rider who walked out or was turned away, who is in no
+       * queue at all. Three shapes, and each would otherwise be filed wrongly: an opening hop has
+       * no leg yet and would read as a passenger who stopped existing; a closing hop's lift leg
+       * has finished and would read as a delivery; a middle hop is the only one the existing
+       * `transferring` already described, and it is named more precisely here.
+       */
+      const cutTurn = this.#cutOnTransport.get(record.journeyId);
+      if (cutTurn !== undefined) {
+        const lastLeg = legs[legs.length - 1];
+        const plannedFirst = record.legs[0];
+        const plannedLast = record.legs[record.legs.length - 1];
+        undelivered.push(
+          Object.freeze({
+            journeyId: record.journeyId,
+            legId: lastLeg?.id ?? record.id,
+            legIndex: lastLeg?.legIndex ?? 0,
+            reason: 'on-transport' as const,
+            originFloorId: lastLeg?.originFloorId ?? plannedFirst?.originFloorId ?? record.originFloorId,
+            destinationFloorId:
+              lastLeg?.destinationFloorId ?? plannedFirst?.destinationFloorId ?? record.finalDestinationFloorId,
+            finalDestinationFloorId:
+              lastLeg?.finalDestinationFloorId ?? plannedLast?.destinationFloorId ?? record.finalDestinationFloorId,
+            journeyStartedAt: record.arrivalTimeS,
+            arrivedAt: lastLeg?.arrivedAt ?? cutTurn.enteredAt,
+            boardedAt: lastLeg?.boardedAt,
+            carId: lastLeg === undefined ? undefined : carOfLeg.get(lastLeg.id),
+          }),
+        );
+        continue;
+      }
       if (legs.length === 0) {
         problems.push(
           `journey "${record.journeyId}" (arriving t=${record.arrivalTimeS}s) never materialized a leg`,
@@ -6632,6 +6797,18 @@ export class Simulation {
     if (legsCreated !== legsRecorded) {
       problems.push(
         `${legsCreated} legs were created but ${legsRecorded} reached the recorder; the difference is invisible to every metric`,
+      );
+    }
+    /*
+     * **Every rider who joined an escalator queue left it, or is named** (§ D1631). `entered`
+     * and `cleared` are counted at different events by different handlers, so the equality is a
+     * check and not an identity: a hop that joined a queue and was then scheduled by a path that
+     * forgot to count its arrival would show here and nowhere else.
+     */
+    const transportQueueCut = this.#cutOnTransport.size;
+    if (this.#transportQueueEntered !== this.#transportQueueCleared + transportQueueCut) {
+      problems.push(
+        `${this.#transportQueueEntered} riders joined an escalator queue but ${this.#transportQueueCleared} stepped off at the far landing and ${transportQueueCut} were cut by the drain deadline`,
       );
     }
     if (delivered + undelivered.length + abandoned + accessRefused + stranded !== generated) {
@@ -6762,6 +6939,19 @@ export class Simulation {
        * count falls and any comparison across configurations with different uptake compares
        * different populations. Without the count that shortfall reads as a better building.
        */
+      /*
+       * Present only where an escalator declares a carrying capacity (§ D1631), so the audit of
+       * every other building is the object it was. `entered === cleared + cut` is checked above.
+       */
+      ...(this.#escalators.isEmpty
+        ? {}
+        : {
+            transportQueue: Object.freeze({
+              entered: this.#transportQueueEntered,
+              cleared: this.#transportQueueCleared,
+              cut: transportQueueCut,
+            }),
+          }),
       ...(this.#stairsTaken.size === 0
         ? {}
         : {

@@ -55923,3 +55923,100 @@ integers.
 
 **Numbers spent.** This session took the charter row's **D1630** and moved the row to D1631; nothing
 is holed.
+## D1631 — an escalator may declare a carrying capacity, and one that does has a queue
+
+> **Taken 2026-11-11** on the product owner's request for escalator handling as an engine feature,
+> comprehensive and correct. **Moves a recorded refusal**: `config/types.ts` and `docs/02` both said
+> a mode deliberately has *no capacity or headway*, because "modelling it would put a queue on the
+> one edge that exists to remove a queue". That sentence is kept where it stood, struck, with what
+> moved it.
+
+**Why an entry.** It adds a field to the building schema, a block to `data/elevator-specs.json`, a
+table and two leg fields to the run record, a sixth `awtIsValid` ground and a fourth undelivered
+reason. Each of those binds code its own module does not own.
+
+**What is ruled.**
+
+1. **The field.** `transportModes[].capacityPersonsPerHour`, optional, strictly positive, persons
+   per hour **in each direction**. **No default.** Absent is *no limit*, which is the model before
+   this entry and what every shipped building declares.
+2. **Declared, not derived.** A mode declares neither a step width nor a speed; `traversalTimeS` is
+   a lumped figure, and a second declared speed beside it would be two statements of one quantity.
+   Per hour, because every source consulted states it so and five of the nine planning figures do
+   not divide by sixty.
+3. **The table is data.** `elevator-specs.json`'s `escalatorCapacity` block carries the nine
+   EN 115-1 traffic-flow-planning figures. It is reference data and never a default. It has two
+   non-test readers: `resolveBuilding` warns above its largest row
+   (`escalator-capacity-above-reference`), and the building designer offers its 0.5 m/s rows.
+4. **The queue.** Each direction of a capacity-bearing mode has a first-come, first-served queue at
+   its boarding landing. Riders step on `3600 / capacity` seconds apart, then ride `traversalTimeS`.
+   The server is deterministic and nobody leaves the queue, so a rider's turn is fixed when they
+   join: the implementation is one `max` per rider and no boarding event (`sim/escalatorQueue.ts`).
+   **No random stream was added** (invariant 2), nothing reads a clock, and riders join in the
+   kernel's `(time, sequence)` order, in trace order within a batch.
+5. **A mode is a pair.** One belt up, one down, each at the declared rate, with independent queues.
+   The shipped modes are named *escalator pair* and `traversalTimeS` is symmetric. A single
+   reversible belt would need a declared direction or schedule and is **not modelled**.
+6. **Stairs are refused the field.** No stair flow capacity was consulted, and a stairs rider never
+   enters the lift system, so the figure would be uncited and unread.
+7. **The route stays fixed.** `traffic/route.ts` plans structurally, before the run. A saturated
+   escalator diverts nobody to a lift that serves both landings; the queue grows and is reported.
+8. **Reporting.** The wait is on time-to-destination and is **not** lift waiting time.
+   `RunRecord.transportQueues` carries every rider's turn; `RunSummary.transportQueues` carries the
+   per-window statistics. A closing hop's wait is on the leg as `egressQueueSeconds`.
+9. **Saturation.** A queue is saturated when more riders joined in the window than the window can
+   board (exact, no threshold), when a rider was cut by the drain deadline, or when a rider waited
+   past the 900 s horizon `serviceLevel` already uses. A saturated queue withholds its own mean and
+   fires `transport-saturated`, which withholds the lift AWT's interval.
+10. **A rider held at the deadline is undelivered**, reason `on-transport`, and the run is
+    `timed-out`. `ConservationAudit.transportQueue` checks `entered === cleared + cut`.
+
+**Why the lift mean is withheld too.** A saturated escalator meters the lifts behind it. The riders
+it holds have reached no lift landing, so they are in no lift queue and are no unserved leg. Lift
+waiting time therefore falls as the escalator gets worse. That is abandonment's shape, and it gets
+abandonment's treatment and its place in the precedence.
+
+**What was sourced, and from where.**
+
+| claim | source | status |
+|---|---|---|
+| the nine planning figures | KONE, *Planning Guide for KONE escalators and autowalks* (GB/IR), § 4.2 Table 4.1 and § 10.2 | **read**; the two tables agree |
+| they are an average practical capacity at full load | same guide, § 4.2 | **read** |
+| EN 115-1's own text, annex and table number | — | **not opened**, not asserted |
+| CIBSE Guide D handling capacities | — | **not opened**, in any edition |
+| a published practical-to-theoretical ratio | — | **none found** |
+| 80 %, 71 %, 67 % of the per-step theoretical figure at 0.5 m/s | arithmetic over the table and Chereau & Chalaux's per-step assumption (read as an excerpt) | **derived here**, stated by neither source |
+
+**The limits, each chosen and each tested** (`sim/escalatorCapacity.test.ts`).
+
+- No diversion and no reneging, so past saturation the queue over-states a real one.
+- A journey that is the escalator alone is refused by the generator as `no-lift-leg` and never
+  loads the queue, so below saturation the queue under-states a real one.
+- Evenly spaced slots; two riders abreast are two slots.
+- The trolley derating the guide records (about 80 %) is not applied.
+- The leg `arrivedAt` after a capacity-bearing hop is no longer dispatcher-independent where the
+  belt is shared with riders coming off a lift. It already was not for any transfer leg.
+
+**What was left out, and said.**
+
+- **No shipped building declares a capacity.** None of them cites one, and the planning figures are
+  far above the hop counts `data/buildings/README.md` records. What a cited capacity would do on a
+  shipped tower is **unmeasured**.
+- **The viewer draws no queue and prints no queue statistic.** `VizSummary` is not extended. The
+  suppression lead for the new ground is worded (`mode/disclosure.ts`); nothing else is shown.
+- **The drawing board offers only the table's 0.5 m/s rows**, the speed its seconds are derived at.
+  Where no lift journey is routed over an escalator the board says a limit changes nothing, and
+  `towerPlan.test.ts` pins that by a run. On every shipped template that is the case.
+- **No replication metric.** `REPLICATION_METRICS` is unchanged, so the experiment runner cannot
+  pair two arms on an escalator's queue wait. The figures are on each run's summary and nowhere
+  aggregated.
+- **`Passenger.timeToDestinationS`** does not include a closing hop's queue wait; the record and
+  `buildJourneys` do. Nothing outside tests reads the getter.
+
+**Held by** `sim/escalatorCapacity.test.ts` (absent is identical; the closed form above and below
+capacity; the control moves the legs at all three hop positions; conservation; the two limits),
+`config/transportModes.test.ts`, `metrics/awtValidity.test.ts`, `traffic/transportIdentity.test.ts`
+(the pinned digests, unchanged), and in the viewer `authoring/authoring.test.ts`,
+`authoring/towerPlan.test.ts`, `everyday/designerModel.test.ts` and `mode/disclosure.test.ts`.
+
+**Numbers spent.** One, **D1631**. The charter row moves to D1631.

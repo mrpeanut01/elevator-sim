@@ -45,6 +45,7 @@ import type { CredentialGroup, Direction } from '../model/types.js';
 // The default is read, not repeated: a declared default that disagrees with the resolver is worse
 // than none, which is the argument `TRAFFIC_DEFAULTS`'s own docstring makes.
 import { TRAFFIC_DEFAULTS, type TrafficModelVersion } from '../traffic/types.js';
+import type { TransportBoardingRecord, TransportQueueRecord } from './transportQueue.js';
 
 import {
   COUNTERWEIGHT_BALANCE_RATIO,
@@ -200,6 +201,10 @@ export interface MetricsRecorderOptions {
  * The recorder
  * -------------------------------------------------------------------------- */
 
+function transportQueueKey(modeId: string, direction: Direction): string {
+  return `${modeId}/${direction}`;
+}
+
 /** Mutable twin of {@link PassengerRecord}, private to the recorder. */
 interface LegState {
   readonly record: {
@@ -217,6 +222,8 @@ interface LegState {
     readonly arrivedAt: SimTime;
     readonly journeyStartedAt: SimTime;
     readonly egressTransitSeconds: number;
+    egressQueueSeconds: number;
+    egressCut: boolean;
     boardedAt: SimTime | undefined;
     alightedAt: SimTime | undefined;
     abandonedAt: SimTime | undefined;
@@ -267,6 +274,17 @@ export class MetricsRecorder {
    * this stays empty on every shipped run and the field is omitted from the record entirely.
    */
   readonly #carMoves: CarMoveRecord[] = [];
+  /**
+   * Escalator queues, **only when the run declares them** — § D1631, `metrics/transportQueue.ts`.
+   *
+   * Nothing calls {@link declareTransportQueue} unless a mode declares a capacity, so this stays
+   * empty on every shipped run and the field is omitted from the record entirely. Insertion
+   * ordered, and inserted in declared order by the run, so the emitted table is deterministic.
+   */
+  readonly #transportQueues = new Map<
+    string,
+    { readonly header: Omit<TransportQueueRecord, 'boardings'>; readonly boardings: TransportBoardingRecord[] }
+  >();
 
   #lastEventAt: SimTime;
   #boardedCount = 0;
@@ -433,6 +451,8 @@ export class MetricsRecorder {
         arrivedAt: passenger.arrivedAt,
         journeyStartedAt: passenger.journeyStartedAt,
         egressTransitSeconds: passenger.egressTransitS ?? 0,
+        egressQueueSeconds: 0,
+        egressCut: false,
         boardedAt: undefined,
         alightedAt: undefined,
         abandonedAt: undefined,
@@ -729,6 +749,86 @@ export class MetricsRecorder {
   }
 
   /* ---------------------------------------------------------------- *
+   * Escalator queues (§ D1631)
+   * ---------------------------------------------------------------- */
+
+  /**
+   * Announce one direction of one capacity-bearing escalator, before anybody queues for it.
+   *
+   * Declared up front rather than discovered on first use so that a queue nobody ever joined is
+   * still a row of the record — a declared capacity that bound nobody is a finding.
+   *
+   * @throws MetricsError if the same queue is declared twice.
+   */
+  declareTransportQueue(header: Omit<TransportQueueRecord, 'boardings'>): void {
+    this.#assertOpen('declareTransportQueue');
+    const key = transportQueueKey(header.modeId, header.direction);
+    if (this.#transportQueues.has(key)) {
+      throw new MetricsError(`Escalator queue "${key}" was declared twice.`);
+    }
+    this.#transportQueues.set(key, { header: Object.freeze({ ...header }), boardings: [] });
+  }
+
+  /**
+   * Record one rider joining an escalator queue, with the instant their turn comes.
+   *
+   * Both instants are known when the rider joins — see {@link TransportBoardingRecord.boardedAt}
+   * — so this is one call rather than a join and a later boarding that could be left unpaired.
+   *
+   * @throws MetricsError if the queue was never declared, the turn precedes the join, or the
+   *   rider joined before the one ahead of them.
+   */
+  recordTransportBoarding(modeId: string, direction: Direction, boarding: TransportBoardingRecord): void {
+    this.#assertOpen('recordTransportBoarding');
+    const key = transportQueueKey(modeId, direction);
+    const queue = this.#transportQueues.get(key);
+    if (queue === undefined) {
+      throw new MetricsError(`Escalator queue "${key}" was never declared; a boarding there has no row to go in.`);
+    }
+    if (!Number.isFinite(boarding.enteredAt) || !Number.isFinite(boarding.boardedAt) || boarding.boardedAt < boarding.enteredAt) {
+      throw new MetricsError(
+        `Journey "${boarding.journeyId}" cannot step onto "${key}" at t=${boarding.boardedAt}: it joined the queue at t=${boarding.enteredAt}.`,
+      );
+    }
+    const ahead = queue.boardings[queue.boardings.length - 1];
+    if (ahead !== undefined && (boarding.enteredAt < ahead.enteredAt || boarding.boardedAt < ahead.boardedAt)) {
+      throw new MetricsError(
+        `Journey "${boarding.journeyId}" joined "${key}" at t=${boarding.enteredAt} for a turn at t=${boarding.boardedAt}, ahead of journey "${ahead.journeyId}" (t=${ahead.enteredAt}, turn t=${ahead.boardedAt}); the queue is first come, first served.`,
+      );
+    }
+    queue.boardings.push(Object.freeze({ ...boarding }));
+    this.#observe(boarding.enteredAt);
+  }
+
+  /**
+   * Put a closing escalator's queue wait on the leg that precedes it, or mark that leg's journey
+   * as cut by the deadline.
+   *
+   * The leg must already have alighted: the wait begins where the lift ride ends.
+   *
+   * @throws MetricsError if the leg has not alighted or the wait is negative.
+   */
+  recordEgressQueue(passenger: RecordablePassenger | string, waitS: number, cut: boolean): void {
+    this.#assertOpen('recordEgressQueue');
+    const id = typeof passenger === 'string' ? passenger : passenger.id;
+    const leg = this.#require(id, 'queue for an escalator after');
+    if (leg.record.alightedAt === undefined) {
+      throw new MetricsError(`Leg "${id}" cannot queue for a closing escalator: it has not alighted.`);
+    }
+    if (!Number.isFinite(waitS) || waitS < 0) {
+      throw new MetricsError(`Leg "${id}" needs a non-negative finite escalator wait; received ${waitS}.`);
+    }
+    leg.record.egressQueueSeconds = waitS;
+    leg.record.egressCut = cut;
+  }
+
+  /** A rider stepped off a capacity-bearing escalator at `at`; the run lasted at least that long. */
+  noteTransportCleared(at: SimTime): void {
+    this.#assertOpen('noteTransportCleared');
+    this.#observe(at);
+  }
+
+  /* ---------------------------------------------------------------- *
    * Samples
    * ---------------------------------------------------------------- */
 
@@ -996,6 +1096,17 @@ export class MetricsRecorder {
         ? {}
         : { reportWindow: Object.freeze({ ...this.#reportWindow }) }),
       passengers: Object.freeze(this.passengerRecords()),
+      // Omitted unless a queue was declared, so every record of a building with no escalator
+      // capacity is byte-identical to one written before § D1631.
+      ...(this.#transportQueues.size === 0
+        ? {}
+        : {
+            transportQueues: Object.freeze(
+              [...this.#transportQueues.values()].map((queue) =>
+                Object.freeze({ ...queue.header, boardings: Object.freeze([...queue.boardings]) }),
+              ),
+            ),
+          }),
       loadSamples: Object.freeze([...this.#loadSamples]),
       queueSamples: Object.freeze([...this.#queueSamples]),
       // Omitted rather than empty when nothing moved, so a record from a harness that does not
@@ -1061,6 +1172,10 @@ function freezeLeg(leg: LegState): PassengerRecord {
     ...(source.egressTransitSeconds === 0
       ? {}
       : { egressTransitSeconds: source.egressTransitSeconds }),
+    // § D1631, and omitted by the same rule: only a rider who actually queued for a closing
+    // escalator, or was cut on one, carries either key.
+    ...(source.egressQueueSeconds === 0 ? {} : { egressQueueSeconds: source.egressQueueSeconds }),
+    ...(source.egressCut ? { egressCut: true as const } : {}),
     ...(source.boardedAt === undefined ? {} : { boardedAt: source.boardedAt }),
     ...(source.alightedAt === undefined ? {} : { alightedAt: source.alightedAt }),
     // Omitted on every leg that did not abandon, by the rule the two keys above and the four

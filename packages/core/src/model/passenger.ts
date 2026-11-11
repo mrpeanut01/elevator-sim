@@ -164,6 +164,12 @@ export interface PassengerInit {
    * or stair, and only ever added to {@link Passenger.timeToDestinationS}. It is not a wait, not
    * a ride, and not something a dispatcher can influence — which is exactly why it is a constant
    * carried on the leg rather than another event.
+   *
+   * **It is the ride only.** Where that escalator declares a carrying capacity (§ D1631) the
+   * rider may also stand in its queue, and that wait is not known until they step off the lift.
+   * It is written to the leg's *record* (`PassengerRecord.egressQueueSeconds`) and added by
+   * `metrics/summarize.ts#buildJourneys`; {@link Passenger.timeToDestinationS} does not include
+   * it, and nothing outside tests reads that getter.
    */
   readonly egressTransitS?: number | undefined;
 }

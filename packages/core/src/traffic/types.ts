@@ -430,6 +430,11 @@ export interface TraceLeg {
  * either as a delay before the next leg starts waiting or, on a hop that ends the journey, as
  * seconds added after the last alighting. Removing a leg and giving its seconds away for free
  * would flatter every arm that uses the escalator.
+ *
+ * **The trace does not carry the escalator's capacity, on purpose** (`DECISIONS.md` § D1631). A
+ * queue wait depends on who else reaches the landing and when, which is the run's business; the
+ * hop here is the same hop whatever capacity the building declares, so moving that control
+ * leaves the trace — and the common random numbers — exactly where they were.
  */
 export interface TraceTransportHop {
   /** `TransportModeConfig.id` of the edge ridden. */

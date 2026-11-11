@@ -477,12 +477,77 @@ shape of the escalator's, add the entry to § Sources, and say which of the two 
 uptake code is exercised from test fixtures. So this is a gap in front of the first author, not
 underneath a published number.
 
-### Two things the model deliberately does not have
+### Escalator carrying capacity
 
-Each because nothing would read them: a direction (a one-way escalator is a real configuration and
-is not expressible), and a capacity or headway (an escalator's handling capacity dwarfs a lift's,
-and modelling it would put a queue on the one edge that exists to remove one). See
-`packages/core/src/config/types.ts`.
+An escalator may declare `capacityPersonsPerHour`, persons per hour in **each** direction
+([`DECISIONS.md` § D1631](../DECISIONS.md)). Absent means no limit. There is no default, for the
+reason the stairs section gives for `use`: a default would put a planning figure nobody chose into
+every study that declared an escalator.
+
+**The planning table, and exactly what was read to get it.** These are the figures EN 115-1 gives
+for traffic flow planning, persons per hour in one direction:
+
+| step width | 0.5 m/s | 0.65 m/s | 0.75 m/s |
+|---|---|---|---|
+| 0.6 m | 3 600 | 4 400 | 4 900 |
+| 0.8 m | 4 800 | 5 900 | 6 600 |
+| 1.0 m | 6 000 | 7 300 | 8 200 |
+
+They are data, in `data/elevator-specs.json`'s `escalatorCapacity` block, and the designer's
+choices are read from there.
+
+| what | status |
+|---|---|
+| the nine figures | **read**, in KONE's *Planning Guide for KONE escalators and autowalks* (GB/IR edition, written against EN 115-1:2008): § 4.2 Table 4.1 *"Traffic capacity calculations according to EN 115-1"*, and again in § 10.2 *"Capacity"*. The two tables agree at all nine cells |
+| what kind of number they are | **read**, same guide § 4.2: EN 115-1 *"indicates an average practical transport capacity rather than the previous theoretical approach"*, and the figures *"are only relevant if the escalator is running at full load, which only occurs during peak hours"* |
+| EN 115-1 itself | **not opened**. It is a priced standard. The annex and table number inside it are not asserted here |
+| CIBSE Guide D's escalator handling capacities | **not opened**, in any edition. No figure from it appears in this section or in `data/` |
+| BS 5656-2 Annex D, practical handling capacities | **not opened** |
+| a published ratio of practical to theoretical capacity | **none found**. The comparison below is arithmetic, not a citation |
+
+**So a row is a full-load planning maximum, not an observed flow.** The same guide lists why a real
+escalator carries fewer: not every step is occupied, many passengers leave a clear step ahead of
+them, and step occupancy falls as speed rises because people hesitate before boarding. It also
+records that shopping trolleys and baggage carts *"will reduce capacity by approximately 80%"*. None
+of that is applied anywhere in the simulator. An author who wants an observed flow must find one and
+cite it.
+
+**Against the older per-step figure, as arithmetic.** Chereau and Chalaux (*Techniques de
+l'Ingénieur* C3726 v3, 2020, § 7, read as a paywalled excerpt) state the theoretical assumption: per
+0.40 m of step depth, 1 person on a 0.60 m step, 1.5 on 0.80 m and 2 on 1.00 m. At 0.5 m/s that is
+`0.5 / 0.40 × 3600 = 4 500` steps an hour, so 4 500, 6 750 and 9 000 persons. The EN 115-1 planning
+figures are **80 %, 71 % and 67 %** of those. That ratio is derived here from two sources and is
+stated by neither. The article's own formula did not survive extraction and is not quoted.
+
+**What the model does with the figure.**
+
+- A mode is a **pair**: one belt up, one down, each at the declared rate, each with a first-come,
+  first-served queue at its boarding landing. A single reversible belt is not modelled.
+- Riders step on one at a time, `3600 / capacity` seconds apart, then ride for `traversalTimeS`.
+  No random draw is involved, so no stream was added and common random numbers are undisturbed.
+- The route is fixed before the run. A full escalator diverts nobody to a lift that serves both
+  landings, and nobody gives up in its queue. Past saturation the queue is longer than a real crowd
+  would allow.
+- A journey that is the escalator and nothing else is not lift demand and is never generated, so
+  the queue holds only riders on their way to or from a lift. It is a floor on the real queue.
+- Slots are evenly spaced. Two riders abreast on one step are modelled as two slots.
+
+How the queue is reported, and when its mean is withheld, is in
+[`docs/03` § Saturation detection](03-traffic-and-statistics.md).
+
+**Stairs are refused the field.** No stair flow capacity has been consulted, and a rider who takes
+the stairs never enters the lift system, so the figure would be uncited and unread.
+
+### One thing the model deliberately does not have
+
+A direction: a one-way escalator is a real configuration and is not expressible, because nothing
+would read it. See `packages/core/src/config/types.ts`.
+
+*This list said two until § D1631. The second was "a capacity or headway (an escalator's handling
+capacity dwarfs a lift's, and modelling it would put a queue on the one edge that exists to remove
+one)". The first half of that is still why the field has no default. The second half was moved by
+the product owner's request for escalator handling as an engine feature: an escalator that declares
+a capacity has a queue, and one that does not is exactly the edge that sentence described.*
 
 *This list said **three** until the stairs work landed, and the third was "a `kind` enum — nothing
 branches on escalator-versus-stair". That is no longer true: `TRANSPORT_MODE_KINDS` ships,
@@ -503,6 +568,8 @@ who remembers the old one should be able to see what moved.*
 - [ISO 25745-2:2015 — Energy performance of lifts, escalators and moving walks, Part 2: Energy calculation and classification for lifts](https://www.iso.org/standard/61551.html) — the reference cycle measured at empty / half / full load, the non-regenerative measurement convention, and the standby term this project's proxy deliberately omits
 - Barney, G. and Al-Sharif, L., *Elevator Traffic Handbook: Theory and Practice* (2nd ed., Routledge 2016) — drive sizing, counterbalancing, and the round-trip-time derivation this project's oracle implements
 - [BS EN 115-1:2017 — Safety of escalators and moving walks, Part 1: Construction and installation](https://standards.iteh.ai/catalog/standards/cen/89597718-b77e-4b2d-b8da-287ce6d9b9b3/en-115-1-2017) — inclination limits (30°, and 35° only for rises ≤ 6 m), the nominal-speed caps (0.75 m/s at ≤ 30°, 0.50 m/s at 30–35°), and the flat-step requirement (2 for a rise ≤ 6 m, 3 above it) behind the `G ↔ 2` traversal time above
+- [KONE Planning Guide for KONE escalators and autowalks, GB/IR edition](https://www.kone.co.uk/Images/Escalator%20planning%20guide%20GBIR_tcm45-86614.pdf) — § 4.2 Table 4.1 and § 10.2: the EN 115-1 traffic-flow-planning capacities by step width and nominal speed, and the statement that they are an average practical capacity at full load. The source `escalatorCapacity` in `data/elevator-specs.json` was read from
+- Chereau, F. and Chalaux, M., [*Movement of Persons — Escalators and Moving Sidewalks*, § 7 Theoretical transport capacity](https://www.techniques-ingenieur.fr/en/resources/article/ti252/people-traffic-c3726/v3/theoretical-transport-capacity-7), Techniques de l'Ingénieur C3726 v3 (2020) — read as a paywalled excerpt: the persons-per-step assumption by step width, and nothing else
 - [KONE Planning guide — Escalators, ramps and autowalks](https://distributors.kone.com/en/Images/KONE-Escalator-Planning-Guide_tcm90-100695.pdf) — 30° as the commercial/infrastructure compromise angle, 0.5 m/s as the common commercial nominal speed, and the 0.40 m standard step depth
 - [Fundamentals of Traffic Analysis — Elevator World](https://elevatorworld.com/article/fundamentals-of-traffic-analysis/) — the four office traffic types (up-peak, down-peak, lunch mixed-peak, random interfloor), the lunch period's leave-and-return mechanism, and the 12–16 %/5 min lunch demand band behind the traffic-mix table above
 - [Lift Passenger Demand in Office Buildings — Elevator World](https://elevatorworld.com/article/lift-passenger-demand-in-office-buildings/) — the 45 % / 45 % / 10 % lunch mix attributed to CIBSE (2010), the 40/40/20 (Barney 2003a) and 42/42/16 (BCO 2009) alternatives, and the BCO *Guide to Specification 2014* lunchtime two-way demand of 13 %/5 min

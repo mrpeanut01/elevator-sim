@@ -87,6 +87,11 @@ export const passengerRecordSchema = z.strictObject({
   // Absent on every run of every building that declares no transport mode, so a stored record
   // written before transport modes existed parses unchanged.
   egressTransitSeconds: z.number().nonnegative().finite().optional(),
+  // § D1631: absent unless the rider queued for a closing escalator that declares a capacity,
+  // and named here for `abandonedAt`'s reason — this is a strict object, so a run that wrote
+  // either key could not otherwise be stored or replayed (invariant 5).
+  egressQueueSeconds: z.number().positive().finite().optional(),
+  egressCut: z.literal(true).optional(),
   boardedAt: simTime.optional(),
   alightedAt: simTime.optional(),
   // Absent on every leg of every building that declares no `accessZones`, and on every leg whose
@@ -114,6 +119,22 @@ export const passengerRecordSchema = z.strictObject({
   // promise it made. `passengerModel` on the run record says which of the two a reader is holding.
   assignedCarId: z.string().min(1).optional(),
   assignedAt: simTime.optional(),
+});
+
+/** One direction of one capacity-bearing escalator — `RunRecord.transportQueues`, § D1631. */
+export const transportQueueRecordSchema = z.strictObject({
+  modeId: identifier,
+  direction: z.enum(DIRECTIONS),
+  boardingFloorId: identifier,
+  capacityPersonsPerHour: z.number().positive().finite(),
+  boardings: z.array(
+    z.strictObject({
+      journeyId: z.string().min(1),
+      enteredAt: simTime,
+      boardedAt: simTime,
+      cut: z.literal(true).optional(),
+    }),
+  ),
 });
 
 export const loadSampleSchema = z.strictObject({
@@ -230,6 +251,8 @@ export const runRecordSchema = z.strictObject({
   reportWindow: reportWindowSchema.optional(),
   warnings: z.array(z.string().min(1)).optional(),
   passengers: z.array(passengerRecordSchema),
+  // § D1631: absent on every building that declares no escalator capacity.
+  transportQueues: z.array(transportQueueRecordSchema).optional(),
   loadSamples: z.array(loadSampleSchema),
   queueSamples: z.array(queueSampleSchema),
   // Optional in both directions: a record written before the energy axis existed parses

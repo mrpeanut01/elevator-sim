@@ -934,6 +934,12 @@ export const UNDELIVERED_REASONS = [
   'riding',
   /** Alighted at a sky lobby; the next leg had not started when the run ended. */
   'transferring',
+  /**
+   * Queued for, or riding, an escalator that declares a carrying capacity when the drain deadline
+   * fell (§ D1631). Used only there: a walk or an uncapped escalator hop cut by the deadline is
+   * still `transferring`, as it always was.
+   */
+  'on-transport',
 ] as const;
 
 export type UndeliveredReason = (typeof UNDELIVERED_REASONS)[number];
@@ -1006,6 +1012,20 @@ export interface ConservationAudit {
    * answer it (`DECISIONS.md` § D147 § 6).
    */
   readonly transportHops: number;
+  /**
+   * Riders who joined an escalator queue, and what became of them — § D1631.
+   *
+   * **Absent on every building that declares no `capacityPersonsPerHour`**, which is every
+   * shipped building. `entered === cleared + cut` on every run that was not aborted, and the
+   * audit reports a problem when it is not. `cut` riders are in {@link undelivered}, named
+   * `on-transport`. A journey that rides two capacity-bearing escalators is counted twice in
+   * `entered`, once per queue, so this is a count of turns and not of people.
+   */
+  readonly transportQueue?: {
+    readonly entered: number;
+    readonly cleared: number;
+    readonly cut: number;
+  };
 
   /* ---- destination dispatch; all three are 0 under the conventional passenger model ---- */
 

@@ -203,6 +203,38 @@ const CASES: Readonly<Record<AwtInvalidGround, GroundCase>> = {
       '42.5 s describes the riders who stayed rather than the service they were offered; its ' +
       'confidence interval must be suppressed.',
   },
+  'transport-saturated': {
+    evidence: cleanEvidence({
+      transportQueues: [
+        {
+          modeId: 'lobby-escalator',
+          direction: 'up',
+          boardingFloorId: 'G',
+          capacityPersonsPerHour: 3600,
+          enteredCount: 420,
+          clearedCount: 420,
+          notClearedCount: 0,
+          maxBoardableCount: 301,
+          utilisation: 1.4,
+          maxWaitS: 118.4,
+          waitHorizonS: 900,
+          waitedCount: 419,
+          peakQueueLength: 119,
+          saturated: true,
+          saturationGround: 'over-capacity',
+        },
+      ],
+    }),
+    reason:
+      'Escalator "lobby-escalator" (up, boarding at G) was offered 420 riders in the 300 s ' +
+      'reporting window against a declared capacity of 3600 persons per hour, which can board at ' +
+      'most 301 in a window that long (140% of capacity); its queue grew by at least 119 riders ' +
+      'over the window and the longest wait recorded there was 118.4 s. Riders held at an ' +
+      'escalator have not reached a lift landing, so they are in no lift queue and count as no ' +
+      'unserved leg: the lifts behind it are being metered, lift waiting time is lowered by ' +
+      'construction, and the reported mean of 42.5 s describes the crowd that got through rather ' +
+      'than the service the building offers. Its confidence interval must be suppressed.',
+  },
   starved: {
     evidence: cleanEvidence({
       serviceLevel: serviceLevel({

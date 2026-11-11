@@ -848,6 +848,23 @@ export function resolveBuilding(
         ISSUE_CODES.unknownFloor,
       );
     });
+    /*
+     * A declared carrying capacity above every row of the planning table (§ D1631). Legal — an
+     * author may cite a source this file does not carry — and worth saying, because the two ways
+     * to arrive here by accident are a figure typed for both directions together and a digit too
+     * many, and either one makes the escalator's queue quietly never form.
+     */
+    const reference = specs.escalatorCapacity;
+    if (mode.capacityPersonsPerHour !== undefined && reference !== undefined) {
+      const largest = Math.max(...reference.rows.map((row) => row.personsPerHour));
+      if (mode.capacityPersonsPerHour > largest) {
+        addWarning(
+          `transportModes[${modeIndex}].capacityPersonsPerHour`,
+          `transport mode "${mode.id}" declares ${mode.capacityPersonsPerHour} persons per hour in each direction, above the largest figure in elevator-specs.json's escalatorCapacity table (${largest}). The run uses the declared value; cite where it comes from in the mode's $comment.`,
+          WARNING_CODES.escalatorCapacityAboveReference,
+        );
+      }
+    }
   });
 
   /*

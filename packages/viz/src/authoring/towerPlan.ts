@@ -47,7 +47,14 @@
  * outside the drawing board and moves nothing already recorded, so this docstring is the record.
  */
 
-import { WARNING_CODES, parseBuilding, resolveBuilding, ConfigError } from '@elevator-sim/core/browser';
+import {
+  ConfigError,
+  RoutePlanner,
+  TRAFFIC_DEFAULTS,
+  WARNING_CODES,
+  parseBuilding,
+  resolveBuilding,
+} from '@elevator-sim/core/browser';
 import type {
   CallType,
   BankConfig,
@@ -71,6 +78,7 @@ import {
   transferSecondsFor,
   transportModesOf,
   withTransportSeconds,
+  withTransportCapacity,
   upPeakBanksOf,
   type BuildingSpec,
   type SpecAccessZone,
@@ -794,7 +802,7 @@ export function buildingFromPlan(plan: TowerPlan, specs: ElevatorSpecs): Buildin
     return bank as unknown as BankConfig;
   });
 
-  const transportModes = transportModesOf(frame);
+  const transportModes = transportModesOf(frame, specs.escalatorCapacity);
   return {
     id: plan.id,
     name: plan.name.trim() === '' ? 'My building' : plan.name.trim(),
@@ -1224,6 +1232,56 @@ export function withEscalatorToggled(plan: TowerPlan, floor: number): TowerPlan 
     traversalTimeS: escalatorSecondsFor(frame, connects),
   };
   return { ...plan, transportModes: [...plan.transportModes, mode] };
+}
+
+/**
+ * Say how many people an hour the escalator above a floor carries in each direction, or lift the
+ * limit again with `undefined` — § D1631.
+ *
+ * `buildingSpec.ts#withTransportCapacity` does the write, so the Engineer editor's rule and this
+ * board's are one rule. A floor with no escalator above it returns the plan unchanged.
+ */
+export function withEscalatorCapacity(
+  plan: TowerPlan,
+  floor: number,
+  capacityPersonsPerHour: number | undefined,
+): TowerPlan {
+  const escalator = escalatorAbove(plan, floor);
+  if (escalator === undefined) return plan;
+  return {
+    ...plan,
+    transportModes: withTransportCapacity(planFrame(plan), escalator.id, capacityPersonsPerHour),
+  };
+}
+
+/**
+ * Whether any journey that rides a lift is routed over the escalator `modeId` — § D1631.
+ *
+ * **The question the capacity control has to ask before it offers anything.** `traffic/route.ts`
+ * plans a journey over an escalator only where that gives the fewest segments, and a journey that
+ * is the escalator and nothing else is not lift demand and is never generated. So an escalator
+ * joining two floors the same lifts already join is ridden by nobody in a run, and a limit on it
+ * moves no leg — a control that writes nothing, which must say so rather than look live.
+ *
+ * Asked of the resolved building, with `core`'s own planner, over the floors a journey can start
+ * or end on (an entrance, or a floor with people) and within the generator's own limit on lift
+ * legs — so *false* means no journey the trace generator can produce touches this machine.
+ */
+export function escalatorCarriesLiftJourneys(resolved: ResolvedBuilding, modeId: string): boolean {
+  const planner = RoutePlanner.forBuilding(resolved);
+  const ends = resolved.floors.filter((floor) => floor.population > 0 || floor.isEntrance === true);
+  for (const from of ends) {
+    for (const to of ends) {
+      if (from.id === to.id) continue;
+      const route = planner.plan(from.id, to.id);
+      if (route === undefined || route.elevatorLegCount === 0) continue;
+      if (route.elevatorLegCount > TRAFFIC_DEFAULTS.maxLegs) continue;
+      if (route.segments.some((segment) => segment.kind === 'transport' && segment.modeId === modeId)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 /**

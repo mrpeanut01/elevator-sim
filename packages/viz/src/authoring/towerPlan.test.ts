@@ -35,6 +35,8 @@ import {
 import { BUILDING_IDS } from '../fixtures.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
 
+import { escalatorCapacityChoices } from './buildingSpec.js';
+
 import {
   PLAN_TEMPLATES,
   autoPopulationAt,
@@ -42,6 +44,8 @@ import {
   blankPlan,
   buildingFromPlan,
   deckPairingOf,
+  escalatorAbove,
+  escalatorCarriesLiftJourneys,
   groupsOf,
   layoutOf,
   orphanFloorsOf,
@@ -60,6 +64,7 @@ import {
   withAutoZones,
   withCars,
   withDecks,
+  withEscalatorCapacity,
   withEscalatorToggled,
   withFloors,
   withPopulation,
@@ -67,7 +72,6 @@ import {
   withShafts,
   withSkyLobbyToggled,
   stairsAbove,
-  escalatorAbove,
   withAccessZoneAdded,
   withAccessZoneRemoved,
   withDescentSpeed,
@@ -130,6 +134,17 @@ function arrivalsOf(plan: TowerPlan): string {
 }
 
 const first = (plan: TowerPlan): string => (plan.shafts[0] as PlanShaft).key;
+
+/**
+ * A two-level lobby, made with the board's own edits: every shaft's lobby door closed, floor 1 a
+ * sky lobby, and an escalator from the street up to it. The one arrangement in which an escalator
+ * is on the way to a lift, which no template ships.
+ */
+function mezzanineLobby(): TowerPlan {
+  const base = zonedTowerPlan();
+  const closed = base.shafts.reduce((plan, shaft) => withStopToggled(plan, shaft.key, 0), base);
+  return withEscalatorToggled(withSkyLobbyToggled(closed, [1]), 0);
+}
 
 describe('every plan becomes a building the loader builds', () => {
   for (const template of PLAN_TEMPLATES) {
@@ -487,5 +502,52 @@ describe('the drawing board is not decoration — every control moves the legs',
     /* Without the transfer flag nobody may change at 30, so the upper half generates no lobby trip. */
     expect(legsOf(withSkyLobbyToggled(sky, [30]))).not.toBe(skyControl);
     expect(legsOf(withEscalatorToggled(sky, 0))).not.toBe(skyControl);
+  });
+
+  it('an escalator’s carrying capacity changes the run where riders are routed over it, and only there', () => {
+    /*
+     * § D1631. The edit is the one the board's chip makes — a row of the reference table — and
+     * the comparison is on the legs. The plan is a two-level lobby drawn on the board: the lifts
+     * start one floor up, at a sky lobby, and the escalator is the only way to them from the
+     * street. Riders are routed over it; those who reach it together step on a slot apart and the
+     * lifts beyond are boarded at different instants.
+     */
+    const tall = mezzanineLobby();
+    const narrowest = escalatorCapacityChoices(SPECS.escalatorCapacity)[0];
+    if (narrowest === undefined) throw new Error('the reference table has no 0.5 m/s row');
+    const analysisTall = planAnalysisOf(tall, SPECS);
+    expect(analysisTall.refusals).toEqual([]);
+    const resolvedTall = analysisTall.resolved;
+    const lobby = escalatorAbove(tall, 0);
+    if (resolvedTall === undefined || lobby === undefined) throw new Error('the plan did not build');
+    expect(escalatorCarriesLiftJourneys(resolvedTall, lobby.id)).toBe(true);
+    const uncapped = legsOf(tall);
+    const capped = withEscalatorCapacity(tall, 0, narrowest.personsPerHour);
+    expect(planAnalysisOf(capped, SPECS).refusals).toEqual([]);
+    expect(legsOf(capped)).not.toBe(uncapped);
+    expect(legsOf(withEscalatorCapacity(capped, 0, undefined))).toBe(uncapped);
+
+    // The document says what the figure is and where it is from, because this board had the table.
+    const written = buildingFromPlan(capped, SPECS).transportModes?.find((mode) => mode.id === lobby.id);
+    expect(written?.capacityPersonsPerHour).toBe(narrowest.personsPerHour);
+    expect(written?.$comment).toContain('CITED as the row');
+    for (const mode of buildingFromPlan(tall, SPECS).transportModes ?? []) {
+      expect(mode).not.toHaveProperty('capacityPersonsPerHour');
+    }
+
+    /*
+     * **And the other half, pinned by a run and not by the sentence that states it** (§ D227).
+     * On the sky-lobby template an escalator above the lobby joins two floors the same lifts
+     * already join, so no lift journey is routed over it — and a limit there, even one rider an
+     * hour, moves no leg at all. The board says so; this is what makes that true.
+     */
+    const drawn = withEscalatorToggled(skyLobbyPlan(), 0);
+    const resolvedDrawn = planAnalysisOf(drawn, SPECS).resolved;
+    const idle = escalatorAbove(drawn, 0);
+    if (resolvedDrawn === undefined || idle === undefined) throw new Error('the template did not build');
+    expect(escalatorCarriesLiftJourneys(resolvedDrawn, idle.id)).toBe(false);
+    expect(legsOf(withEscalatorCapacity(drawn, 0, 1))).toBe(legsOf(drawn));
+    // A floor with no escalator above it has nothing to set.
+    expect(withEscalatorCapacity(drawn, 3, narrowest.personsPerHour)).toBe(drawn);
   });
 });

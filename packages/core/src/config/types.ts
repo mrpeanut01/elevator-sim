@@ -384,6 +384,39 @@ export interface ShaftFootprintTable extends Commented {
   readonly source: string;
 }
 
+/**
+ * One row of the escalator planning table: a step width, a nominal speed and the persons per hour
+ * the source states for that pair. See {@link EscalatorCapacityReference}.
+ */
+export interface EscalatorCapacityRow {
+  /** Nominal step width, metres — `0.6`, `0.8` or `1.0` in EN 115-1's table. */
+  readonly stepWidthM: number;
+  /** Nominal speed of the step band, metres per second. */
+  readonly nominalSpeedMps: number;
+  /** Persons per hour, one direction, as the source states it. */
+  readonly personsPerHour: number;
+}
+
+/**
+ * **The escalator carrying-capacity planning table** — `elevator-specs.json`'s
+ * `escalatorCapacity` block, § D1631.
+ *
+ * Reference data and not a default: no code path reads a row and applies it to an escalator that
+ * declared no capacity. It has two readers. `resolveBuilding` warns when a mode's
+ * {@link TransportModeConfig.capacityPersonsPerHour} is above the largest row
+ * (`escalator-capacity-above-reference`), which is what catches a figure typed per minute or with
+ * a digit too many. And the building designer offers the rows as its choices, so a capacity a
+ * reader picks there is a cited one.
+ *
+ * Beside the classes for {@link AirPressureLimit}'s reason — it is not a property of a lift class
+ * — and optional for the same one: a data directory that declares none warns about nothing.
+ */
+export interface EscalatorCapacityReference extends Commented {
+  readonly rows: readonly EscalatorCapacityRow[];
+  /** Where the figures come from, and what was and was not opened to get them. */
+  readonly source: string;
+}
+
 /** The whole of `data/elevator-specs.json`. */
 export interface ElevatorSpecs extends Commented {
   readonly version: number;
@@ -421,6 +454,12 @@ export interface ElevatorSpecs extends Commented {
    * issue #429, and a building that declares a plate there is told so (`floor-area-buys-nothing`).
    */
   readonly shaftFootprint?: ShaftFootprintTable | undefined;
+  /**
+   * Escalator carrying capacity by step width and speed — § D1631. Optional for
+   * {@link airPressure}'s reason: a data directory that declares none has no reference to check
+   * a declared capacity against, and checks none.
+   */
+  readonly escalatorCapacity?: EscalatorCapacityReference | undefined;
   readonly capacities: readonly CapacityEntry[];
   readonly doors: DoorTimings;
   readonly timing: ElevatorTiming;
@@ -1813,15 +1852,20 @@ export interface ShaftConfig {
  * breakdown, because none of those would be read by anything — the simulator measures lift
  * service, and this type exists to stop the lifts being charged for work they do not do.
  *
- * Two things are still deliberately **not** declared, each because nothing in the tree would
- * consult them and an unread field is the dead seam `CLAUDE.md` names eleven times over:
+ * One thing is still deliberately **not** declared, because nothing in the tree would consult it
+ * and an unread field is the dead seam `CLAUDE.md` names eleven times over. *(There were two. The
+ * second was a capacity, and it is declared now; its refusal is kept below with what moved it.)*
  *
  * - **No one-way direction.** A one-way escalator is a real configuration and this cannot express
  *   it. Note this is *not* the same as {@link traversalTimeS}'s asymmetry, which says climbing and
  *   descending take different lengths of time; a one-way machine is one you cannot use at all in
  *   the other direction. Named as a limitation rather than half-built.
- * - **No capacity or headway.** An escalator's handling capacity is enormous relative to a lift's
- *   and modelling it would put a queue on the one edge that exists to *remove* a queue.
+ * - ~~**No capacity or headway.**~~ *This read: "An escalator's handling capacity is enormous
+ *   relative to a lift's and modelling it would put a queue on the one edge that exists to remove
+ *   a queue."* The first half is still true and is why the field has no default. The second was
+ *   moved by the product owner's request and by `DECISIONS.md` § D1631: an escalator may declare
+ *   {@link capacityPersonsPerHour}, and one that does has a queue. One that does not is exactly
+ *   the edge described here.
  *
  * **A third was declared, and the reason it was refused is worth keeping.** *"No `kind` enum —
  * nothing branches on it"* was correct for as long as every mode behaved identically. docs/14
@@ -1867,8 +1911,10 @@ export interface TransportModeConfig extends Commented {
    * A *deterministic* number, not a distribution, and deliberately so: a random draw would need a
    * new named stream on `StreamSet`, and adding a stream shifts every downstream draw, which
    * desynchronizes common random numbers against every run already stored (CLAUDE.md invariant 2,
-   * and `random/streams.ts`). The gain — a few seconds of spread on a segment nobody queues for —
-   * does not buy back the comparison power.
+   * and `random/streams.ts`). The gain — a few seconds of spread on the ride itself — does not
+   * buy back the comparison power. *(This read "on a segment nobody queues for". An escalator
+   * that declares {@link capacityPersonsPerHour} is queued for, since § D1631; the queue is
+   * deterministic too, for this paragraph's reason.)*
    *
    * **Reference value, so it must be cited** in the declaring building's `$comment`; see
    * `docs/02-elevator-reference.md` § *Non-lift transport*.
@@ -1879,6 +1925,49 @@ export interface TransportModeConfig extends Commented {
    * mode and refused on an escalator, which nobody chooses.
    */
   readonly use?: StairsUseConfig | undefined;
+  /**
+   * **How many people one direction of this escalator can carry, persons per hour** — § D1631.
+   *
+   * **Absent means no limit, which is the model this project shipped before the field existed**:
+   * the hop takes {@link traversalTimeS} and any number of riders may step on at the same
+   * instant. Every shipped building declares none, so every shipped run and every stored record
+   * is the object it was; `sim/escalatorCapacity.test.ts` holds that on the legs. There is **no
+   * default in code**, for the reason `StairsUseConfig` has none: a default would put a planning
+   * figure nobody chose into every study that declared an escalator.
+   *
+   * Present, it is the service rate of a **first-come, first-served queue at each boarding
+   * landing**. A rider steps on at the later of the instant they reach the landing and the
+   * instant the previous rider's slot ends; slots are `3600 / capacityPersonsPerHour` seconds
+   * apart; the ride then takes {@link traversalTimeS}. The time spent standing at the landing is
+   * a wait and is published as one (`RunSummary.transportQueues`), on the journey's
+   * time-to-destination and never inside lift waiting time.
+   *
+   * ## An escalator mode is a pair, and the figure is per direction
+   *
+   * `connects` is unordered and {@link traversalTimeS} is symmetric, and every shipped mode is
+   * named *"escalator pair"*: one machine up and one down. So a mode with a capacity has **two
+   * independent queues**, one at each landing, each served at this rate. A single reversible
+   * belt would need a declared direction or a schedule, and neither is modelled — an author with
+   * one belt has no way to say so here and should not declare this field as though they had two.
+   *
+   * ## Persons per hour, and declared rather than derived
+   *
+   * Per hour because that is the unit every source consulted states it in, and five of the nine
+   * EN 115-1 planning figures do not divide by sixty. Declared rather than derived from a step
+   * width and a speed because the mode declares neither: {@link traversalTimeS} is a lumped
+   * figure, and a second declared speed beside it would be two statements of one quantity free
+   * to disagree. The planning table itself is data — `elevator-specs.json`'s
+   * `escalatorCapacity` block ({@link EscalatorCapacityReference}) — and a declared value above
+   * its largest row is warned about (`escalator-capacity-above-reference`), not refused.
+   *
+   * **Reference value, so it must be cited** in the declaring building's `$comment`; see
+   * `docs/02-elevator-reference.md` § *Escalator carrying capacity*.
+   *
+   * **Refused on a `stairs` mode.** No stair flow capacity has been consulted or cited, and a
+   * stairs rider never enters the lift system at all, so the field would be both uncited and
+   * unread there.
+   */
+  readonly capacityPersonsPerHour?: number | undefined;
 }
 
 /** What a {@link TransportModeConfig} is. See {@link TransportModeConfig.kind}. */

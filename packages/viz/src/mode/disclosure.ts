@@ -360,6 +360,12 @@ const SUPPRESSION_CLAUSE_BY_GROUND: Readonly<Record<AwtInvalidGround, Suppressio
       cause: 'somebody waited far longer than any average could admit to',
       consequence: 'the average describes a run nobody had',
     },
+    // The sixth ground (§ D1631). It has to read differently from `abandoned` and from
+    // `censored`: those riders left or were left standing at a lift, and these never reached one.
+    'transport-saturated': {
+      cause: 'an escalator could not carry its crowd',
+      consequence: 'the lifts met only the riders it let through',
+    },
   });
 
 /**

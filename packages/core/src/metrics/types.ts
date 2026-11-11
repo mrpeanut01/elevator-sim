@@ -49,6 +49,7 @@ import type { TrafficModelVersion } from '../traffic/types.js';
 
 import type { AwtInvalidGround } from './awtValidity.js';
 import type { PassengerModel } from './comparability.js';
+import type { TransportQueueRecord, TransportQueueStatistics } from './transportQueue.js';
 
 /* -------------------------------------------------------------------------- *
  * Errors and versioning
@@ -257,6 +258,25 @@ export interface PassengerRecord {
    * removing a spurious lift leg from silently handing the passenger free seconds.
    */
   readonly egressTransitSeconds?: number | undefined;
+  /**
+   * Seconds this rider stood at the foot of that closing escalator before their turn — § D1631.
+   *
+   * **Absent, not `0`, unless they waited**, which needs an escalator that declares a
+   * `capacityPersonsPerHour` and a queue ahead of them; so every record of every building that
+   * declares no capacity is the object it was. {@link buildJourneys} adds it to the completion
+   * instant beside {@link egressTransitSeconds}. It is a wait, published per queue in
+   * `RunSummary.transportQueues`, and it is **not** part of lift waiting time.
+   */
+  readonly egressQueueSeconds?: number | undefined;
+  /**
+   * Present, and `true`, when the closing escalator would have put this rider at their
+   * destination after the run's drain deadline — § D1631.
+   *
+   * The lift leg finished; the journey did not. {@link buildJourneys} reports such a journey as
+   * incomplete, with no time-to-destination, and the run names it in
+   * `SimulationResult.undelivered` as `on-transport`. Absent on every other leg.
+   */
+  readonly egressCut?: true | undefined;
   /** When the passenger entered the car, or absent if they were never served. */
   readonly boardedAt?: SimTime | undefined;
   /** When the passenger left the car, or absent if they never boarded or never arrived. */
@@ -1061,6 +1081,16 @@ export interface RunRecord {
   readonly carTimings?: CarTimings | undefined;
   /** One entry per leg, in the order the legs arrived. */
   readonly passengers: readonly PassengerRecord[];
+  /**
+   * One entry per direction of every escalator that declares a carrying capacity, in declared
+   * order, `up` before `down` — § D1631, and see `metrics/transportQueue.ts`.
+   *
+   * **Absent on every run of every building that declares no `capacityPersonsPerHour`**, which is
+   * every shipped building, so no record this project has written changes by a byte. Present, it
+   * lists a queue even when nobody joined it: a declared capacity that bound nobody is a finding,
+   * and an omitted row could not say so.
+   */
+  readonly transportQueues?: readonly TransportQueueRecord[] | undefined;
   readonly loadSamples: readonly LoadSample[];
   readonly queueSamples: readonly QueueSample[];
   /**
@@ -1801,6 +1831,16 @@ export interface RunSummary {
    * field existed. See `metrics/awtValidity.ts`.
    */
   readonly awtInvalidGround?: AwtInvalidGround | undefined;
+  /**
+   * Every escalator queue over this window — entries, waits, peak length and whether it kept up.
+   *
+   * **Absent when the record carries no `transportQueues`**, so a summary of a building that
+   * declares no escalator capacity is the object it was before § D1631. A queue's wait is a wait
+   * and is on the journey's {@link timeToDestination}; it is here, beside {@link waiting}, and
+   * not inside it, because {@link waiting} is lift waiting time. A saturated queue withholds its
+   * own mean and, through the `transport-saturated` ground, this summary's {@link awtIsValid}.
+   */
+  readonly transportQueues?: readonly TransportQueueStatistics[] | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
