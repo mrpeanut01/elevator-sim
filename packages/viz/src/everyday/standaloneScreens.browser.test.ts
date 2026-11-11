@@ -281,6 +281,54 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     await page.close();
   });
 
+  it('stands a short block apart, and fits a stair, a panel, a kept floor and a slower descent', async () => {
+    const page = await coldLoad();
+    await openBoard(page, 'podium');
+    const structures = async (): Promise<number> => page.$$eval('.everyday-designer-shaft-chip', (nodes) => nodes.length);
+    const before = (await groups(page)).length;
+    await page.click('.everyday-designer-shaft-chip[data-k="shaft:s5"]');
+    expect(await page.textContent('.everyday-designer-wing')).toBe('Stand apart, as a block on the other side');
+    await page.click('.everyday-designer-wing');
+    expect(await groups(page)).toHaveLength(before + 1);
+    expect(await page.textContent('.everyday-designer-wing')).toBe('Rejoin the first block');
+    expect(await structures()).toBe(9);
+
+    /* A slower descent is offered from the class's own steps, below the rated speed only. */
+    await page.click('.everyday-designer-tab[data-step="lifts"]');
+    expect(await page.getAttribute('.everyday-designer-descent[data-k="descent:0"]', 'aria-pressed')).toBe('true');
+
+    await page.click('.everyday-designer-tab[data-step="floors"]');
+    await page.fill('.everyday-designer-number[data-k="number:First floor picked"]', '3');
+    await page.keyboard.press('Tab');
+    /* A stair asks for four numbers and is refused, in words, until it has them. */
+    await page.click('.everyday-designer-stairs-add');
+    expect(await page.textContent('.everyday-designer-stairs-refused')).toContain('A stair needs all four');
+    for (const [label, value] of [
+      ['Seconds to climb', '30'],
+      ['Seconds to walk down', '22'],
+      ['Percent who walk up', '20'],
+      ['Percent who walk down', '45'],
+    ] as const) {
+      await page.fill(`.everyday-designer-draft[data-k="draft:${label}"]`, value);
+    }
+    await page.click('.everyday-designer-stairs-add');
+    expect(await page.textContent('.everyday-designer-stairs-line')).toBe(
+      '30.0 s up and 22.0 s down · 20% walk up and 45% walk down',
+    );
+    expect(await page.$('.everyday-designer-warning-blocker')).toBeNull();
+
+    await page.click('.everyday-designer-panel[data-k="panel:destination-entry"]');
+    expect(await page.getAttribute('.everyday-designer-panel[data-k="panel:destination-entry"]', 'aria-pressed')).toBe('true');
+
+    expect(await page.textContent('.everyday-designer-access-open')).toBe('Anybody may travel here.');
+    await page.fill('.everyday-designer-draft[data-k="draft:Name of the group"]', 'staff');
+    await page.click('.everyday-designer-access-add');
+    expect(await page.textContent('.everyday-designer-access-zone')).toContain('staff only');
+    await page.click('.everyday-designer-access-lift');
+    expect(await page.textContent('.everyday-designer-access-open')).toBe('Anybody may travel here.');
+    await page.close();
+  });
+
   it('makes a shorter shaft a wing, and gives the wider floors more people', async () => {
     const page = await coldLoad();
     await openBoard(page);
@@ -350,6 +398,9 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     expect(paired).toContain('two cars');
     expect(paired).not.toContain('double-deck');
     expect(await figureOf(page, 'Lifts')).toBe('5');
+    /* The pair's group says in its own row why it has no interval, and names no figure. */
+    const rows = await groups(page);
+    expect(rows.some((row) => row.includes('Not worked out for a group with two cars in one shaft'))).toBe(true);
     await page.close();
   });
 

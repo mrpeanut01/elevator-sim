@@ -172,6 +172,7 @@ import {
   DESIGNER_COPY,
   DESIGNER_DUTY_COPY,
   DESIGNER_KIND_COPY,
+  DESIGNER_PANEL_COPY,
   DESIGNER_SERVICE_COPY,
   DESIGNER_STEPS,
   DESIGNER_TEMPLATE_COPY,
@@ -194,8 +195,12 @@ import {
   planAnalysisOf,
   planFromBuilding,
   skyLobbyPlan,
+  withAccessZoneAdded,
   withCars,
   withDecks,
+  withDescentSpeed,
+  withPanel,
+  withStairsAdded,
   withPopulation,
   withSkyLobbyToggled,
   withStopToggled,
@@ -10797,6 +10802,7 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     /* `DESIGNER_DUTY_COPY` is four single words, which the derivation does not read as prose; it
        is seeded below all the same, because a label is still something a player reads. */
     'everyday/designerModel.ts#DESIGNER_KIND_COPY',
+    'everyday/designerModel.ts#DESIGNER_PANEL_COPY',
     'everyday/designerModel.ts#designerGroupRows',
     'everyday/designerModel.ts#designerFloorFacts',
     'everyday/designerModel.ts#designerServiceLine',
@@ -11089,7 +11095,7 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     }
 
     /* ------------------------------------------------------- § 13 designer */
-    const designerProse = new Set(['specNote', 'lede', 'notScored', 'groupsHint', 'groupNotSized']);
+    const designerProse = new Set(['specNote', 'lede', 'notScored', 'groupsHint', 'groupNotSized', 'stairsRefused', 'accessOpen']);
     for (const [key, text] of Object.entries(DESIGNER_COPY)) {
       seeds.push({
         field: `designer.copy.${key}`,
@@ -11114,6 +11120,9 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     }
     for (const [kind, text] of Object.entries(DESIGNER_KIND_COPY)) {
       seeds.push({ field: `designer.kind.${kind}`, text, role: 'label' });
+    }
+    for (const [panel, text] of Object.entries(DESIGNER_PANEL_COPY)) {
+      seeds.push({ field: `designer.panel.${panel}`, text, role: 'label' });
     }
 
     const specs = context.elevatorSpecs;
@@ -11151,7 +11160,22 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       ],
       ['stranded', withSkyLobbyToggled(skyLobbyPlan(), [30])],
       ['paired', withCars(small, small.shafts.map((shaft) => shaft.key), 2)],
+      /* One pair beside ordinary shafts: the group loads, and its figures are withheld with the reason. */
+      ['paired-one', withCars(small, [firstKey], 2)],
       ['decked', withDecks(small, [firstKey], 2)],
+      /* A stair, a landing panel, floors kept for one group and a slower descent, on one block. */
+      [
+        'fitted-out',
+        withDescentSpeed(
+          withAccessZoneAdded(
+            withPanel(withStairsAdded(small, 1, { upS: 26, downS: 19, up: 0.35, down: 0.55 }), [1], 'destination-entry'),
+            [2, 3],
+            'tenants',
+          ),
+          [firstKey],
+          1,
+        ),
+      ],
       ['hand', withPopulation(withStopToggled(small, firstKey, 7), [5], 200)],
       /*
        * Equipment a small block has no use for — a pressurised cabin, a rope and a regenerative
@@ -11287,6 +11311,10 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         seeds.push({ field: `${at}.title`, text: facts.title, role: 'label' });
         seeds.push({ field: `${at}.people`, text: String(facts.people), role: 'observation' });
         seeds.push({ field: `${at}.peopleNote`, text: facts.peopleNote, role: 'reason' });
+        if (facts.stairs !== '') seeds.push({ field: `${at}.stairs`, text: facts.stairs, role: 'observation' });
+        for (const zone of facts.zones) {
+          seeds.push({ field: `${at}.zone.${zone.id}`, text: zone.line, role: 'observation' });
+        }
       }
       const reading = designerReading(analysis);
       if (reading !== '') {
@@ -11295,14 +11323,13 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     }
     /*
      * The opened-building line, on the case's own document and on **every** code at once — the
-     * second because no shipped building declares a service schedule or a landing call type, so a
-     * corpus drawn only from documents would never render two of the eight clauses.
+     * second because no shipped building declares a service schedule, so a
+     * corpus drawn only from documents would never render one of the seven clauses.
      */
     const everyLoss: readonly PlanLoss[] = [
       'uneven-floor-heights',
       'floor-labels',
       'floor-areas',
-      'landing-call-types',
       'car-timings',
       'service-events',
       'notes',

@@ -66,7 +66,16 @@ import {
   withShaftAdded,
   withShafts,
   withSkyLobbyToggled,
+  stairsAbove,
+  escalatorAbove,
+  withAccessZoneAdded,
+  withAccessZoneRemoved,
+  withDescentSpeed,
+  withEscalatorSeconds,
+  withPanel,
+  withStairsAdded,
   withStopToggled,
+  withTransportModeRemoved,
   withWing,
   zonedTowerPlan,
   type PlanShaft,
@@ -105,6 +114,17 @@ function legsOf(plan: TowerPlan, overrides: Partial<SimulationConfig> = {}): str
       leg.passengerId,
       leg.carId ?? '',
       leg.boardedAt ?? -1,
+    ]),
+  );
+}
+
+/** The same run, by when each leg ended: a walk or a ride on an escalator has no car and no boarding. */
+function arrivalsOf(plan: TowerPlan): string {
+  return JSON.stringify(
+    recordRun(configFor(plan), { recordDecisions: false }).recording.legs.map((leg) => [
+      leg.passengerId,
+      leg.carId ?? '',
+      leg.alightedAt ?? -1,
     ]),
   );
 }
@@ -342,6 +362,69 @@ describe('the drawing board is not decoration — every control moves the legs',
   it('a block stood apart is a group of its own, and the run changes', () => {
     const podium = podiumPlan();
     expect(legsOf(withWing(podium, ['s5', 's9'], 1))).not.toBe(legsOf(podium));
+  });
+
+  it('a slower descent changes the run, and a limit at the rated speed is no limit', () => {
+    const key = first(base);
+    const rated = (base.shafts[0] as PlanShaft).machine.ratedSpeedMps;
+    const limited = withDescentSpeed(base, [key], rated / 2);
+    expect(planAnalysisOf(limited, SPECS).refusals).toEqual([]);
+    expect(legsOf(limited)).not.toBe(control);
+    expect(withDescentSpeed(limited, [key], rated)).toEqual(base);
+    expect(withDescentSpeed(limited, [key], undefined)).toEqual(base);
+  });
+
+  it('floors kept for one group change the run, and lifting the zone restores it', () => {
+    const kept = withAccessZoneAdded(base, [30, 31, 32], 'tenants');
+    expect(planAnalysisOf(kept, SPECS).refusals).toEqual([]);
+    expect(legsOf(kept)).not.toBe(control);
+    expect(withAccessZoneAdded(base, [30], '  ')).toBe(base);
+    const zone = kept.accessZones[0]?.id ?? '';
+    expect(legsOf(withAccessZoneRemoved(kept, zone))).toBe(control);
+  });
+
+  it('a stair changes the run, is written as set by hand, and is refused without all four numbers', () => {
+    const stairs = { upS: 26, downS: 19, up: 0.9, down: 0.9 };
+    const walked = withStairsAdded(base, 0, stairs);
+    expect(planAnalysisOf(walked, SPECS).refusals).toEqual([]);
+    expect(arrivalsOf(walked)).not.toBe(arrivalsOf(base));
+    const written = buildingFromPlan(walked, SPECS).transportModes?.[0];
+    expect(written?.kind).toBe('stairs');
+    expect(written?.$comment).toContain('NOT cited');
+    /* A climb quicker than the walk down, a share past one, and a blank are each no stair at all. */
+    expect(withStairsAdded(base, 0, { ...stairs, upS: 10 })).toBe(base);
+    expect(withStairsAdded(base, 0, { ...stairs, down: 1.2 })).toBe(base);
+    expect(withStairsAdded(base, 0, { ...stairs, up: Number.NaN })).toBe(base);
+    expect(stairsAbove(walked, 0)?.id).toBe(written?.id);
+    expect(escalatorAbove(walked, 0)).toBeUndefined();
+    expect(withTransportModeRemoved(walked, written?.id ?? '')).toEqual(base);
+  });
+
+  it('a landing panel is written on its floor and read back', () => {
+    const panelled = withPanel(base, [0], 'destination-entry');
+    const config = buildingFromPlan(panelled, SPECS);
+    expect(config.floors?.find((floor) => floor.index === 0)?.landingCallType).toBe('destination-entry');
+    expect(planFromBuilding(config, panelled.id).plan.panelByFloor).toEqual({ 0: 'destination-entry' });
+    expect(planFromBuilding(config, panelled.id).notCarried).toEqual([]);
+    expect(withPanel(panelled, [0], undefined)).toEqual(base);
+  });
+
+  it('an escalator made slower changes the run where a journey has to take it', () => {
+    /* The upper group boards one floor up, so everybody bound for it rides the escalator first. */
+    const upper = base.shafts.filter((shaft) => shaft.service === 'express').map((shaft) => shaft.key);
+    expect(upper.length).toBeGreaterThan(0);
+    const mezzanine = withEscalatorToggled(
+      withSkyLobbyToggled(withShafts(base, upper, (shaft) => ({ ...shaft, bottom: 1 })), [1]),
+      0,
+    );
+    expect(planAnalysisOf(mezzanine, SPECS).refusals).toEqual([]);
+    expect(strandedFloorsOf(mezzanine)).toEqual([]);
+    const slow = withEscalatorSeconds(mezzanine, 0, 120);
+    expect(escalatorAbove(slow, 0)?.traversalTimeS).toBe(120);
+    expect(legsOf(slow)).not.toBe(legsOf(mezzanine));
+    /* Where a lift opens on both ends of an escalator the lift is the route, and the seconds move nothing. */
+    const podium = podiumPlan();
+    expect(legsOf(withEscalatorSeconds(podium, 0, 120))).toBe(legsOf(podium));
   });
 
   it('publishes no interval for the group that holds a pair, and still publishes the others', () => {

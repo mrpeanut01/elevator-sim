@@ -49,7 +49,7 @@
  * the screen.
  */
 
-import type { ElevatorSpecs } from '@elevator-sim/core/browser';
+import type { CallType, ElevatorSpecs } from '@elevator-sim/core/browser';
 
 import {
   RATED_LOADS,
@@ -57,13 +57,16 @@ import {
   type BuildingSpec,
   type SpecBankAnalysis,
   type SpecMachine,
+  type SpecTransportMode,
 } from '../authoring/buildingSpec.js';
 import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
 import {
   autoPopulationAt,
   baysAt,
   deckPairingOf,
+  TWO_CAR_FIGURES_WITHHELD,
   escalatorAbove,
+  stairsAbove,
   groupsOf,
   layoutOf,
   orphanFloorsOf,
@@ -180,6 +183,31 @@ export const DESIGNER_COPY = Object.freeze({
   escalatorLabel: 'Escalator up one floor',
   escalatorHint:
     'An escalator joins two floors and takes the seconds it takes. A rider whose whole journey is those two floors rides it instead of calling a lift.',
+  escalatorSecondsLabel: 'Seconds to ride it, landing to landing',
+  stairsLabel: 'Stairs up one floor',
+  stairsHint:
+    'Nobody has to take the stairs, so a stair needs four numbers and all four are yours: the seconds up and down, and the share of people going one floor who walk. Nothing is filled in for you, and the document says they were set by hand.',
+  stairsUpSeconds: 'Seconds to climb',
+  stairsDownSeconds: 'Seconds to walk down',
+  stairsUpShare: 'Percent who walk up',
+  stairsDownShare: 'Percent who walk down',
+  stairsAdd: 'Add the stair',
+  stairsRemove: 'Take the stair away',
+  stairsRefused: 'A stair needs all four: a climb no quicker than the walk down, and two shares from 0 to 100.',
+  panelLabel: 'Call panel on the landing',
+  panelHint:
+    'What a rider presses here. A destination panel asks which floor they want before they board. It changes what the controller is told, and stops no lift and no rider.',
+  descentLabel: 'Coming down',
+  descentSame: 'As fast as going up',
+  descentHint:
+    'A car may be held to a lower speed on the way down, as two cars sharing a shaft are, and as a very tall shaft is for the sake of ears.',
+  accessLabel: 'Who may come here',
+  accessHint:
+    'Keep floors for one group of people by name. Riders outside the group are not carried to them. This is about people, and moves no lift’s doors.',
+  accessGroupName: 'Name of the group',
+  accessAdd: 'Keep these floors for them',
+  accessOpen: 'Anybody may travel here.',
+  accessLift: 'Lift it',
   zoneLabel: 'First floor of its zone',
   autoZoneLabel: 'Zone the tallest shafts for me',
   autoZoneHint:
@@ -197,6 +225,7 @@ export const DESIGNER_COPY = Object.freeze({
   legendSky: 'a sky lobby',
   legendStop: 'doors open here',
   legendEscalator: 'an escalator',
+  legendStairs: 'a stair',
   legendPeople: 'people on the floor',
 } as const);
 
@@ -805,7 +834,10 @@ export function designerGroupRows(plan: TowerPlan, analysis: PlanAnalysis): read
         figures === undefined
           ? bank === undefined || bank.refusal === ''
             ? DESIGNER_COPY.withheld
-            : DESIGNER_COPY.groupNotSized
+            : bank.refusal === TWO_CAR_FIGURES_WITHHELD
+              ? /* The board's own sentence, in plain words: said on the row, not sent to the document. */
+                TWO_CAR_FIGURES_WITHHELD
+              : DESIGNER_COPY.groupNotSized
           : `${figures.intervalS.toFixed(1)} s interval · ${figures.percentPopulation5Min.toFixed(1)}% of ${String(figures.servedPopulation)} people in five minutes`,
       withheld: figures === undefined,
     };
@@ -950,9 +982,39 @@ export interface DesignerFloorFacts {
   readonly escalator: boolean;
   /** False for a range, and for the top floor. */
   readonly canHaveEscalator: boolean;
+  /** Seconds the escalator above the picked floor takes, or `undefined` where there is none. */
+  readonly escalatorSeconds: number | undefined;
+  /** The stair above the (single) picked floor, said in one line, or `''`. */
+  readonly stairs: string;
+  /** The landing fixture every picked floor shares; `'controller'` where none is set, `undefined` where they differ. */
+  readonly panel: CallType | 'controller' | undefined;
+  /** Every access zone that covers a picked floor: its id, and who it is kept for and where. */
+  readonly zones: readonly { readonly id: string; readonly line: string }[];
   /** The crowd every picked floor shares, as a profile id, or `undefined` where they differ. */
   readonly use: string | undefined;
 }
+
+function escalatorSecondsOf(mode: SpecTransportMode | undefined): number | undefined {
+  return mode !== undefined && typeof mode.traversalTimeS === 'number' ? mode.traversalTimeS : undefined;
+}
+
+/** A stair's four numbers in one line, both directions named. `''` where there is no stair. */
+function stairsLineOf(mode: SpecTransportMode | undefined): string {
+  if (mode === undefined || typeof mode.traversalTimeS === 'number') return '';
+  const share = (value: number | undefined): string => `${String(Math.round((value ?? 0) * 100))}%`;
+  return (
+    `${mode.traversalTimeS.upS.toFixed(1)} s up and ${mode.traversalTimeS.downS.toFixed(1)} s down · ` +
+    `${share(mode.use?.up)} walk up and ${share(mode.use?.down)} walk down`
+  );
+}
+
+/** The landing fixtures a floor may have, in the words the board uses. */
+export const DESIGNER_PANEL_COPY: Readonly<Record<CallType | 'controller', string>> = Object.freeze({
+  controller: 'As the controller has it',
+  'up-down-buttons': 'Up and down buttons',
+  'destination-entry': 'A destination panel',
+  'mobile-credential': 'A phone credential',
+});
 
 export function designerFloorFacts(plan: TowerPlan, range: readonly [number, number]): DesignerFloorFacts {
   const low = Math.min(range[0], range[1]);
@@ -964,6 +1026,7 @@ export function designerFloorFacts(plan: TowerPlan, range: readonly [number, num
   const handSet = floors.filter((floor) => plan.populationByFloor[floor] !== undefined).length;
   const bays = baysAt(plan, layout, low);
   const uses = new Set(floors.map((floor) => plan.useByFloor[floor] ?? plan.trafficProfile));
+  const panels = new Set<CallType | 'controller'>(floors.map((floor) => plan.panelByFloor[floor] ?? 'controller'));
   const lowId = planFloorId(plan, low);
   const highId = planFloorId(plan, high);
   const single = low === high;
@@ -987,6 +1050,15 @@ export function designerFloorFacts(plan: TowerPlan, range: readonly [number, num
     canBeSkyLobby: lobbyable.length > 0,
     escalator: single && escalatorAbove(plan, low) !== undefined,
     canHaveEscalator: single && low < plan.floors,
+    escalatorSeconds: escalatorSecondsOf(single ? escalatorAbove(plan, low) : undefined),
+    stairs: stairsLineOf(single ? stairsAbove(plan, low) : undefined),
+    panel: panels.size === 1 ? ([...panels][0] as CallType | 'controller') : undefined,
+    zones: plan.accessZones
+      .filter((zone) => zone.floors.some((floor) => floor >= low && floor <= high))
+      .map((zone) => ({
+        id: zone.id,
+        line: `${zone.credentialGroups.join(', ')} only · ${stopsSummary(plan, zone.floors)}`,
+      })),
     use: uses.size === 1 ? ([...uses][0] as string) : undefined,
   };
 }
@@ -1017,7 +1089,6 @@ const LOSS_COPY: Readonly<Record<PlanLoss, string>> = Object.freeze({
   'uneven-floor-heights': 'its floors were not all the same height, and here every floor is',
   'floor-labels': 'the names its floors were given',
   'floor-areas': 'the floor areas it declared',
-  'landing-call-types': 'the call panels set floor by floor',
   'car-timings': 'door, transfer and ride timings set on single cars',
   'service-events': 'cars scheduled to leave and return during a run',
   notes: 'the notes written on it',
