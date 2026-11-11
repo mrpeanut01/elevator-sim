@@ -19,6 +19,21 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave AY
+
+**Wave AY moves +43.00 strings a case always-on, with the surface set unchanged.** The base is wave AX's
+row, measured on that wave's head, whose code `main` carries unchanged at `e134f2a`. Measured once on wave
+AY's head, which is one lane. The same 80 surfaces speak, so the move is text on existing producers: the
+Scenario hub's adapter gains *Your buildings* with a list and with none, and the bar's adapter gains the
+test simulation's stage primary and note and the lobby's way out ([§ D1629](../DECISIONS.md)). The deep
+row still names `c181913` until the first nightly after wave AY merges.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base, wave AX's row (`38fa319`) | 1 047 333 | | | 80 |
+| wave AY's head (`0592442`) | **1 049 440** | **+2 107** | **+43.00** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
 ## Wave AX
 
 **Wave AX moves −132.00 strings a case always-on, with the surface set unchanged.** The base is wave AW's
