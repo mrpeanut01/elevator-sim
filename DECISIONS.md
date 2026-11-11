@@ -55997,6 +55997,14 @@ abandonment's treatment and its place in the precedence.
 - The leg `arrivedAt` after a capacity-bearing hop is no longer dispatcher-independent where the
   belt is shared with riders coming off a lift. It already was not for any transfer leg.
 
+**What the data block cost, said plainly.** `elevator-specs.json` is part of every run's
+configuration, so adding a block to it moves every digest taken over a run's inputs, whether or
+not any run reads the block. Two shipped files are pinned that way and both were regenerated, as
+their guards instruct: `data/fixit-as-built-mornings.json` (all 18 input hashes moved and **no
+reading did**) and `data/scenario-survivors.json`. A stored run still replays to the same legs; a
+digest of its *inputs* taken before this entry no longer matches one taken after. `airPressure`,
+`ropeClasses` and `shaftFootprint` paid the same cost for the same reason.
+
 **What was left out, and said.**
 
 - **No shipped building declares a capacity.** None of them cites one, and the planning figures are
