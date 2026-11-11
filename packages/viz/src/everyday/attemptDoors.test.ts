@@ -106,6 +106,7 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   editedDispatcher: 'reads',
   elevatorSpecs: 'reads',
   buildingSpec: 'reads',
+  buildingPlan: 'reads',
   plainLevers: 'reads',
   dispatcherProfilesFile: 'reads',
   workingSpec: 'reads',
@@ -164,6 +165,8 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   campaignDay: 'reads',
   answerIncident: 'elsewhere',
   applyBuildingSpec: 'held',
+  /* The drawing board's save: `applyBuildingSpec`'s door for a plan, held on the same question. */
+  applyTowerPlan: 'held',
   /* § D1368's sandbox day plays the day's crowd, so it is held while an attempt stands (joined at integration). */
   sandboxStanding: 'reads',
   /* Lane AO-4's two reads, joined at integration: the attempt's left-at clock and the day before's driver. */
@@ -364,6 +367,11 @@ const HELD_PRESSES: Readonly<Record<string, (host: EverydayHost) => unknown>> = 
     if (spec === undefined) throw new Error('the standing building has no spec');
     return host.applyBuildingSpec(spec);
   },
+  applyTowerPlan: (host) => {
+    const reading = host.buildingPlan();
+    if (reading === undefined) throw new Error('the standing building has no plan');
+    return host.applyTowerPlan(reading.plan);
+  },
   runSandbox: (host) => host.runSandbox({ building: undefined, pattern: undefined, dwell: { choice: 'patient' } }),
   takeCallAgain: (host) => host.takeCallAgain(),
   playThisCrowd: (host) =>
@@ -384,6 +392,7 @@ const BEFORE_THE_ATTEMPT: Readonly<Record<string, 'practice' | 'refused' | 'writ
   setDispatcher: 'writes',
   setPlainLever: 'writes',
   applyBuildingSpec: 'writes',
+  applyTowerPlan: 'writes',
   startRun: 'practice',
   runSandbox: 'practice',
   takeCallAgain: 'refused',
