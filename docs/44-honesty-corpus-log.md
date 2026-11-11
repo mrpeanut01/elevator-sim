@@ -24,7 +24,7 @@ The always-on row is measured on the integrated head; the deep row is read from 
 **Wave AZ moves +43.00 strings a case always-on, with the surface set unchanged.** One lane: a building
 the player drew is played from the Scenario floor ([§ D1629](../DECISIONS.md)). The base was re-measured
 on `main` at `9211636` and read 1 160 545, not the 1 151 823 wave AY's row published: #658 merged after
-that row was taken and moved it by 8 722, which is that lane's and is not decomposed here. Measured once
+that row was taken and moved it by 8 722, that lane's, not decomposed here. Measured once
 on wave AZ's head after `main` was merged in. The same 80 surfaces speak, so the move is text on existing
 producers: the Scenario hub's *Your buildings*, and the bar's test simulation and lobby cells. The deep
 row still names `c181913` until the first nightly after wave AZ merges.
