@@ -99,6 +99,8 @@ export const DESIGNER_COPY = Object.freeze({
     'Nothing here is scored.',
   blankLabel: 'blank tower',
   saveLabel: 'Save as a new building',
+  /** What a save did, and where the building is played — § D1629. */
+  savedLine: 'Saved. Play a day in it from the Scenario floor, under Your buildings.',
   nameLabel: 'What it is called',
   /** § 13.3's panel headings, uppercased to the eyebrow register. */
   buildingEyebrow: 'THE BUILDING',

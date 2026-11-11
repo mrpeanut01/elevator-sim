@@ -336,6 +336,65 @@ export const SCENARIO_ABSENCES: readonly string[] = Object.freeze([
   'Two of the six engineering challenges ship, and they are played on the Engineer surface rather than from this list. The other four ask for something a scenario run cannot do yet, and each says which.',
 ]);
 
+/* -------------------------------------------------------------------------- *
+ * Your buildings — § D1629
+ * -------------------------------------------------------------------------- */
+
+/** The words of the hub's *Your buildings* block. */
+export const OWN_BUILDINGS_COPY = Object.freeze({
+  heading: 'Your buildings',
+  lede:
+    'Buildings you drew and saved on the Design floor. Play a day in one from its brief to its ' +
+    'report. Each has a week of its own, and a day there is yours alone: it is not posted to a ' +
+    'board and it earns no chimes.',
+  play: 'Play a day',
+  empty: 'You have not saved a building yet. Draw one on the Design floor and it is listed here.',
+  design: 'Design a building',
+});
+
+/** One saved building, as the hub lists it. */
+export interface OwnBuildingRow {
+  readonly id: string;
+  readonly name: string;
+  /** The building's own one-line specification, or empty where it cannot be read. */
+  readonly spec: string;
+}
+
+export interface OwnBuildingsView {
+  readonly heading: string;
+  readonly lede: string;
+  readonly rows: readonly OwnBuildingRow[];
+  /** The sentence drawn in place of the rows, when there are none. */
+  readonly empty: string | undefined;
+  readonly playLabel: string;
+  readonly designLabel: string;
+}
+
+/**
+ * **The buildings a player can play because they made them** —
+ * [§ D1629](../../../../DECISIONS.md), `docs/38` § 2.1's *Build your own* as far as this build takes
+ * it. Newest first, because the building just saved is the one the player came here to play.
+ *
+ * Takes the list and the spec reader rather than a host: this module is pure, and the hub's mount
+ * hands it `EverydayHost.ownBuildings()` and `buildingSpecLine`.
+ */
+export function ownBuildingsViewOf(
+  buildings: readonly { readonly id: string; readonly name: string }[],
+  specOf: (id: string) => string | undefined = () => undefined,
+): OwnBuildingsView {
+  const rows = [...buildings].reverse().map((building) =>
+    Object.freeze({ id: building.id, name: building.name, spec: specOf(building.id) ?? '' }),
+  );
+  return Object.freeze({
+    heading: OWN_BUILDINGS_COPY.heading,
+    lede: OWN_BUILDINGS_COPY.lede,
+    rows: Object.freeze(rows),
+    empty: rows.length === 0 ? OWN_BUILDINGS_COPY.empty : undefined,
+    playLabel: OWN_BUILDINGS_COPY.play,
+    designLabel: OWN_BUILDINGS_COPY.design,
+  });
+}
+
 /**
  * The register sentence for the stages that are listed and not offered, derived from the path.
  *

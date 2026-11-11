@@ -66,6 +66,9 @@ import {
   ACTION_BAR_ROWS,
   actionBarFor,
   confirmStripFor,
+  LOBBY_WAY_OUT,
+  TEST_SIMULATION_NOTE,
+  TEST_SIMULATION_PRIMARY,
   testSimulationBarOf,
   TIMELINE_STEPS,
   WATCHING_NOTE_OWN,
@@ -148,7 +151,7 @@ import {
   DOOR_STEPS,
   sameForEveryoneLine,
 } from '../everyday/doorView.js';
-import { HOST_PENDING_REASON } from '../everyday/host.js';
+import { HOST_PENDING_REASON, OWN_BUILDING_GONE } from '../everyday/host.js';
 import {
   BUILD_NOTES_POINTER,
   buildNotesSummaryOf,
@@ -320,7 +323,13 @@ import {
   RUN_CONTEXTS,
   SHELL_SKIP_LABEL,
 } from '../everyday/types.js';
-import { SCENARIO_COPY, SCENARIO_ENTRIES, scenarioHubViewOf } from '../everyday/scenarioModel.js';
+import {
+  OWN_BUILDINGS_COPY,
+  SCENARIO_COPY,
+  SCENARIO_ENTRIES,
+  ownBuildingsViewOf,
+  scenarioHubViewOf,
+} from '../everyday/scenarioModel.js';
 import { SCENARIO_LADDER_COPY, type ScenarioLadderRung } from '../scenario/ladder.js';
 import {
   TUTORIAL_ABSENCES,
@@ -10295,6 +10304,10 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     'everyday/actionBar.ts#confirmStripFor',
     /* § D1627: a test simulation's stage and report, with the way back to the bench. */
     'everyday/actionBar.ts#TEST_SIMULATION_LEAVE',
+    'everyday/actionBar.ts#TEST_SIMULATION_PRIMARY',
+    'everyday/actionBar.ts#TEST_SIMULATION_NOTE',
+    /* § D1628: the way home, where the guide's cells read Modes and Main Menu. */
+    'everyday/actionBar.ts#LOBBY_WAY_OUT',
     'everyday/actionBar.ts#testSimulationBarOf',
     /* § D1218 — the brief's resume and held driver, and the strip over a day whose attempt stands. */
     'shift/attempt.ts#DAY_ATTEMPT_COPY',
@@ -10438,7 +10451,9 @@ const EVERYDAY_MENU: SurfaceAdapter = {
       const tested = testSimulationBarOf(actionBarFor({ screen, ctx: 'daily' }), 'workshop');
       seeds.push({ field: `bar.test.${screen}.leave`, text: tested.leave.label, role: 'label' });
       seeds.push({ field: `bar.test.${screen}.primary`, text: tested.primary.label, role: 'label' });
+      if (tested.note !== undefined) seeds.push({ field: `bar.test.${screen}.note`, text: tested.note, role: 'prose' });
     }
+    void [LOBBY_WAY_OUT, TEST_SIMULATION_NOTE, TEST_SIMULATION_PRIMARY].length;
     seeds.push({
       field: 'rail.subline.report.test',
       text: stageSublineOf({ screen: 'report', ctx: 'daily' }, undefined, true),
@@ -15504,6 +15519,10 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/scenarioModel.ts#stageParNoteOf',
     'everyday/scenarioModel.ts#stageParLineOf',
     'everyday/scenarioModel.ts#SCENARIO_ABSENCES',
+    /* § D1629: the hub's *Your buildings* block, with a list and with none, and the host's one refusal there. */
+    'everyday/scenarioModel.ts#OWN_BUILDINGS_COPY',
+    'everyday/scenarioModel.ts#ownBuildingsViewOf',
+    'everyday/host.ts#OWN_BUILDING_GONE',
     /*
      * The hub's two session shapes — GitHub issue #559, [§ D753](../../../../DECISIONS.md). They
      * are the shapes `ENTRIES` carries, which `scenarioHubViewOf` above already seeds one row at a
@@ -16126,6 +16145,19 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
 
         /* ---- Scenario: § D525's hub, the first tile's whole surface (issue #364) ---- */
         const hub = scenarioHubViewOf(context.scenarioPath);
+        for (const [which, own] of [
+          ['none', ownBuildingsViewOf([])],
+          ['some', ownBuildingsViewOf([{ id: 'bld-1', name: '⟨building⟩' }])],
+        ] as const) {
+          const at = `${arm}.scenario.own.${which}`;
+          seeds.push({ field: `${at}.heading`, text: own.heading, role: 'label' });
+          seeds.push({ field: `${at}.lede`, text: own.lede, role: 'prose' });
+          seeds.push({ field: `${at}.play`, text: own.playLabel, role: 'label' });
+          seeds.push({ field: `${at}.design`, text: own.designLabel, role: 'label' });
+          if (own.empty !== undefined) seeds.push({ field: `${at}.empty`, text: own.empty, role: 'prose' });
+        }
+        seeds.push({ field: `${arm}.scenario.own.gone`, text: OWN_BUILDING_GONE, role: 'reason' });
+        void OWN_BUILDINGS_COPY;
         seeds.push({ field: `${arm}.scenario.eyebrow`, text: hub.eyebrow, role: 'prose' });
         seeds.push({ field: `${arm}.scenario.title`, text: hub.title, role: 'prose' });
         seeds.push({ field: `${arm}.scenario.lede`, text: hub.lede, role: 'prose' });

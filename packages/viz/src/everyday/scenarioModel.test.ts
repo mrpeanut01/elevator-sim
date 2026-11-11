@@ -20,7 +20,13 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { EVERYDAY_MODES } from './modes.js';
 import { isScreenBuilt } from './screens.js';
-import { SCENARIO_ABSENCES, SCENARIO_COPY, scenarioHubViewOf } from './scenarioModel.js';
+import {
+  OWN_BUILDINGS_COPY,
+  SCENARIO_ABSENCES,
+  SCENARIO_COPY,
+  ownBuildingsViewOf,
+  scenarioHubViewOf,
+} from './scenarioModel.js';
 import { SCENARIO_LOSS_CLAUSE } from './sittingShape.js';
 import { EVERYDAY_SCREENS } from './types.js';
 import { restrictedFloorIds } from '../access/zoning.js';
@@ -387,5 +393,38 @@ describe('the primary plays the next stage — wave AQ lane AQ-1, wave AR lane A
     const all = scenarioHubViewOf(path, new Set(offered.map((rung) => rung.id)));
     expect(all.startHere).toBeUndefined();
     expect(all.startHereLabel).toBeUndefined();
+  });
+});
+
+/* § D1629: the buildings a player can play because they made them. */
+describe('your buildings, on the Scenario floor', () => {
+  it('lists every saved building newest first, with its own name and specification', () => {
+    const view = ownBuildingsViewOf(
+      [
+        { id: 'bld-1', name: 'First Tower' },
+        { id: 'bld-2', name: 'Second Tower' },
+      ],
+      (id) => (id === 'bld-2' ? '12 floors · 3 cars' : undefined),
+    );
+    expect(view.rows.map((row) => row.id)).toEqual(['bld-2', 'bld-1']);
+    expect(view.rows[0]).toEqual({ id: 'bld-2', name: 'Second Tower', spec: '12 floors · 3 cars' });
+    /* A building whose line cannot be read draws its name and no invented figure. */
+    expect(view.rows[1]?.spec).toBe('');
+    expect(view.empty).toBeUndefined();
+    expect(view.playLabel).toBe(OWN_BUILDINGS_COPY.play);
+  });
+
+  it('says where a building comes from when there is none, and never draws an empty list', () => {
+    const view = ownBuildingsViewOf([]);
+    expect(view.rows).toEqual([]);
+    expect(view.empty).toBe(OWN_BUILDINGS_COPY.empty);
+    expect(view.empty).toContain('Design floor');
+    expect(view.designLabel).toBe(OWN_BUILDINGS_COPY.design);
+  });
+
+  /* What a day there is, said once and held: it is the player's own, so no board and no chimes. */
+  it('promises no board and no chimes, which is what a week on no authored scenario gets', () => {
+    expect(OWN_BUILDINGS_COPY.lede).toMatch(/not posted to a\s+board/u);
+    expect(OWN_BUILDINGS_COPY.lede).toMatch(/earns no chimes/u);
   });
 });

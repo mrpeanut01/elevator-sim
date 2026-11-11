@@ -74,6 +74,12 @@ export interface LobbyPorts {
    * is nothing to continue. One tile, so the lobby and the tests that press it agree on what it is.
    */
   continueTile(): HTMLElement | undefined;
+  /**
+   * Point the tray's car at a floor, or back at the lobby with `undefined` — § D1629. On a wide
+   * screen the tray is the lobby's shaft, so pointing at a landing moves the car the player can
+   * already see instead of a second one drawn beside it.
+   */
+  pointTray(floor: GameFloorKey | undefined): void;
 }
 
 export interface MountedLobby {
@@ -327,6 +333,7 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     state = next;
     render();
     travel(from, key);
+    ports.pointTray(key);
   };
 
   const view0 = lobbyViewOf(state);
@@ -455,6 +462,10 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     list.append(rowEl);
   }
   section.append(hoist, list);
+  /* Leaving the building with the pointer puts the tray's car back where the player is. */
+  section.addEventListener('mouseleave', () => {
+    ports.pointTray(undefined);
+  });
 
   /* --- The display beside the shaft, and what the menu carried under it. --- */
   const side = el(doc, 'div');
@@ -548,6 +559,11 @@ export function mountLobby(region: HTMLElement, ports: LobbyPorts): MountedLobby
     indicator.style.display = narrow ? 'none' : 'flex';
     display.style.display = narrow ? 'none' : 'block';
     root.style.padding = narrow ? '14px 12px 20px' : '24px 22px 26px';
+    /*
+     * § D1629: one shaft at a time. Wide, the tray beside the lobby is the shaft and its car is the
+     * one that moves; narrow, the tray is in the drawer, so the lobby draws its own.
+     */
+    hoist.style.display = narrow ? 'block' : 'none';
     hoist.style.width = narrow ? '64px' : '92px';
     hoist.style.background = narrow ? HOIST_NARROW : HOIST_WIDE;
     car.style.left = narrow ? '9px' : '16px';

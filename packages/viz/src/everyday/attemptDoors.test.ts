@@ -163,7 +163,10 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   runCampaignDay: 'elsewhere',
   campaignDay: 'reads',
   answerIncident: 'elsewhere',
-  applyBuildingSpec: 'held',
+  /* § D1629: saving writes the shelf and asks the hold; playing a saved building moves the week on screen. */
+  saveBuilding: 'held',
+  ownBuildings: 'reads',
+  playOwnBuilding: 'held',
   /* § D1368's sandbox day plays the day's crowd, so it is held while an attempt stands (joined at integration). */
   sandboxStanding: 'reads',
   /* Lane AO-4's two reads, joined at integration: the attempt's left-at clock and the day before's driver. */
@@ -359,10 +362,16 @@ const HELD_PRESSES: Readonly<Record<string, (host: EverydayHost) => unknown>> = 
     return host.setDispatcher(other.id);
   },
   setPlainLever: (host) => host.setPlainLever('patience', 80),
-  applyBuildingSpec: (host) => {
+  saveBuilding: (host) => {
     const spec = host.buildingSpec();
     if (spec === undefined) throw new Error('the standing building has no spec');
-    return host.applyBuildingSpec(spec);
+    return host.saveBuilding(spec);
+  },
+  /* Saved first, as a player must: with an attempt standing the save is what refuses, and nothing is played. */
+  playOwnBuilding: (host) => {
+    const spec = host.buildingSpec();
+    if (spec === undefined) throw new Error('the standing building has no spec');
+    return host.playOwnBuilding(host.saveBuilding(spec));
   },
   runSandbox: (host) => host.runSandbox({ building: undefined, pattern: undefined, dwell: { choice: 'patient' } }),
   takeCallAgain: (host) => host.takeCallAgain(),
@@ -383,7 +392,8 @@ const BEFORE_THE_ATTEMPT: Readonly<Record<string, 'practice' | 'refused' | 'writ
   startFromDispatcher: 'writes',
   setDispatcher: 'writes',
   setPlainLever: 'writes',
-  applyBuildingSpec: 'writes',
+  saveBuilding: 'writes',
+  playOwnBuilding: 'writes',
   startRun: 'practice',
   runSandbox: 'practice',
   takeCallAgain: 'refused',

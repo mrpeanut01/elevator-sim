@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { ACTION_BAR_ROWS, TEST_SIMULATION_LEAVE, actionBarFor, testSimulationBarOf } from './actionBar.js';
+import {
+  ACTION_BAR_ROWS,
+  TEST_SIMULATION_LEAVE,
+  TEST_SIMULATION_NOTE,
+  TEST_SIMULATION_PRIMARY,
+  actionBarFor,
+  testSimulationBarOf,
+} from './actionBar.js';
 import {
   GAME_FLOORS,
   GAME_FLOOR_ORDER,
   floorDirection,
+  floorKeyOf,
   floorOfScreen,
   gameFloorOf,
 } from './floors.js';
@@ -86,6 +94,7 @@ describe('the floors', () => {
     const primaryOf = (screen: string): readonly string[] =>
       ACTION_BAR_ROWS.filter((row) => row.screen === screen).flatMap((row) => row.primary.variants);
     expect(primaryOf('workshop')).toEqual([TEST_SIMULATION_LABEL]);
+    expect(primaryOf('tuner')).toEqual([TEST_SIMULATION_LABEL]);
     expect(primaryOf('designer')).toEqual([TEST_SIMULATION_LABEL]);
     for (const row of ACTION_BAR_ROWS) {
       if (floorOfScreen({ screen: row.screen, ctx: row.ctx ?? 'daily' }) === 'B') continue;
@@ -103,11 +112,25 @@ describe('the floors', () => {
         expect(tested.leave).toEqual({ label: TEST_SIMULATION_LEAVE, inert: false, screen: origin });
         expect(tested.back).toBeUndefined();
         expect(tested.timeline).toBeUndefined();
-        /* The run's own controls are the screen's, untouched. */
-        expect(tested.primary).toBe(daily.primary);
+        /* The report's primary is the screen's own; the stage's is named for a test, which closes no day. */
+        if (screen === 'stage') {
+          expect(tested.primary.label).toBe(TEST_SIMULATION_PRIMARY);
+          expect(tested.note).toBe(TEST_SIMULATION_NOTE);
+        } else {
+          expect(tested.primary).toBe(daily.primary);
+        }
         expect(tested.screen).toBe(screen);
       }
     }
+  });
+
+  /* § D1629: the plates are the shortcuts, so there is no second list of keys to drift from them. */
+  it('reads a floor’s own plate as its key, in either case, and nothing else', () => {
+    for (const key of GAME_FLOOR_ORDER) {
+      expect(floorKeyOf(key)).toBe(key);
+      expect(floorKeyOf(key.toLowerCase())).toBe(key);
+    }
+    for (const other of ['4', 'x', 'Enter', ' ', 'Escape', 'ArrowUp']) expect(floorKeyOf(other)).toBeUndefined();
   });
 
   it('says which way a ride goes', () => {

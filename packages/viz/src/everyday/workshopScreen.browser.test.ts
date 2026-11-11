@@ -102,7 +102,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
   it('opens from the rail with § 3.3’s workshop row under it', async () => {
     const page = await openWorkshop();
     expect(await page.textContent('.everyday-workshop h1')).toBe('Build the thing that decides');
-    expect(await page.textContent('.everyday-bar-leave')).toBe('⌂ Modes');
+    expect(await page.textContent('.everyday-bar-leave')).toBe('⌂ Lobby');
     expect(await page.textContent('.everyday-bar-primary')).toBe('Test simulation');
     // The style cards are the shipped `playStyles` block, under their own names.
     expect(await page.textContent('.everyday-workshop-style')).toContain('Steady hand');
