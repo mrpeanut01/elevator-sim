@@ -6,9 +6,10 @@
  * 1. **The rush tile now opens**, and its § 3.3 primary is drawn *disabled* rather than live over
  *    an engine that does not exist. A model test can assert `inert`; only a page proves the shell
  *    draws it as a button nobody can press.
- * 2. **The designer's controls reach the closed form through the mount.** The specification block is
- *    re-derived on every edit, so moving *Shafts* must move the printed interval — the standing
- *    requirement, checked on the drawn figure rather than on an internal field.
+ * 2. **The designer's controls reach the closed form through the mount.** The figures are
+ *    re-derived on every edit, so adding a shaft must move the printed interval — the standing
+ *    requirement, checked on the drawn figure rather than on an internal field — and a press on the
+ *    drawing itself must change which floors a shaft opens at.
  * 3. **The tuner is reached from the brief and from nowhere else.** § 3.2 forbids a rail row and
  *    names its two doors as the brief's locked-for-score door and the report's third lever; the
  *    first is drawn here (`briefView.ts#lockedForScore`) and the second is not, so what this tier
@@ -231,195 +232,196 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
 });
 
 describe.skipIf(!HAS_BROWSER)('Design a building', () => {
-  it('re-derives the specification block when a control moves', async () => {
-    const page = await coldLoad();
+  /** Open the board on its simplest starting point: twelve floors, four lifts that stop everywhere. */
+  async function openBoard(page: Page, template = 'blank'): Promise<void> {
     await railRow(page, 'Design a building');
     await page.waitForSelector('.everyday-designer');
+    await page.click(`.everyday-designer-template[data-template="${template}"]`);
+    await page.waitForSelector('.everyday-designer-svg');
+  }
 
-    const intervalOf = async (): Promise<string> =>
-      (await page.$$eval('.everyday-designer-figure', (cells) => {
-        const cell = cells.find((node) => node.textContent?.includes('Interval'));
+  const figureOf = async (page: Page, label: string): Promise<string> =>
+    (await page.$$eval(
+      '.everyday-designer-figure',
+      (cells, wanted) => {
+        const cell = cells.find((node) => node.textContent?.includes(wanted));
         return cell?.querySelector('.everyday-designer-figure-value')?.textContent ?? '';
-      })) ?? '';
+      },
+      label,
+    )) ?? '';
 
-    const before = await intervalOf();
+  /** What the chip over each shaft says about it — its reach, its class and anything unusual. */
+  const chips = async (page: Page): Promise<string[]> =>
+    page.$$eval('.everyday-designer-shaft-chip', (nodes) => nodes.map((node) => (node as HTMLElement).title));
+
+  const groups = async (page: Page): Promise<string[]> =>
+    page.$$eval('.everyday-designer-group', (nodes) => nodes.map((node) => node.textContent ?? ''));
+
+  it('draws the building, and re-derives the figures when a shaft is added', async () => {
+    const page = await coldLoad();
+    await openBoard(page);
+    /* The drawing is the screen: one letter over each shaft, and a group row under it. */
+    expect(await page.$$eval('.everyday-designer-svg text', (nodes) => nodes.map((node) => node.textContent))).toEqual(
+      expect.arrayContaining(['A', 'B', 'C', 'D', 'G', '12']),
+    );
+    expect(await groups(page)).toHaveLength(1);
+
+    const before = await figureOf(page, 'Interval');
     expect(before).toMatch(/^[\d.]+ s$/);
-
     /*
-     * *Shafts* — the last slider in the § 13.3 building panel. Moving it re-runs `analyzeUpPeak`
-     * over the drawn spec, so the printed interval must move: more cars over the same round trip
-     * is a shorter interval, which is the one thing the closed form is certain about.
+     * One more shaft to the roof re-runs `analyzeUpPeak` over the drawn plan, so the printed
+     * interval must move: more cars over the same round trip is a shorter interval, which is the
+     * one thing the closed form is certain about.
      */
-    await page.$$eval('.everyday-designer-building input[type="range"]', (inputs) => {
-      const shafts = inputs.at(-1) as HTMLInputElement | undefined;
-      if (shafts === undefined) throw new Error('no shafts slider');
-      shafts.value = String(Number(shafts.value) + 4);
-      shafts.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    const after = await intervalOf();
-    expect(after).not.toBe(before);
+    await page.click('.everyday-designer-add-full');
+    const after = await figureOf(page, 'Interval');
     expect(Number.parseFloat(after)).toBeLessThan(Number.parseFloat(before));
+    expect(await chips(page)).toHaveLength(5);
+    expect(await figureOf(page, 'Lifts')).toBe('5');
     await page.close();
   });
 
-  it('offers rated speed as steps within the class, and moves both when the class changes', async () => {
+  it('makes a shorter shaft a wing, and gives the wider floors more people', async () => {
     const page = await coldLoad();
-    await railRow(page, 'Design a building');
-    await page.waitForSelector('.everyday-designer');
+    await openBoard(page);
+    const before = await figureOf(page, 'People');
+    /* A shaft that stops short of the roof stands beside the core, and the floors it passes widen. */
+    await page.click('.everyday-designer-add-short');
+    expect(Number(await figureOf(page, 'People'))).toBeGreaterThan(Number(before));
+    expect((await chips(page)).at(-1)).toContain('G to 6');
+    /* Two groups now: the shaft that stops at 6 does not open onto the same floors as the rest. */
+    expect(await groups(page)).toHaveLength(2);
+    await page.close();
+  });
 
-    const steps = await page.$$eval('.everyday-designer-step', (chips) =>
-      chips.map((chip) => chip.textContent ?? ''),
-    );
+  it('offers rated speed as steps within the class, and names both numbers past the class', async () => {
+    const page = await coldLoad();
+    await openBoard(page);
+    await page.click('.everyday-designer-pick-all');
+    await page.click('.everyday-designer-tab[data-step="lifts"]');
+
+    const steps = await page.$$eval('.everyday-designer-step', (nodes) => nodes.map((node) => node.textContent ?? ''));
     expect(steps.length).toBeGreaterThan(1);
     // § 10.1: steps, never a free number — every speed chip is a catalogue value in m/s.
     expect(steps.some((chip) => /m\/s$/.test(chip))).toBe(true);
 
-    // Picking the hydraulic class narrows both ladders and re-prints the plate's class row.
+    // Hanging the hydraulic class in every shaft re-prints each chip and the plate's class row.
     await page.click('.everyday-designer-class:has-text("Hydraulic")');
+    expect((await chips(page)).every((chip) => chip.includes('Hydraulic'))).toBe(true);
+    await page.click('.everyday-designer-document-summary');
     expect(await page.textContent('.everyday-designer-plate')).toContain('Hydraulic');
     /*
-     * Then take the tower past the class. Hydraulic is rated to six floors and eighteen metres, so
-     * a thirty-storey draw raises § 10's first warning — and the guide requires it to name **both**
-     * numbers: what the design is, and what the class is rated for.
+     * Hydraulic is rated to six floors and eighteen metres, so a twelve-storey shaft raises the
+     * class warning — and the guide requires it to name **both** numbers: what the shafts travel,
+     * and what the class is rated for.
      */
-    await page.$$eval('.everyday-designer-building input[type="range"]', (inputs) => {
-      const floors = inputs[0] as HTMLInputElement | undefined;
-      if (floors === undefined) throw new Error('no floors slider');
-      floors.value = '30';
-      floors.dispatchEvent(new Event('input', { bubbles: true }));
-    });
     const warning = await page.textContent('.everyday-designer-warning-class');
-    expect(warning).toMatch(/30 floors is past what Hydraulic is built for/);
-    expect(warning).toContain('rated to 6');
+    expect(warning).toMatch(/Shafts A B C D travel up to 12 floors/);
+    expect(warning).toContain('rated to 6 floors');
     await page.close();
   });
 
   /**
-   * **The per-shaft machine picker, driven — GitHub issue #420.**
-   *
-   * The seam this covers had **no** driven guard. The only thing standing over the picker → model
-   * edge was `staleRefusals.test.ts:235`, a source grep asserting that `designerScreen.ts` contains
-   * the string `withShaftMachine` — which passes when the listener writes the wrong car index, and
-   * passes when no listener is attached at all. #420's acceptance says *the pickers write it*, and
-   * a grep cannot say that.
-   *
-   * It is driven from `blank tower` rather than from `garden-apartments`, because the state the
-   * review found is two clicks from that button and nowhere near a shipped document: `BLANK_SPEC`
-   * is geared traction at 2.5 m/s and 2 500 lb, geared traction's own band is `[1.75, 2.5]` and its
-   * load ladder starts at 2 500, so both of `withShaftMachine`'s snaps are identities when the
-   * class handed to a shaft is the design's own. The shaft is genuinely pinned and genuinely
-   * carries the design's machine, and the plate above it is true of all four shafts. Counting pins
-   * rather than differences made the note claim otherwise while `buildingSummary` said *4 cars at
-   * 2.50 m/s · 16 persons each* about the same spec.
+   * **One shaft's machine, driven.** The seam `staleRefusals.test.ts` can only grep for: the screen
+   * names `withPlanMachineClass`, and a grep passes when the listener writes the wrong shaft. Here
+   * shaft **B** is picked on the page and given a class through the shipped chips, and the
+   * assertion is *that shaft and no other*.
    */
-  it('writes one shaft’s machine from its own picker, and stays quiet when it matches the design', async () => {
+  it('gives one shaft a machine of its own, and leaves the three beside it alone', async () => {
     const page = await coldLoad();
-    await railRow(page, 'Design a building');
-    await page.waitForSelector('.everyday-designer');
-    await page.click('.everyday-designer-blank');
-    await page.waitForSelector('.everyday-designer-machine-shaft-class');
-    /* The plate and its note live inside § 13.3's collapsed document; open it once and it stays. */
-    await page.click('.everyday-designer-document-summary');
+    await openBoard(page);
+    const blank = await chips(page);
+    expect(new Set(blank.map((chip) => chip.replace(/^[^·]+· /, ''))).size, 'one machine in all four').toBe(1);
 
-    /** Every shaft's picker value, its figure line, and whether its own step ladders are drawn. */
-    const shafts = async (): Promise<{ value: string; figure: string; steps: number }[]> =>
-      page.$$eval('.everyday-designer-machine-shaft', (nodes) =>
-        nodes.map((node) => ({
-          value: (node.querySelector('select') as HTMLSelectElement).value,
-          figure: node.querySelector('.everyday-designer-machine-shaft-figure')?.textContent ?? '',
-          steps: node.querySelectorAll('.everyday-designer-step').length,
-        })),
+    await page.click('.everyday-designer-shaft-chip[data-k="shaft:s2"]');
+    await page.click('.everyday-designer-tab[data-step="lifts"]');
+    await page.click('.everyday-designer-class:has-text("Hydraulic")');
+    const one = await chips(page);
+    expect(one[1]).toContain('Hydraulic');
+    for (const other of [0, 2, 3]) expect(one[other], `shaft ${String(other)}`).toBe(blank[other]);
+
+    /* A second deck on that shaft alone: it leaves its group, and the chip says what it is. */
+    await page.click('.everyday-designer-decks[data-k="decks:2"]');
+    expect((await chips(page))[1]).toContain('double-deck');
+    expect(await groups(page)).toHaveLength(2);
+    /* Two cars and two decks cannot share a shaft, so asking for the pair takes the deck back off. */
+    await page.click('.everyday-designer-cars[data-k="cars:2"]');
+    const paired = (await chips(page))[1] ?? '';
+    expect(paired).toContain('two cars');
+    expect(paired).not.toContain('double-deck');
+    expect(await figureOf(page, 'Lifts')).toBe('5');
+    await page.close();
+  });
+
+  it('opens and closes a shaft’s doors from a press on the drawing itself', async () => {
+    const page = await coldLoad();
+    await openBoard(page);
+    await page.click('.everyday-designer-shaft-chip[data-k="shaft:s1"]');
+    await page.click('.everyday-designer-tab[data-step="service"]');
+    expect(await page.textContent('.everyday-designer-service-line')).toContain('Local — doors open at G–12.');
+
+    /* The picked shaft is the one outlined in ink. Press it a third of the way down: one floor's doors. */
+    const box = await page.$eval('.everyday-designer-svg', (svg) => {
+      const outline = [...svg.querySelectorAll('rect')].find((rect) => rect.getAttribute('stroke-width') === '2.6');
+      if (outline === undefined) throw new Error('no picked shaft is outlined');
+      const at = outline.getBoundingClientRect();
+      return { x: at.left + at.width / 2, y: at.top + at.height / 3 };
+    });
+    await page.mouse.click(box.x, box.y);
+    const line = (await page.textContent('.everyday-designer-service-line')) ?? '';
+    expect(line).toContain('Hand-picked');
+    expect(line).not.toContain('G–12.');
+    /* A shaft with different doors is a group of its own — the bank split, visible. */
+    expect(await groups(page)).toHaveLength(2);
+
+    /* And a pattern chip puts every floor back, for that shaft alone. */
+    await page.click('.everyday-designer-pattern[data-k="pattern:local"]');
+    expect(await groups(page)).toHaveLength(1);
+    await page.close();
+  });
+
+  it('mends a tower whose upper lifts nobody can reach, in the one press the warning offers', async () => {
+    const page = await coldLoad();
+    await openBoard(page, 'sky-lobby');
+    expect(await page.$eval('.everyday-designer-warnings', (card) => (card as HTMLElement).hidden)).toBe(true);
+
+    /* Take the dot off floor 30: the upper lifts still start there, and nobody may change onto them. */
+    await page.click('.everyday-designer-tab[data-step="floors"]');
+    await page.fill('.everyday-designer-number[data-k="number:First floor picked"]', '30');
+    await page.keyboard.press('Tab');
+    await page.click('.everyday-designer-sky[data-k="sky:no"]');
+    const blocker = (await page.textContent('.everyday-designer-warning-blocker')) ?? '';
+    expect(blocker).toContain('nobody can board from the street');
+    expect(await page.textContent('.everyday-designer-fix')).toBe('Make floor 30 a sky lobby');
+
+    await page.click('.everyday-designer-fix');
+    expect(await page.$('.everyday-designer-warning-blocker')).toBeNull();
+    await page.close();
+  });
+
+  it('adds an escalator and removes it again, and folds the document — § D518', async () => {
+    const page = await coldLoad();
+    await openBoard(page);
+    await page.click('.everyday-designer-tab[data-step="floors"]');
+    await page.fill('.everyday-designer-number[data-k="number:First floor picked"]', '0');
+    await page.keyboard.press('Tab');
+    expect(await page.textContent('.everyday-designer-floor-title')).toBe('The lobby');
+
+    const pressed = async (key: string): Promise<string | null> =>
+      page.getAttribute(`.everyday-designer-escalator[data-k="escalator:${key}"]`, 'aria-pressed');
+    /* The escalator is drawn as a stroke in the core's margin; nothing else on the drawing is that colour and round-capped. */
+    const drawn = async (): Promise<number> =>
+      page.$$eval('.everyday-designer-svg line', (lines) =>
+        lines.filter((line) => line.getAttribute('stroke-linecap') === 'round').length,
       );
-    const note = async (): Promise<string> =>
-      (await page.$('.everyday-designer-plate-note')) === null
-        ? ''
-        : ((await page.textContent('.everyday-designer-plate-note')) ?? '');
-    const pick = async (shaft: number, value: string): Promise<void> => {
-      const selects = await page.$$('.everyday-designer-machine-shaft-class');
-      const select = selects[shaft];
-      if (select === undefined) throw new Error(`no picker for shaft ${String(shaft)}`);
-      await select.selectOption(value);
-    };
-
-    const blank = await shafts();
-    expect(blank).toHaveLength(4);
-    expect(blank.every((shaft) => shaft.value === '')).toBe(true);
-    expect(new Set(blank.map((shaft) => shaft.figure)).size, 'one design, one figure').toBe(1);
-    expect(blank.every((shaft) => shaft.steps === 0), 'no steps on a following shaft').toBe(true);
-    expect(await note()).toBe('');
-
-    /*
-     * Shaft **B**, and the assertion is *that shaft and no other* — the half a grep cannot make and
-     * the half an off-by-one in the listener would fail. Its figure moves, its step ladders appear,
-     * and the other three are byte-identical to what they were.
-     */
-    await pick(1, 'hydraulic');
-    const one = await shafts();
-    expect(one[1]?.value).toBe('hydraulic');
-    expect(one[1]?.figure).not.toBe(blank[1]?.figure);
-    expect(one[1]?.steps, 'a shaft with its own machine gets its own ladders').toBeGreaterThan(0);
-    for (const other of [0, 2, 3]) {
-      expect(one[other]?.figure, `shaft ${String(other)}`).toBe(blank[other]?.figure);
-      expect(one[other]?.value, `shaft ${String(other)}`).toBe('');
-    }
-    expect(await note()).toContain('1 of 4 shafts');
-
-    /*
-     * Shaft **C**, handed the design's *own* class. The pin is real — the select holds it and the
-     * clear affordance is gated on it — and the machine it names is the machine the plate already
-     * quotes, so the note must not grow. This is the assertion that was red before the fix.
-     */
-    await pick(2, 'geared-traction');
-    const equal = await shafts();
-    expect(equal[2]?.value).toBe('geared-traction');
-    expect(equal[2]?.figure, 'the snap is an identity here').toBe(blank[2]?.figure);
-    expect(equal[2]?.steps).toBeGreaterThan(0);
-    expect(await note()).toContain('1 of 4 shafts');
-
-    /* And *Same as the design* clears the pin the picker gave, rather than writing the design in. */
-    await pick(1, '');
-    const cleared = await shafts();
-    expect(cleared[1]?.value).toBe('');
-    expect(cleared[1]?.figure).toBe(blank[1]?.figure);
-    expect(cleared[1]?.steps).toBe(0);
-    expect(await note(), 'the equal pin on C is not a shaft that differs').toBe('');
-    await page.close();
-  });
-
-  /**
-   * **The register moved, so this case follows it across the two screens.**
-   *
-   * It used to assert that the drawing board drew three or more register rows of its own. GitHub
-   * issue #207 draws every register on one build-information panel reached from Settings, so what
-   * a page can now prove is the pair: the board does **not** carry the block, and the panel that
-   * took it over really carries the board's rows. Asserting only the first half would pass just as
-   * well if the register had been deleted outright, which is the failure this pairing exists to
-   * make impossible.
-   */
-  it('writes an escalator row the run reads, removes it again, and folds the document — § D518', async () => {
-    const page = await coldLoad();
-    await railRow(page, 'Design a building');
-    await page.waitForSelector('.everyday-designer-escalators');
-    expect(await page.textContent('.everyday-designer-escalators-none')).toContain('No escalators');
-    expect(await page.$$('.everyday-designer-escalator')).toHaveLength(0);
-
-    await page.click('.everyday-designer-escalator-add');
-    const rows = await page.$$eval('.everyday-designer-escalator', (nodes) =>
-      nodes.map((node) => ({
-        id: (node as HTMLElement).dataset['modeId'] ?? '',
-        ends: [...node.querySelectorAll('input')].slice(0, 2).map((input) => input.value),
-        seconds: [...node.querySelectorAll('input')][2]?.value ?? '',
-      })),
-    );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.id).toBe('escalator-1');
-    expect(rows[0]?.ends).toEqual(['0', '1']);
-    expect(Number(rows[0]?.seconds)).toBeGreaterThan(5);
-    expect(await page.$('.everyday-designer-escalators-none')).toBeNull();
-
-    await page.click('.everyday-designer-escalator-remove');
-    expect(await page.$$('.everyday-designer-escalator')).toHaveLength(0);
-    expect(await page.textContent('.everyday-designer-escalators-none')).toContain('No escalators');
+    expect(await pressed('yes')).toBe('false');
+    expect(await drawn()).toBe(0);
+    await page.click('.everyday-designer-escalator[data-k="escalator:yes"]');
+    expect(await pressed('yes')).toBe('true');
+    expect(await drawn()).toBe(1);
+    await page.click('.everyday-designer-escalator[data-k="escalator:no"]');
+    expect(await pressed('yes')).toBe('false');
+    expect(await drawn()).toBe(0);
 
     /* § 13.3's document is a collapsed disclosure, and the plate is inside it. */
     const fold = await page.$eval('.everyday-designer-document', (node) => ({
@@ -451,8 +453,14 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
      * cannot do. The words did not leave with them: each stands beside the control a reader would
      * otherwise mistake for it, which is the only reason deleting the rows was not a loss.
      */
+    /*
+     * One of the two is still a hint: service zoning is not access zoning, and it is said on the
+     * Service step beside the control it qualifies. The other — that a sky lobby's starting floor
+     * was set in the machine editor — left when the Shape step gained the control for it.
+     */
+    await page.click('.everyday-designer-tab[data-step="service"]');
     expect(await page.textContent('.everyday-designer-service-scope')).toContain('building editor');
-    expect(await page.textContent('.everyday-designer-machine-owner')).toContain('machine editor');
+    expect(await page.$('.everyday-designer-machine-owner')).toBeNull();
 
     /* The rail's bordered gear row — the one Settings destination, as `settingsScreen.browser.test.ts` reaches it. */
     await page.click('.everyday-rail-settings');

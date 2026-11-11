@@ -160,16 +160,38 @@ import { AVATAR_SWATCHES } from '../everyday/profile.js';
 import {
   DESIGNER_ABSENCES,
   DESIGNER_COPY,
-  classOfSpec,
+  DESIGNER_DUTY_COPY,
+  DESIGNER_KIND_COPY,
+  DESIGNER_SERVICE_COPY,
+  DESIGNER_STEPS,
+  DESIGNER_TEMPLATE_COPY,
+  classOfMachine,
   designerCapacityLine,
   designerFigures,
+  designerFloorFacts,
+  designerGroupRows,
+  designerLossLine,
   designerPlateRows,
   designerReading,
-  designerShaftNote,
+  designerServiceLine,
   designerShaftRows,
   designerWarnings,
-  withShaftMachine,
+  withPlanMachineClass,
 } from '../everyday/designerModel.js';
+import {
+  PLAN_TEMPLATES,
+  blankPlan,
+  planAnalysisOf,
+  planFromBuilding,
+  skyLobbyPlan,
+  withCars,
+  withDecks,
+  withPopulation,
+  withSkyLobbyToggled,
+  withStopToggled,
+  type PlanLoss,
+  type TowerPlan,
+} from '../authoring/towerPlan.js';
 import { RAIL_DRAWER_COPY, railModel, stageSublineOf, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
@@ -10751,9 +10773,39 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/designerModel.ts#designerWarnings',
     'everyday/designerModel.ts#designerPlateRows',
     'everyday/designerModel.ts#designerCapacityLine',
-    /* § 13.3 per shaft — GitHub issue #420, driven on the `mixed` arm seeded below. */
+    /* One row per shaft, driven on every arm seeded below — a shaft has its own machine by construction. */
     'everyday/designerModel.ts#designerShaftRows',
-    'everyday/designerModel.ts#designerShaftNote',
+    /*
+     * **The drawing board over `authoring/towerPlan.ts`.** The steps, the starting points and the
+     * pattern, duty and kind names are copy tables; the group rows, the floor facts, the service
+     * line and the opened-building line are sentences about one drawing and are driven on the arms
+     * below. `designerShaftNote` left with the per-shaft pin it counted: a plan has no pin.
+     */
+    'everyday/designerModel.ts#DESIGNER_STEPS',
+    'everyday/designerModel.ts#DESIGNER_TEMPLATE_COPY',
+    'everyday/designerModel.ts#DESIGNER_SERVICE_COPY',
+    /* `DESIGNER_DUTY_COPY` is four single words, which the derivation does not read as prose; it
+       is seeded below all the same, because a label is still something a player reads. */
+    'everyday/designerModel.ts#DESIGNER_KIND_COPY',
+    'everyday/designerModel.ts#designerGroupRows',
+    'everyday/designerModel.ts#designerFloorFacts',
+    'everyday/designerModel.ts#designerServiceLine',
+    'everyday/designerModel.ts#designerLossLine',
+    /*
+     * **The plan's own strings that reach a player**, claimed here because these are the arms that
+     * draw them. A template's `name` is what the name box opens on and what the building is saved
+     * as. `buildingFromPlan` names each bank, and the stage draws a bank's name.
+     * `planAnalysisOf` passes the loader's refusals and advisories through untouched, and the
+     * folded document prints them whole — so all three are seeded below, off every arm.
+     */
+    'authoring/towerPlan.ts#PLAN_TEMPLATES',
+    'authoring/towerPlan.ts#blankPlan',
+    'authoring/towerPlan.ts#zonedTowerPlan',
+    'authoring/towerPlan.ts#skyLobbyPlan',
+    'authoring/towerPlan.ts#podiumPlan',
+    'authoring/towerPlan.ts#supertallPlan',
+    'authoring/towerPlan.ts#buildingFromPlan',
+    'authoring/towerPlan.ts#planAnalysisOf',
     /*
      * `designerReading` is deliberately **not** claimed. It authors no prose: it reads
      * `SpecBankAnalysis.reading`, which is `authoring/buildingSpec.ts`'s own arm of § 10's
@@ -11027,91 +11079,156 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     }
 
     /* ------------------------------------------------------- § 13 designer */
+    const designerProse = new Set(['specNote', 'lede', 'notScored', 'groupsHint', 'groupNotSized']);
     for (const [key, text] of Object.entries(DESIGNER_COPY)) {
       seeds.push({
         field: `designer.copy.${key}`,
         text,
-        role: key === 'specNote' || key === 'lede' || key === 'notScored' ? 'prose' : 'label',
+        role: designerProse.has(key) || key.endsWith('Hint') || key.endsWith('NoSelection') ? 'prose' : 'label',
       });
+    }
+    for (const step of DESIGNER_STEPS) {
+      seeds.push({ field: `designer.step.${step.id}.label`, text: step.label, role: 'label' });
+      seeds.push({ field: `designer.step.${step.id}.hint`, text: step.hint, role: 'prose' });
+    }
+    for (const [id, copy] of Object.entries(DESIGNER_TEMPLATE_COPY)) {
+      seeds.push({ field: `designer.template.${id}.name`, text: copy.name, role: 'label' });
+      seeds.push({ field: `designer.template.${id}.blurb`, text: copy.blurb, role: 'prose' });
+    }
+    for (const [kind, copy] of Object.entries(DESIGNER_SERVICE_COPY)) {
+      seeds.push({ field: `designer.service.${kind}.name`, text: copy.name, role: 'label' });
+      seeds.push({ field: `designer.service.${kind}.blurb`, text: copy.blurb, role: 'prose' });
+    }
+    for (const [duty, text] of Object.entries(DESIGNER_DUTY_COPY)) {
+      seeds.push({ field: `designer.duty.${duty}`, text, role: 'label' });
+    }
+    for (const [kind, text] of Object.entries(DESIGNER_KIND_COPY)) {
+      seeds.push({ field: `designer.kind.${kind}`, text, role: 'label' });
     }
 
     const specs = context.elevatorSpecs;
     const classes = classesFromSpecs(specs);
+    /* The standing building as the Engineer editor's spec — the tuner's arms below still read it. */
     const sized = specFromBuilding(context.building.config, context.building.id);
     /*
-     * The refusing arm, built by the one edit that produces it: a design whose only shaft is taken
-     * out of the lobby serves nothing the closed form can board anybody at, so `analyzeUpPeak`
-     * throws and every figure must come back `—` with the reason beside it rather than as a number.
-     */
-    const refused: typeof sized = { ...sized, cars: 1, noLobby: { 0: true }, bandByCar: { 0: [sized.floors, sized.floors] } };
-    /* A design past its class's ceiling, for § 10's first warning — both numbers, named. */
-    const overClass: typeof sized = { ...sized, specClass: 'hydraulic', floors: 40, ratedSpeedMps: 0.75, ratedLoadLb: 2500 };
-    /*
-     * **A design whose shafts do not all carry the same machine** — GitHub issue #420. The arm is
-     * here rather than folded into `sized` because the two are different products: `sized` is the
-     * document's own fleet, and this is that fleet with one more machine in it.
+     * **The arms are drawings a player produces, each chosen for a sentence only it draws.**
      *
-     * **`sized` is not the homogeneous half, and this comment used to say it was.** It read *"Both
-     * are states a player produces, and only one of them draws `designerShaftNote`"*, which is
-     * false on every shipped building whose document authored more than one lift:
-     * `specFromBuilding` derives a pin for each car unlike the headline, so `crown-hotel`'s service
-     * lift, `st-jude-hospital`'s two and the tall towers' many are pinned straight off the document
-     * and `sized` draws the note by itself. What is true of both arms is narrower — `mixed` draws
-     * the note with one more shaft in it than `sized` does, so the arm *adds* a machine rather than
-     * introducing the sentence, and on the buildings authored with one lift throughout it is the
-     * arm that introduces it. § D227: a sentence that has gone false leaves on the commit that
-     * makes it false.
-     *
-     * The pin is the **first** shaft and the class is the shipped hydraulic, so it exists on every
-     * building the corpus draws from; `withShaftMachine` snaps its two steps into that class's own
-     * ladder, which is the same rule the design's class chips follow one panel up. That snap is
-     * also why this arm reliably *differs* from the design rather than merely being pinned — a pin
-     * byte-equal to the design draws nothing, which is what `designerShaftNote` counts. It lands on
-     * hydraulic's own rungs, which no shipped building's design sits on: measured, including
-     * `garden-apartments`, whose design *is* hydraulic and whose 0.63 m/s snaps down to 0.50.
+     * - `opened` is the case's own building read onto the board, which is what the screen shows when
+     *   it is opened — and the only arm whose loss line is the document's own.
+     * - `empty` has no shaft, so every closed-form figure must come back `—` with the reason beside
+     *   it rather than as a number.
+     * - `over-class` hangs the shipped hydraulic in every shaft, past its rise on most buildings.
+     * - `stranded` is the sky-lobby template with the dot taken off its lobby: floors with a lift
+     *   nobody can board, and the one-press fix that names the floor.
+     * - `paired` hangs two cars in every shaft of a group, and `decked` puts a second deck on a
+     *   shaft with an odd number of landings: the two refusals that carry a fix of their own.
+     * - `hand` closes one floor's doors and sets one floor's people by hand.
+     * - every **template**, because each is a button on the screen and the supertall is the one
+     *   drawing whose shuttle the closed form sizes against almost nobody.
      */
-    const mixed: typeof sized = withShaftMachine(
-      sized,
-      0,
-      classes.find((entry) => entry.id === 'hydraulic') ?? classes[0],
-    );
-
-    for (const [arm, drawn] of [
-      ['sized', sized],
-      ['refused', refused],
-      ['over-class', overClass],
-      ['mixed', mixed],
-    ] as const) {
-      const analysis = upPeakAnalysisOf(drawn, specs);
-      for (const figure of designerFigures(drawn, analysis)) {
-        seeds.push({
-          field: `designer.${arm}.figure.${figure.label}`,
-          text: figure.value,
-          role: figure.withheld ? 'label' : 'observation',
-        });
-        seeds.push({
-          field: `designer.${arm}.figure.${figure.label}.note`,
-          text: figure.note,
-          role: figure.withheld ? 'reason' : 'observation',
-        });
-      }
-      for (const [index, warning] of designerWarnings(drawn, classOfSpec(classes, drawn), analysis).entries()) {
-        seeds.push({
-          field: `designer.${arm}.warning.${String(index)}`,
-          text: warning.text,
-          role: 'prose',
-        });
-      }
+    const opened = planFromBuilding(context.building.config, context.building.id);
+    const small = blankPlan();
+    const firstKey = small.shafts[0]?.key ?? '';
+    const hydraulic = classes.find((entry) => entry.id === 'hydraulic') ?? classes[0];
+    const arms: (readonly [string, TowerPlan])[] = [
+      ['opened', opened.plan],
+      ['empty', { ...opened.plan, shafts: [] }],
+      [
+        'over-class',
+        hydraulic === undefined
+          ? opened.plan
+          : withPlanMachineClass(opened.plan, opened.plan.shafts.map((shaft) => shaft.key), hydraulic),
+      ],
+      ['stranded', withSkyLobbyToggled(skyLobbyPlan(), [30])],
+      ['paired', withCars(small, small.shafts.map((shaft) => shaft.key), 2)],
+      ['decked', withDecks(small, [firstKey], 2)],
+      ['hand', withPopulation(withStopToggled(small, firstKey, 7), [5], 200)],
       /*
-       * **The machine-class band's range and rise, in both preferences.** The band's own sentence
-       * (*"… · up to 20 floors and 61 m of rise"*) is authored inline in `designerScreen.ts` and is
-       * excluded on the DOM mounts' shared ground, so what enters the corpus is the two figures
-       * rather than the sentence around them — which is what makes claiming `speedRangeFigure`
-       * above a coverage claim rather than a hope.
+       * Equipment a small block has no use for — a pressurised cabin, a rope and a regenerative
+       * drive on twelve floors — so the loader's *this buys nothing* advisories are drawn, which
+       * are the ones the folded document prints in the loader's own words.
        */
-      const band = classOfSpec(classes, drawn);
-      if (band !== undefined) {
-        for (const units of EVERYDAY_UNITS) {
+      [
+        'equipped',
+        {
+          ...small,
+          regenerativeDrive: true,
+          ropeClass: specs.ropeClasses?.classes[0]?.id,
+          shafts: small.shafts.map((shaft) => ({ ...shaft, pressurised: true })),
+        },
+      ],
+      ...PLAN_TEMPLATES.map((template) => [`template-${template.id}`, template.make()] as const),
+    ];
+
+    for (const [arm, drawn] of arms) {
+      const analysis = planAnalysisOf(drawn, specs);
+      seeds.push({ field: `designer.${arm}.name`, text: drawn.name, role: 'label' });
+      /* What the loader said, as the folded document prints it, and the names the banks were given. */
+      for (const [index, refusal] of analysis.refusals.entries()) {
+        seeds.push({ field: `designer.${arm}.refusal.${String(index)}`, text: refusal, role: 'reason' });
+      }
+      for (const [index, advisory] of analysis.advisories.entries()) {
+        seeds.push({ field: `designer.${arm}.advisory.${String(index)}`, text: advisory, role: 'reason' });
+      }
+      for (const bank of analysis.resolved?.banks ?? []) {
+        if (bank.name !== undefined) {
+          seeds.push({ field: `designer.${arm}.bank.${bank.id}.name`, text: bank.name, role: 'label' });
+        }
+      }
+      for (const bank of analysis.banks) {
+        seeds.push({
+          field: `designer.${arm}.bank.${bank.bankId}.line`,
+          text: bank.refusal !== '' ? bank.refusal : bank.line,
+          role: bank.refusal !== '' ? 'reason' : 'observation',
+        });
+        for (const [index, warning] of bank.warnings.entries()) {
+          seeds.push({ field: `designer.${arm}.bank.${bank.bankId}.warning.${String(index)}`, text: warning, role: 'prose' });
+        }
+      }
+      for (const units of EVERYDAY_UNITS) {
+        for (const figure of designerFigures(drawn, analysis, units)) {
+          seeds.push({
+            field: `designer.${arm}.${units}.figure.${figure.label}`,
+            text: figure.value,
+            role: figure.withheld ? 'label' : 'observation',
+          });
+          seeds.push({
+            field: `designer.${arm}.${units}.figure.${figure.label}.note`,
+            text: figure.note,
+            role: figure.withheld ? 'reason' : 'observation',
+          });
+        }
+        for (const [index, warning] of designerWarnings(drawn, classes, analysis, units).entries()) {
+          seeds.push({ field: `designer.${arm}.${units}.warning.${String(index)}`, text: warning.text, role: 'prose' });
+          if (warning.fix !== undefined) {
+            seeds.push({ field: `designer.${arm}.${units}.warning.${String(index)}.fix`, text: warning.fix.label, role: 'label' });
+          }
+        }
+        /*
+         * One row per shaft, in both preferences: a shaft's figure carries a rated speed, and
+         * `Units` reaches it. The plate is the first shaft's, as the screen draws it.
+         */
+        for (const row of designerShaftRows(drawn, classes, units)) {
+          seeds.push({ field: `designer.${arm}.shaft.${row.label}.${units}.class`, text: row.className, role: 'label' });
+          seeds.push({ field: `designer.${arm}.shaft.${row.label}.${units}.figure`, text: row.figure, role: 'observation' });
+          seeds.push({ field: `designer.${arm}.shaft.${row.label}.${units}.reach`, text: row.reach, role: 'observation' });
+          for (const [index, mark] of row.marks.entries()) {
+            seeds.push({ field: `designer.${arm}.shaft.${row.label}.${units}.mark.${String(index)}`, text: mark, role: 'label' });
+          }
+        }
+        const plated = drawn.shafts[0];
+        if (plated !== undefined) {
+          for (const row of designerPlateRows(drawn, plated, classOfMachine(classes, plated.machine), units)) {
+            seeds.push({ field: `designer.${arm}.plate.${units}.${row.key}`, text: row.value, role: 'observation' });
+          }
+        }
+        /*
+         * **The machine-class band's range and rise, in both preferences.** The band's own sentence
+         * is authored inline in `designerScreen.ts` and is excluded on the DOM mounts' shared
+         * ground, so what enters the corpus is the two figures rather than the sentence around them.
+         */
+        const band = plated === undefined ? undefined : classOfMachine(classes, plated.machine);
+        if (band !== undefined) {
           seeds.push({
             field: `designer.${arm}.class.${units}.speeds`,
             text: speedRangeFigure(band.speedMinMps, band.speedMaxMps, units),
@@ -11124,55 +11241,69 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
           });
         }
       }
-      /*
-       * **Both units preferences, on the one surface that has a plate** — GitHub issue #170's Units
-       * half, § D448. § 15.1's `Units` row switches machine specifications between metres and feet,
-       * so `RATED SPEED` and `TRAVEL` have two faces a player can produce and a corpus that saw one
-       * of them would be blind to half a screen. The other four rows are identical under both by
-       * construction, which is asserted in `designerModel.test.ts` rather than assumed here.
-       */
-      for (const units of EVERYDAY_UNITS) {
-        for (const row of designerPlateRows(drawn, classOfSpec(classes, drawn), units)) {
-          seeds.push({
-            field: `designer.${arm}.plate.${units}.${row.key}`,
-            text: row.value,
-            role: 'observation',
-          });
-        }
+      for (const row of designerGroupRows(drawn, analysis)) {
+        seeds.push({ field: `designer.${arm}.group.${String(row.index)}.name`, text: row.name, role: 'label' });
+        seeds.push({ field: `designer.${arm}.group.${String(row.index)}.shafts`, text: row.shafts, role: 'label' });
+        seeds.push({ field: `designer.${arm}.group.${String(row.index)}.pattern`, text: row.pattern, role: 'observation' });
+        seeds.push({ field: `designer.${arm}.group.${String(row.index)}.stops`, text: row.stops, role: 'observation' });
+        seeds.push({
+          field: `designer.${arm}.group.${String(row.index)}.figure`,
+          text: row.figure,
+          role: row.withheld ? 'reason' : 'observation',
+        });
       }
-      seeds.push({
-        field: `designer.${arm}.capacity`,
-        text: designerCapacityLine(drawn),
-        role: 'observation',
-      });
-      /*
-       * § 13.3's per-shaft rows, in both preferences for the plate's own reason: a shaft's figure
-       * carries a rated speed, and `Units` reaches it. The note is a `reason` — it exists to say
-       * which shafts the plate above does **not** describe, which is R3's exemption for a refusal
-       * that has to name what it is refusing — and is drawn only where there is one.
-       */
-      for (const units of EVERYDAY_UNITS) {
-        for (const row of designerShaftRows(drawn, classes, units)) {
-          seeds.push({
-            field: `designer.${arm}.shaft.${row.label}.${units}.class`,
-            text: row.className,
-            role: 'label',
-          });
-          seeds.push({
-            field: `designer.${arm}.shaft.${row.label}.${units}.figure`,
-            text: row.figure,
-            role: 'observation',
-          });
-        }
+      seeds.push({ field: `designer.${arm}.capacity`, text: designerCapacityLine(drawn), role: 'observation' });
+      /* One service line per pattern the drawing has, which is every sentence the function can say of it. */
+      const said = new Set<string>();
+      for (const shaft of drawn.shafts) {
+        const kind = `${shaft.service}/${String(shaft.decks)}`;
+        if (said.has(kind)) continue;
+        said.add(kind);
+        seeds.push({ field: `designer.${arm}.service.${kind}`, text: designerServiceLine(drawn, shaft), role: 'observation' });
       }
-      const shaftNote = designerShaftNote(drawn);
-      if (shaftNote !== '') {
-        seeds.push({ field: `designer.${arm}.shaftNote`, text: shaftNote, role: 'reason' });
+      /* The lobby, one floor, a sky lobby if it has one, a hand-set floor if it has one, and a range. */
+      const ranges: (readonly [number, number])[] = [
+        [0, 0],
+        [1, 1],
+        [1, Math.min(drawn.floors, 4)],
+        ...drawn.skyLobbies.slice(0, 1).map((floor) => [floor, floor] as const),
+        ...Object.keys(drawn.populationByFloor)
+          .slice(0, 1)
+          .map((floor) => [Number(floor), Number(floor)] as const),
+      ];
+      for (const range of ranges) {
+        const facts = designerFloorFacts(drawn, range);
+        const at = `designer.${arm}.floor.${String(range[0])}-${String(range[1])}`;
+        seeds.push({ field: `${at}.title`, text: facts.title, role: 'label' });
+        seeds.push({ field: `${at}.people`, text: String(facts.people), role: 'observation' });
+        seeds.push({ field: `${at}.peopleNote`, text: facts.peopleNote, role: 'reason' });
       }
       const reading = designerReading(analysis);
       if (reading !== '') {
         seeds.push({ field: `designer.${arm}.reading`, text: reading, role: 'prose' });
       }
+    }
+    /*
+     * The opened-building line, on the case's own document and on **every** code at once — the
+     * second because no shipped building declares a service schedule or a landing call type, so a
+     * corpus drawn only from documents would never render two of the eight clauses.
+     */
+    const everyLoss: readonly PlanLoss[] = [
+      'uneven-floor-heights',
+      'floor-labels',
+      'floor-areas',
+      'landing-call-types',
+      'car-timings',
+      'service-events',
+      'notes',
+      'mixed-bank-equipment',
+    ];
+    for (const [arm, losses] of [
+      ['opened', opened.notCarried],
+      ['every', everyLoss],
+    ] as const) {
+      const line = designerLossLine(opened.plan.name, losses);
+      if (line !== '') seeds.push({ field: `designer.loss.${arm}`, text: line, role: 'reason' });
     }
 
     /* ---------------------------------------------------------- § 18 tuner */

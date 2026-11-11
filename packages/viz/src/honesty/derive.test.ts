@@ -1724,6 +1724,28 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The transfer time a building type must declare. `transferSecondsFor` returns a number or ' +
+        '`undefined`; its only sentence is the message of the error it throws on a building type ' +
+        'nothing has priced, which names two source files to edit and is a programming fault no ' +
+        'surface draws. It was module-private until `authoring/towerPlan.ts` needed the same rule ' +
+        'for the cars it writes, and exporting it is what made the derivation see it.',
+      ids: ['authoring/buildingSpec.ts#transferSecondsFor'],
+    },
+    {
+      reason:
+        'Ids and keys on the drawing board’s plan, never drawn. `planFromBuilding`’s strings are ' +
+        'the closed `PlanLoss` codes and the shaft keys it mints (`s1`, `s2`, …): the sentence for ' +
+        'each code is `everyday/designerModel.ts#designerLossLine`’s, which the standalone-screens ' +
+        'adapter drives on every code at once, and a key is a selection handle the screen never ' +
+        'prints. `DESIGNER_PROFILE_BY_KIND` maps a building kind to a traffic-profile id out of ' +
+        '`data/traffic-profiles.json`; what the Floors step draws is that profile’s own `name`.',
+      ids: [
+        'authoring/towerPlan.ts#planFromBuilding',
+        'everyday/designerModel.ts#DESIGNER_PROFILE_BY_KIND',
+      ],
+    },
+    {
+      reason:
         'The decision log’s collector and its two wrappers, producers since slice 4b’s selector ' +
         'trace. Their strings are `VizDecision`/`VizPatternSwitch` fields copied from core plus ' +
         'one thrown invariant — the policy-to-bank ordinal check in `buildPatternSwitches` — ' +

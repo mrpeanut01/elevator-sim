@@ -112,8 +112,9 @@ const WINDOW_CALLERS: Readonly<Record<string, string>> = Object.freeze({
  *
  * So the derived set that matters is this one — everything that can move that id. `withBuilding` is
  * the one function that writes it on the shift path (`stateRunningSaved` and the host's
- * `applyBuildingSpec` are its two wrappers), which is what makes the question askable at all.
- * A sixth screen that presses any of the three lands here and fails until it says which it is.
+ * `applyBuildingSpec` and `applyTowerPlan` are its wrappers), which is what makes the question
+ * askable at all. A sixth screen that presses any of them lands here and fails until it says which
+ * it is.
  *
  * The entries answer one question: **does this move the id to a building the matrix has not
  * measured, and did the player ask for that?** *Yes, and yes* is correct — a drawn tower has no
@@ -134,11 +135,12 @@ const ID_MOVERS: Readonly<Record<string, string>> = Object.freeze({
     '`withBuilding` over a fresh `initialState`, and never on the player\'s own state, so no window ' +
     'the player reads moves.',
   'everyday/host.ts':
-    'declares and implements `applyBuildingSpec`, the Everyday port onto `stateRunningSaved`, and ' +
-    '`runSandbox`, which presses `everyday/sandbox.ts#sandboxPatchOf` (wave AO, § D1368).',
+    'declares and implements `applyBuildingSpec` and `applyTowerPlan`, the Everyday ports onto ' +
+    '`stateRunningSaved`, and `runSandbox`, which presses `everyday/sandbox.ts#sandboxPatchOf` ' +
+    '(wave AO, § D1368).',
   'everyday/designerScreen.ts':
-    '*Save as a new building* — the drawing board’s whole purpose, so the fresh id is what the ' +
-    'player asked for.',
+    '*Save as a new building*, through `applyTowerPlan` — the drawing board’s whole purpose, so ' +
+    'the fresh id is what the player asked for.',
   'everyday/sandbox.ts':
     'issue #289 and wave AO’s § D1368. `sandboxPatchOf` writes a copied tower’s id only when one of ' +
     'the tower’s four controls moved (`tunerModel.ts#tunePresses`): an untouched tower keeps the ' +
@@ -157,12 +159,12 @@ describe('who can move this window — the producer set, derived from disk', () 
 
   it('has exactly the registered id movers, and no further one arrives unregistered', async () => {
     /*
-     * The three wrappers together rather than `withBuilding` alone: a screen reaches the write
+     * The wrappers together rather than `withBuilding` alone: a screen reaches the write
      * through whichever of them its layer offers, and a set derived from the innermost one would
      * report `everyday/host.ts` and stay silent about the screens pressing it — which is exactly
      * the blindness that let the tuner ship.
      */
-    const found = await filesCalling(/\b(withBuilding|stateRunningSaved|applyBuildingSpec|sandboxPatchOf)\s*\(/);
+    const found = await filesCalling(/\b(withBuilding|stateRunningSaved|applyBuildingSpec|applyTowerPlan|sandboxPatchOf)\s*\(/);
     expect(found).toEqual(Object.keys(ID_MOVERS).sort((a, b) => a.localeCompare(b)));
   });
 
@@ -184,7 +186,7 @@ describe('who can move this window — the producer set, derived from disk', () 
      * moved the tuner's press to the sandbox's own, which is `sandbox.ts`'s entry above.) A scan that
      * could not tell them apart would report a green over a set it had not actually derived.
      */
-    const movers = await filesCalling(/\b(withBuilding|stateRunningSaved|applyBuildingSpec|sandboxPatchOf)\s*\(/);
+    const movers = await filesCalling(/\b(withBuilding|stateRunningSaved|applyBuildingSpec|applyTowerPlan|sandboxPatchOf)\s*\(/);
     const prose = await readFile(join(VIZ_SRC, 'everyday/tunerModel.ts'), 'utf8');
     expect(prose).toContain('applyBuildingSpec(');
     expect(movers).not.toContain('everyday/tunerModel.ts');

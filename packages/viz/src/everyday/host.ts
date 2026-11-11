@@ -146,6 +146,7 @@ import type { ChallengeBoardPage, ChallengeIndex, ChallengeView } from '../menu/
 import type { PriceSchedule } from '../pricing/types.js';
 
 import { specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
+import { planFromBuilding, type PlanReading, type TowerPlan } from '../authoring/towerPlan.js';
 import {
   specFromProfile,
   specIsDirty,
@@ -209,7 +210,7 @@ import {
   type TowerChoiceView,
 } from './towerChoice.js';
 import type { VizRecording } from '../contract/types.js';
-import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
+import { savedBuildingFrom, savedBuildingFromPlan, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
 import {
   allBuildingIds,
@@ -1354,6 +1355,15 @@ export interface EverydayHost {
   buildingSpec(): BuildingSpec | undefined;
 
   /**
+   * The building the next run will be built from, as the drawing board's plan — every shaft with
+   * its own height, stops, decks and cars — and the kinds of authored fact a plan cannot hold.
+   *
+   * `authoring/towerPlan.ts#planFromBuilding` over the same document {@link buildingSpec} reads, so
+   * the two boards agree about which floor is which. `undefined` on the honest-lookup rule.
+   */
+  buildingPlan(): PlanReading | undefined;
+
+  /**
    * **What *Tune the tower* opens on: the day as it will run** — wave AO, lane AO-2,
    * [§ D1368](../../../../DECISIONS.md), the post-AN panel's seat D (D3). `undefined` when the
    * standing id names no building this build knows, on {@link buildingById}'s rule.
@@ -2058,6 +2068,17 @@ export interface EverydayHost {
    * quotes; the tuner's primary is inert with the same words, so it never reaches this.
    */
   applyBuildingSpec(spec: BuildingSpec): string;
+
+  /**
+   * {@link applyBuildingSpec} for the drawing board's plan: save it under a fresh id **and stand
+   * the next run on it**, answering the id it took. *Design a building*'s *Save as a new building*.
+   *
+   * The same two halves and the same load-bearing one: `dev/buildingEditor.ts#savedBuildingFromPlan`
+   * puts the document through the real loader, so a plan it refuses throws here, and
+   * `stateRunningSaved` selects it through `withBuilding`. It does not run, and it throws
+   * {@link attemptHold}'s sentence and writes nothing while a scored attempt stands (§ D1360).
+   */
+  applyTowerPlan(plan: TowerPlan): string;
 
   /**
    * **Run a sandbox day: the day with what moved, over the week and never on it** — wave AO, lane
@@ -4408,6 +4429,11 @@ export function createEverydayHost(
       const config = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
       return config === undefined ? undefined : specFromBuilding(config, state.buildingId);
     },
+    buildingPlan: () => {
+      const state = b.state();
+      const config = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
+      return config === undefined ? undefined : planFromBuilding(config, state.buildingId);
+    },
     sandboxStanding: () => {
       const state = b.state();
       const config = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
@@ -5175,6 +5201,16 @@ export function createEverydayHost(
        * nothing else can have moved underneath it.
        */
       /* § D1360: the loader's refusal shape, which the designer quotes; nothing is written. */
+      const held = attemptHoldOver({ ...next });
+      if (held !== undefined) throw new Error(held);
+      b.applyPatch({ ...next });
+      return saved.id;
+    },
+    applyTowerPlan: (plan) => {
+      const state = b.state();
+      const saved = savedBuildingFromPlan(plan, state, b.resources);
+      const next = stateRunningSaved(state, b.resources, saved);
+      /* § D1360, as `applyBuildingSpec` asks it: the loader's refusal shape, and nothing written. */
       const held = attemptHoldOver({ ...next });
       if (held !== undefined) throw new Error(held);
       b.applyPatch({ ...next });

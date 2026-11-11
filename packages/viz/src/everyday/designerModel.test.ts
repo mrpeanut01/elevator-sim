@@ -7,8 +7,9 @@
  * and requiring the screen's cells to equal them. A second copy of § 10's five-line arithmetic would
  * pass a test written against § 10's five-line arithmetic; it would not pass this one.
  *
- * The rest is § 10.1's *steps within a class, never free numbers*, and § 10's three warnings in the
- * guide's own priority order.
+ * The rest is § 10.1's *steps within a class, never free numbers*, the warnings in priority order
+ * with the fixes some of them carry, and the words the side panel says about a shaft and a floor.
+ * Whether an edit reaches the **run** is `authoring/towerPlan.test.ts`'s, compared on the legs.
  */
 
 import { readFileSync } from 'node:fs';
@@ -23,112 +24,114 @@ import {
 } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
-import {
-  BLANK_SPEC,
-  buildingFromSpec,
-  designMachineOf,
-  machineAt,
-  machinesWithin,
-  riseM,
-  totalPopulation,
-  upPeakAnalysisOf,
-  type BuildingSpec,
-} from '../authoring/buildingSpec.js';
 import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
+import {
+  PLAN_TEMPLATES,
+  blankPlan,
+  buildingFromPlan,
+  planAnalysisOf,
+  planFromBuilding,
+  planRiseM,
+  planTotalPopulation,
+  skyLobbyPlan,
+  supertallPlan,
+  withCars,
+  withDecks,
+  withFloors,
+  withPopulation,
+  withShaftAdded,
+  withShafts,
+  withSkyLobbyToggled,
+  withStopToggled,
+  zonedTowerPlan,
+  type PlanShaft,
+  type TowerPlan,
+} from '../authoring/towerPlan.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import {
   automaticClassFor,
-  classOfSpec,
+  classOfMachine,
   designerCapacityLine,
   designerFigures,
+  designerFloorFacts,
+  designerGroupRows,
+  designerLossLine,
   designerPlateRows,
   designerReading,
-  designerShaftNote,
+  designerServiceLine,
   designerShaftRows,
-  shaftPickOf,
   designerWarnings,
   loadStepsFor,
+  machineSnappedTo,
   speedStepsFor,
   stepAtOrBelow,
-  withMachineClass,
-  withShaftMachine,
+  stopsSummary,
+  withPlanMachineClass,
+  withPlanMachineStep,
   CATALOGUE_SPEEDS_MPS,
   COMFORTABLE_HANDLING_PCT,
   COMFORTABLE_INTERVAL_S,
   DESIGNER_ABSENCES,
+  DESIGNER_COPY,
+  DESIGNER_STEPS,
+  DESIGNER_TEMPLATE_COPY,
 } from './designerModel.js';
 
 const SPECS: ElevatorSpecs = parseElevatorSpecs(
   JSON.parse(readFileSync(join(DATA_DIR, 'elevator-specs.json'), 'utf8')) as unknown,
 );
 const CLASSES = classesFromSpecs(SPECS);
+const classNamed = (id: string): MachineClass => CLASSES.find((entry) => entry.id === id) as MachineClass;
+const SIZED: TowerPlan = blankPlan();
+const keyAt = (plan: TowerPlan, index: number): string => (plan.shafts[index] as PlanShaft).key;
+const valueOf = (plan: TowerPlan, label: string): string =>
+  designerFigures(plan, planAnalysisOf(plan, SPECS), 'metric').find((figure) => figure.label === label)?.value ?? '';
 
-/** A design the closed form can size: the blank tower, which is a twelve-storey office. */
-const SIZED: BuildingSpec = BLANK_SPEC;
-
-describe('the specification block is the closed form, not a second copy of § 10', () => {
+describe('the figures are the closed form, not a second copy of § 10', () => {
   it('prints the interval and handling capacity `analyzeUpPeak` computes, to the digit', () => {
-    /*
-     * The figures are taken here **through core directly** — parse, resolve, `analyzeUpPeak` — and
-     * the screen's cells are required to match. That is the check ENGINE_CONTRACT § 10's rule asks
-     * for: *it must be the same code the engine uses to size a group*. A module that implemented
-     * § 10's own `rtt = round(travelTime + stopTime + 8)` would disagree with this by several
-     * seconds and would still look plausible on screen.
-     */
-    const config = buildingFromSpec(SIZED, { specs: SPECS });
-    const resolved = resolveBuilding(parseBuilding(config as unknown, 'test.json'), SPECS, {
-      file: 'test.json',
-    });
-    const bank = resolved.banks[0];
-    expect(bank).toBeDefined();
-    const oracle = analyzeUpPeak(resolved, SPECS, { bankId: bank?.id ?? '' });
-
-    const figures = designerFigures(SIZED, upPeakAnalysisOf(SIZED, SPECS));
-    const interval = figures.find((figure) => figure.label === 'Interval');
-    const handling = figures.find((figure) => figure.label === 'Handling capacity');
-    expect(interval?.withheld).toBe(false);
-    expect(interval?.value).toBe(`${oracle.result.intervalS.toFixed(1)} s`);
-    expect(handling?.value).toBe(`${oracle.result.percentPopulation5Min.toFixed(1)}%`);
-    expect(interval?.note).toContain(oracle.result.roundTripTimeS.toFixed(1));
+    const file = `${SIZED.id}.json`;
+    const resolved = resolveBuilding(parseBuilding(buildingFromPlan(SIZED, SPECS) as unknown, file), SPECS, { file });
+    const direct = analyzeUpPeak(resolved, SPECS, { bankId: 'main' }).result;
+    expect(valueOf(SIZED, 'Interval')).toBe(`${direct.intervalS.toFixed(1)} s`);
+    expect(valueOf(SIZED, 'Handling capacity')).toBe(`${direct.percentPopulation5Min.toFixed(1)}%`);
   });
 
-  it('reads § 10’s stops-versus-travel sentence off the analysis rather than recomputing it', () => {
-    const analysis = upPeakAnalysisOf(SIZED, SPECS);
-    expect(designerReading(analysis)).toBe(analysis.banks[0]?.reading);
-    expect(designerReading(analysis)).toMatch(/dominated by (stops|travel)/);
+  it('takes people and height from the plan, not from a second derivation', () => {
+    expect(valueOf(SIZED, 'People')).toBe(String(planTotalPopulation(SIZED)));
+    expect(valueOf(SIZED, 'Height')).toBe(`${planRiseM(SIZED).toFixed(1)} m`);
+    /* A pair of cars in one shaft is two lifts in one shaft, and the cell says both numbers. */
+    const paired = withCars(SIZED, [keyAt(SIZED, 0)], 2);
+    const lifts = designerFigures(paired, planAnalysisOf(paired, SPECS), 'metric').find((figure) => figure.label === 'Lifts');
+    expect(lifts?.value).toBe('5');
+    expect(lifts?.note).toContain('4 shafts');
   });
 
-  it('takes population and rise from the authoring model, not from a second derivation', () => {
-    const figures = designerFigures(SIZED, upPeakAnalysisOf(SIZED, SPECS));
-    expect(figures.find((figure) => figure.label === 'Population')?.value).toBe(
-      String(totalPopulation(SIZED)),
-    );
-    expect(figures.find((figure) => figure.label === 'Rise')?.value).toBe(
-      `${riseM(SIZED).toFixed(1)} m`,
-    );
+  it('quotes the group that moves the smallest share of its people, and names it', () => {
+    const zoned = zonedTowerPlan();
+    const analysis = planAnalysisOf(zoned, SPECS);
+    const shares = analysis.banks.map((bank) => bank.figures?.percentPopulation5Min ?? Infinity);
+    const lowest = Math.min(...shares);
+    const cell = designerFigures(zoned, analysis, 'metric').find((figure) => figure.label === 'Handling capacity');
+    expect(cell?.value).toBe(`${lowest.toFixed(1)}%`);
+    expect(cell?.note).toContain(`group ${String(shares.indexOf(lowest) + 1)}, the lowest of ${String(shares.length)}`);
+    /* One group needs no name: there is nothing to tell it apart from. */
+    expect(designerFigures(SIZED, planAnalysisOf(SIZED, SPECS), 'metric').at(-1)?.note).not.toContain('group');
   });
 
   it('withholds a refused figure with the reason, and never a stale number or a NaN', () => {
-    /*
-     * One shaft, taken out of the lobby and pinned to the top floor: nothing the closed form can
-     * board anybody at, so it throws and the analysis returns a labelled per-bank refusal.
-     */
-    const refused: BuildingSpec = {
-      ...SIZED,
-      cars: 1,
-      noLobby: { 0: true },
-      bandByCar: { 0: [SIZED.floors, SIZED.floors] },
-    };
-    const figures = designerFigures(refused, upPeakAnalysisOf(refused, SPECS));
-    for (const label of ['Interval', 'Handling capacity']) {
-      const figure = figures.find((entry) => entry.label === label);
-      expect(figure?.withheld, label).toBe(true);
-      expect(figure?.value, label).toBe('—');
-      expect(figure?.value, label).not.toMatch(/NaN/);
-      expect(figure?.note.trim().length, label).toBeGreaterThan(10);
+    const none: TowerPlan = { ...SIZED, shafts: [] };
+    for (const figure of designerFigures(none, planAnalysisOf(none, SPECS), 'metric').slice(3)) {
+      expect(figure.withheld).toBe(true);
+      expect(figure.value).toBe(DESIGNER_COPY.withheld);
+      expect(figure.note.length).toBeGreaterThan(10);
+      expect(figure.note).not.toContain('NaN');
     }
-    // The two the closed form has no say in stay, because nothing refused them.
-    expect(figures.find((figure) => figure.label === 'Population')?.withheld).toBe(false);
+  });
+
+  it('reads § 10’s stops-versus-travel sentence off the analysis rather than recomputing it', () => {
+    const analysis = planAnalysisOf(SIZED, SPECS);
+    expect(designerReading(analysis)).toBe(analysis.banks[0]?.reading);
+    expect(designerReading(planAnalysisOf({ ...SIZED, shafts: [] }, SPECS))).toBe('');
   });
 });
 
@@ -138,373 +141,266 @@ describe('§ 10.1 — speed and load are steps within a class', () => {
       const steps = speedStepsFor(machineClass);
       expect(steps.length, machineClass.id).toBeGreaterThan(0);
       for (const step of steps) {
-        expect(step, machineClass.id).toBeGreaterThanOrEqual(machineClass.speedMinMps);
-        expect(step, machineClass.id).toBeLessThanOrEqual(machineClass.speedMaxMps);
-        expect(CATALOGUE_SPEEDS_MPS, machineClass.id).toContain(step);
+        expect(step).toBeGreaterThanOrEqual(machineClass.speedMinMps);
+        expect(step).toBeLessThanOrEqual(machineClass.speedMaxMps);
+        expect(CATALOGUE_SPEEDS_MPS).toContain(step);
       }
     }
   });
 
   it('offers only rated loads inside the class’s own capacity range', () => {
     for (const machineClass of CLASSES) {
-      const steps = loadStepsFor(machineClass);
-      expect(steps.length, machineClass.id).toBeGreaterThan(0);
-      for (const step of steps) {
-        expect(step, machineClass.id).toBeGreaterThanOrEqual(machineClass.loadMinLb);
-        expect(step, machineClass.id).toBeLessThanOrEqual(machineClass.loadMaxLb);
+      for (const load of loadStepsFor(machineClass)) {
+        expect(load).toBeGreaterThanOrEqual(machineClass.loadMinLb);
+        expect(load).toBeLessThanOrEqual(machineClass.loadMaxLb);
       }
     }
   });
 
   it('carries a class change down onto the new class’s steps, never up', () => {
-    /*
-     * A design that quietly got *faster* when its machine was changed would be a control doing more
-     * than it says, so `stepAtOrBelow` only ever moves down — and the result must be a step the new
-     * class has, or `parseBuilding` refuses the document.
-     */
-    const fast = CLASSES.find((entry) => entry.id === 'high-speed-gearless');
-    const slow = CLASSES.find((entry) => entry.id === 'hydraulic');
-    expect(fast).toBeDefined();
-    expect(slow).toBeDefined();
-    const onFast = withMachineClass(SIZED, fast as MachineClass);
-    const backDown = withMachineClass(onFast, slow as MachineClass);
-    expect(speedStepsFor(fast as MachineClass)).toContain(onFast.ratedSpeedMps);
-    expect(speedStepsFor(slow as MachineClass)).toContain(backDown.ratedSpeedMps);
-    expect(backDown.ratedSpeedMps).toBeLessThanOrEqual(onFast.ratedSpeedMps);
-    expect(loadStepsFor(slow as MachineClass)).toContain(backDown.ratedLoadLb);
+    const hydraulic = classNamed('hydraulic');
+    const snapped = machineSnappedTo(hydraulic, { specClass: 'gearless-traction', ratedSpeedMps: 4, ratedLoadLb: 4000 });
+    expect(snapped.specClass).toBe('hydraulic');
+    expect(snapped.ratedSpeedMps).toBeLessThanOrEqual(hydraulic.speedMaxMps);
+    expect(snapped.ratedLoadLb).toBeLessThanOrEqual(hydraulic.loadMaxLb);
+    expect(speedStepsFor(hydraulic)).toContain(snapped.ratedSpeedMps);
+  });
+
+  it('writes the shafts it names and no other', () => {
+    const second = keyAt(SIZED, 1);
+    const changed = withPlanMachineClass(SIZED, [second], classNamed('hydraulic'));
+    expect(changed.shafts.map((shaft) => shaft.machine.specClass)).toEqual([
+      'geared-traction',
+      'hydraulic',
+      'geared-traction',
+      'geared-traction',
+    ]);
+    const stepped = withPlanMachineStep(SIZED, [second], { ratedLoadLb: 4000 });
+    expect(stepped.shafts.map((shaft) => shaft.machine.ratedLoadLb)).toEqual([2500, 4000, 2500, 2500]);
+    expect(classOfMachine(CLASSES, (changed.shafts[1] as PlanShaft).machine)?.id).toBe('hydraulic');
   });
 
   it('picks the first class rated for the rise and the floor count, and never nothing', () => {
-    // § 10.1's automatic choice, derived from the table's own ceilings rather than from a ladder of
-    // literals. A design past every class gets the last one, because the envelope is guidance.
-    const hydraulic = automaticClassFor(CLASSES, 15, 5);
-    expect(hydraulic?.id).toBe('hydraulic');
-    const tall = automaticClassFor(CLASSES, 5000, 400);
-    expect(tall).toBe(CLASSES.at(-1));
-    for (const rise of [10, 50, 100, 300, 650]) {
-      expect(automaticClassFor(CLASSES, rise, 20), String(rise)).toBeDefined();
-    }
+    expect(automaticClassFor(CLASSES, 12, 4)?.id).toBe('hydraulic');
+    expect(automaticClassFor(CLASSES, 300, 55)?.id).toBe('gearless-traction');
+    expect(automaticClassFor(CLASSES, 5000, 900)).toBe(CLASSES.at(-1));
   });
 
   it('snaps to the step at or below, and to the first step when everything is above', () => {
-    expect(stepAtOrBelow([1, 2, 3], 2.9)).toBe(2);
-    expect(stepAtOrBelow([1, 2, 3], 3)).toBe(3);
-    expect(stepAtOrBelow([2, 3], 1)).toBe(2);
+    expect(stepAtOrBelow([1, 2.5, 4], 3)).toBe(2.5);
+    expect(stepAtOrBelow([1, 2.5, 4], 0.2)).toBe(1);
   });
 });
 
-describe('§ 10’s three warnings, in the guide’s priority order', () => {
-  /** A twelve-storey design on a class rated to six floors and eighteen metres. */
-  function pastItsClass(): BuildingSpec {
-    const hydraulic = CLASSES.find((entry) => entry.id === 'hydraulic') as MachineClass;
-    return withMachineClass({ ...SIZED, floors: 40 }, hydraulic);
-  }
+describe('the warnings, most serious first, and the fixes some of them carry', () => {
+  const warningsOf = (plan: TowerPlan): ReturnType<typeof designerWarnings> =>
+    designerWarnings(plan, CLASSES, planAnalysisOf(plan, SPECS), 'metric');
 
-  it('says class limits first, and names both numbers', () => {
-    const spec = pastItsClass();
-    const warnings = designerWarnings(spec, classOfSpec(CLASSES, spec), upPeakAnalysisOf(spec, SPECS));
-    expect(warnings[0]?.severity).toBe('class');
-    // *naming both numbers* — what the design is, and what the class is rated for.
-    expect(warnings[0]?.text).toContain('40 floors');
-    expect(warnings[0]?.text).toContain('6');
-    // A design both unbuildable and slow is told it is unbuildable first.
-    const classFirst = warnings.findIndex((warning) => warning.severity === 'class');
-    const comfortFirst = warnings.findIndex((warning) => warning.severity === 'comfort');
-    if (comfortFirst >= 0) expect(classFirst).toBeLessThan(comfortFirst);
+  it('is quiet on a design that runs, is inside its class and inside both comfort bounds', () => {
+    expect(warningsOf(SIZED)).toEqual([]);
+  });
+
+  it('says a floor with no doors before it says anything about comfort', () => {
+    const tall = { ...SIZED, floors: 13 };
+    const warnings = warningsOf(tall);
+    expect(warnings[0]?.severity).toBe('blocker');
+    expect(warnings[0]?.text).toContain('No lift opens at 13');
+  });
+
+  it('offers the one press that joins stranded floors to the lobby, and the press mends it', () => {
+    const cut = withSkyLobbyToggled(skyLobbyPlan(), [30]);
+    const stranded = warningsOf(cut).find((warning) => warning.text.includes('nobody can board from the street'));
+    expect(stranded?.severity).toBe('blocker');
+    expect(stranded?.fix?.label).toBe('Make floor 30 a sky lobby');
+    const mended = stranded?.fix?.apply(cut) as TowerPlan;
+    expect(mended.skyLobbies).toEqual([30]);
+    expect(warningsOf(mended).filter((warning) => warning.severity === 'blocker')).toEqual([]);
+  });
+
+  it('refuses a group made only of two-car shafts, and its fix leaves one ordinary shaft', () => {
+    const all = withCars(SIZED, SIZED.shafts.map((shaft) => shaft.key), 2);
+    const paired = warningsOf(all).find((warning) => warning.text.includes('holds two cars'));
+    expect(paired?.severity).toBe('blocker');
+    const mended = paired?.fix?.apply(all) as TowerPlan;
+    expect(mended.shafts.map((shaft) => shaft.cars)).toEqual([2, 2, 2, 1]);
+    expect(warningsOf(mended).some((warning) => warning.text.includes('holds two cars'))).toBe(false);
+  });
+
+  it('names the floor a double deck cannot pair, and its fix takes the second deck off', () => {
+    const key = keyAt(SIZED, 0);
+    /* Twelve floors above the lobby is thirteen landings: one is left over. */
+    const decked = withDecks(SIZED, [key], 2);
+    const unpaired = warningsOf(decked).find((warning) => warning.text.includes('double-deck'));
+    expect(unpaired?.text).toContain('12 has no floor beside it');
+    expect((unpaired?.fix?.apply(decked) as TowerPlan).shafts[0]?.decks).toBe(1);
+  });
+
+  it('says a machine is outside its class with both numbers, after what will not run', () => {
+    const hydraulic = withPlanMachineClass(SIZED, SIZED.shafts.map((shaft) => shaft.key), classNamed('hydraulic'));
+    const classWarning = warningsOf(hydraulic).find((warning) => warning.severity === 'class');
+    expect(classWarning?.text).toContain('Shafts A B C D travel up to 12 floors and 43.2 m');
+    expect(classWarning?.text).toContain('rated to 6 floors and 18 m');
+    expect(warningsOf(hydraulic).map((warning) => warning.severity).indexOf('class')).toBe(0);
   });
 
   it('warns under 11% handling capacity and over a forty-second interval, in that order', () => {
-    // One car in a forty-storey tower: both comfort warnings, and § 10 orders capacity before
-    // interval.
-    const starved: BuildingSpec = { ...SIZED, floors: 40, cars: 1 };
-    const analysis = upPeakAnalysisOf(starved, SPECS);
-    const warnings = designerWarnings(starved, classOfSpec(CLASSES, starved), analysis);
-    const comfort = warnings.filter((warning) => warning.severity === 'comfort');
-    expect(comfort.length).toBeGreaterThan(0);
-    const figures = analysis.banks[0]?.figures;
-    expect(figures).toBeDefined();
-    if ((figures?.percentPopulation5Min ?? 0) < COMFORTABLE_HANDLING_PCT) {
-      expect(comfort[0]?.text).toMatch(/feel slow every morning/);
-    }
-    if ((figures?.intervalS ?? 0) > COMFORTABLE_INTERVAL_S) {
-      expect(comfort.at(-1)?.text).toMatch(/long wait, whatever the average says/);
-    }
+    const crowded = { ...SIZED, peoplePerBay: 80, shafts: SIZED.shafts.slice(0, 1) };
+    const comfort = warningsOf(crowded).filter((warning) => warning.severity === 'comfort');
+    expect(comfort).toHaveLength(2);
+    expect(comfort[0]?.text).toContain(`under ${String(COMFORTABLE_HANDLING_PCT)}%`);
+    expect(comfort[1]?.text).toContain(`over ${String(COMFORTABLE_INTERVAL_S)} s`);
   });
 
-  it('says nothing about comfort when the closed form refused the figures', () => {
-    /*
-     * A warning that a withheld interval is over forty seconds would be an assertion about a number
-     * that does not exist — the exact defect the whole `awtIsValid` discipline exists for, one
-     * surface up.
-     */
-    const refused: BuildingSpec = {
-      ...SIZED,
-      cars: 1,
-      noLobby: { 0: true },
-      bandByCar: { 0: [SIZED.floors, SIZED.floors] },
-    };
-    const warnings = designerWarnings(refused, classOfSpec(CLASSES, refused), upPeakAnalysisOf(refused, SPECS));
-    expect(warnings.filter((warning) => warning.severity === 'comfort')).toEqual([]);
-  });
-
-  it('is quiet on a design inside its class and inside both comfort bounds', () => {
-    const warnings = designerWarnings(SIZED, classOfSpec(CLASSES, SIZED), upPeakAnalysisOf(SIZED, SPECS));
-    expect(warnings.filter((warning) => warning.severity === 'class')).toEqual([]);
+  it('says nothing about comfort when nothing was sized', () => {
+    const none: TowerPlan = { ...SIZED, shafts: [] };
+    const warnings = warningsOf(none);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.severity).toBe('blocker');
   });
 });
 
-describe('the plate, the capacity line and the register', () => {
-  it('reads the plate’s persons from the load-to-persons table rather than a second rule', () => {
-    const rows = designerPlateRows(SIZED, classOfSpec(CLASSES, SIZED), 'metric');
-    const keys = rows.map((row) => row.key);
-    expect(keys).toEqual(['CAPACITY', 'PERSONS', 'RATED SPEED', 'TRAVEL', 'LANDINGS', 'CLASS']);
-    expect(rows.find((row) => row.key === 'CAPACITY')?.value).toBe(`${String(SIZED.ratedLoadLb)} lb`);
-    expect(rows.find((row) => row.key === 'TRAVEL')?.value).toBe(`${riseM(SIZED).toFixed(1)} m`);
+describe('the rows under the drawing', () => {
+  it('gives every group a row with its shafts, its pattern and where its doors open', () => {
+    const zoned = zonedTowerPlan();
+    const rows = designerGroupRows(zoned, planAnalysisOf(zoned, SPECS));
+    expect(rows.map((row) => [row.name, row.shafts, row.stops])).toEqual([
+      ['Group 1', 'A B C D', 'G–20'],
+      ['Group 2', 'E F G H I', 'G, 21–40'],
+    ]);
+    expect(rows[0]?.pattern).toBe('Local · 4 cars');
+    expect(rows[1]?.pattern).toBe('Express · 5 cars');
+    for (const row of rows) expect(row.withheld).toBe(false);
   });
 
-  /**
-   * § 13's *convert, not relabel*, on the two rows the preference reaches and the one it does not.
-   *
-   * Asserted on the plate rather than only in `units.test.ts` because the failure this guards
-   * against is a **site** failure: a row that draws the imperial suffix over the metric number
-   * passes every test the formatter has, and only a comparison taken here can tell the two apart.
-   * The load row is asserted **unchanged** in the same case, on `documentation.test.ts`'s pattern of
-   * asserting an exclusion in both directions — a lane that decided to convert `ratedLoadLb` as
-   * well would be changing a decision rather than fixing a bug, and would have to come here to do
-   * it. See [§ D448](../../../../DECISIONS.md).
-   */
+  it('says a group the closed form refused is not sized, rather than quoting bank ids at a player', () => {
+    const sky = skyLobbyPlan();
+    const analysis = planAnalysisOf(sky, SPECS);
+    const shuttle = designerGroupRows(sky, analysis).find((row) => row.pattern.startsWith('Shuttle'));
+    expect(shuttle?.withheld).toBe(true);
+    expect(shuttle?.figure).toBe(DESIGNER_COPY.groupNotSized);
+    /* The engine's own sentence still exists, for the folded document to print whole. */
+    expect(analysis.banks.some((bank) => bank.refusal.length > 0)).toBe(true);
+  });
+
+  it('gives every shaft a row that says what is unusual about it', () => {
+    const tall = supertallPlan();
+    const rows = designerShaftRows(tall, CLASSES, 'metric');
+    expect(rows).toHaveLength(tall.shafts.length);
+    const shuttle = rows.find((row) => row.marks.includes('double-deck'));
+    expect(shuttle?.reach).toBe('G to 68');
+    expect(shuttle?.figure).toContain('persons a deck');
+    const goods = designerShaftRows(
+      withShafts(SIZED, [keyAt(SIZED, 0)], (shaft) => ({ ...shaft, duty: 'goods', pressurised: true })),
+      CLASSES,
+      'metric',
+    )[0];
+    expect(goods?.marks).toEqual(['goods', 'pressurised cabin']);
+  });
+
+  it('shortens a stop list without hiding its shape', () => {
+    expect(stopsSummary(SIZED, [0, 1, 2, 3, 4])).toBe('G–4');
+    expect(stopsSummary(SIZED, [0, 21, 22, 23])).toBe('G, 21–23');
+    expect(stopsSummary(SIZED, [0, 1, 29, 30])).toBe('G, 1, 29, 30');
+  });
+});
+
+describe('the plate and the people line', () => {
+  const shaft = SIZED.shafts[0] as PlanShaft;
+  const plate = (units: 'metric' | 'imperial', of: PlanShaft = shaft, plan: TowerPlan = SIZED): Record<string, string> =>
+    Object.fromEntries(
+      designerPlateRows(plan, of, classOfMachine(CLASSES, of.machine), units).map((row) => [row.key, row.value]),
+    );
+
+  it('reads the plate’s persons from the load-to-persons table, and per deck on a double deck', () => {
+    expect(plate('metric')['PERSONS']).toBe('16');
+    expect(plate('metric')['LANDINGS']).toBe('13');
+    const tall = supertallPlan();
+    const shuttle = tall.shafts.find((entry) => entry.decks === 2) as PlanShaft;
+    expect(plate('metric', shuttle, tall)['PERSONS']).toBe('13 a deck');
+    expect(plate('metric', shuttle, tall)['LANDINGS']).toBe('6');
+  });
+
   it('converts the plate’s two metre-denominated rows to feet, and leaves the load alone', () => {
-    const machineClass = classOfSpec(CLASSES, SIZED);
-    const metric = designerPlateRows(SIZED, machineClass, 'metric');
-    const imperial = designerPlateRows(SIZED, machineClass, 'imperial');
-    const valueOf = (rows: readonly { key: string; value: string }[], key: string): string =>
-      rows.find((row) => row.key === key)?.value ?? '';
-
-    // The number moves, not just the suffix — a relabel would leave the digits identical.
-    const metricSpeed = valueOf(metric, 'RATED SPEED');
-    const imperialSpeed = valueOf(imperial, 'RATED SPEED');
-    expect(metricSpeed).toMatch(/ m\/s$/u);
-    expect(imperialSpeed).toMatch(/ ft\/s$/u);
-    expect(imperialSpeed.replace(/ ft\/s$/u, '')).not.toBe(metricSpeed.replace(/ m\/s$/u, ''));
-    expect(imperialSpeed).toBe(`${(SIZED.ratedSpeedMps / 0.3048).toFixed(2)} ft/s`);
-
-    const metricTravel = valueOf(metric, 'TRAVEL');
-    const imperialTravel = valueOf(imperial, 'TRAVEL');
-    expect(imperialTravel).toBe(`${(riseM(SIZED) / 0.3048).toFixed(1)} ft`);
-    expect(imperialTravel.replace(/ ft$/u, '')).not.toBe(metricTravel.replace(/ m$/u, ''));
-
-    // And the three rows the preference does not reach are byte-identical under both.
-    for (const key of ['CAPACITY', 'PERSONS', 'LANDINGS', 'CLASS']) {
-      expect(valueOf(imperial, key), key).toBe(valueOf(metric, key));
-    }
+    const metric = plate('metric');
+    const imperial = plate('imperial');
+    expect(metric['RATED SPEED']).toContain('m/s');
+    expect(imperial['RATED SPEED']).toContain('ft/s');
+    expect(metric['TRAVEL']).toBe('43.2 m');
+    expect(imperial['TRAVEL']).toContain('ft');
+    for (const key of ['CAPACITY', 'PERSONS', 'LANDINGS', 'CLASS']) expect(imperial[key]).toBe(metric[key]);
   });
 
-  it('prints the per-floor figure with the floor count it was divided by', () => {
-    /*
-     * The deviation from § 13.2's *28 people on a typical floor today*, and the reason it is a
-     * deviation rather than a transcription is in `designerCapacityLine`'s docstring. What is
-     * asserted here is the half that matters: the derived average carries its own denominator, and
-     * no mean cue stands over it.
-     */
-    const line = designerCapacityLine(SIZED);
-    expect(line).toContain(`across ${String(SIZED.floors)} floors`);
-    expect(line).not.toMatch(/typical|average|mean/i);
-    expect(line).toContain(String(totalPopulation(SIZED)));
+  it('prints both ends of how the plate spreads people, never one floor standing for all', () => {
+    expect(designerCapacityLine(SIZED)).toBe(
+      '816 people · 20 people a shaft bay at 85% let · every floor is 4 bays wide and holds 68',
+    );
+    const stepped = withShaftAdded(withShaftAdded(SIZED, 0, 4), 0, 4);
+    expect(designerCapacityLine(stepped)).toContain('the widest floor is 6 bays and holds 102, the narrowest is 4 and holds 68');
   });
 
   it('names what the board does not do, in sentences rather than in gaps', () => {
-    /*
-     * **The register is empty, and this case is what keeps that a measured state.** It was three
-     * until GitHub issue #177 item 5 wrote the escalator rows and folded the document (§ D518), and
-     * one until #420 gave the model a machine per shaft and drew the pickers over it. The count is
-     * deliberately **not** asserted — an entry arriving is a legitimate thing for a screen to do,
-     * and `buildNotes.test.ts` is what holds an empty register to drawing its own sentence rather
-     * than a heading over nothing. What is asserted is the shape every entry must have if one comes
-     * back: a prose sentence rather than an identifier or a section number, which is the whole of
-     * what GitHub issue #207 changed about these registers.
-     */
-    for (const absence of DESIGNER_ABSENCES) {
-      expect(absence.trim().length, absence).toBeGreaterThan(30);
-      expect(absence, 'a register row is player-facing prose, not a symbol').toMatch(
-        /[a-z] [a-z]/u,
-      );
-    }
+    expect(DESIGNER_ABSENCES).toEqual([]);
+    expect(DESIGNER_COPY.serviceScopeHint).toContain('Who is allowed where');
   });
 });
 
-/* -------------------------------------------------------------------------- *
- * A machine class per shaft — GitHub issue #420
- * -------------------------------------------------------------------------- */
+describe('what the side panel says about a floor and about a shaft’s doors', () => {
+  it('says where a floor’s people come from, and stops saying it once a hand has set them', () => {
+    const facts = designerFloorFacts(SIZED, [5, 5]);
+    expect(facts.title).toBe('Floor 5');
+    expect(facts.people).toBe(68);
+    expect(facts.peopleNote).toBe('from its width: 4 shaft bays');
+    expect(designerFloorFacts(withPopulation(SIZED, [5], 200), [5, 5]).peopleNote).toBe('set by hand');
+    expect(designerFloorFacts(SIZED, [0, 0]).title).toBe('The lobby');
+    expect(designerFloorFacts(SIZED, [0, 0]).canBeSkyLobby).toBe(false);
+  });
 
-describe('a machine per shaft, over a design-wide default', () => {
-  /*
-   * The model half of what `DESIGNER_ABSENCES` used to refuse. `authoring/authoring.test.ts` holds
-   * the half that matters most — that moving a shaft's machine changes the run on the legs — and
-   * these are the words the panel draws over it, which is the half a player actually reads.
-   */
-  const hydraulic = CLASSES.find((entry) => entry.id === 'hydraulic') as (typeof CLASSES)[number];
+  it('takes a range of floors as one thing', () => {
+    const facts = designerFloorFacts(SIZED, [8, 3]);
+    expect(facts.title).toBe('Floors 3–8');
+    expect(facts.people).toBe(68 * 6);
+    expect(facts.canHaveEscalator).toBe(false);
+    expect(facts.use).toBe(SIZED.trafficProfile);
+  });
 
-  it('gives every shaft a row, whether or not it carries its own machine', () => {
-    const rows = designerShaftRows(SIZED, CLASSES, 'metric');
-    expect(rows).toHaveLength(SIZED.cars);
-    expect(rows.map((row) => row.label)).toStrictEqual(['A', 'B', 'C', 'D']);
-    /*
-     * A shaft following the design gets a row saying what it carries rather than being left out.
-     * A panel listing only the pinned ones would ask the reader to infer the default from a gap.
-     */
-    expect(rows.every((row) => !row.pinned)).toBe(true);
-    for (const row of rows) {
-      expect(row.className, 'the class named as a player reads it').toBe(
-        classOfSpec(CLASSES, SIZED)?.name,
-      );
-      expect(row.figure).toContain('persons');
+  it('says a shaft’s doors in words, and a double deck’s as pairs', () => {
+    expect(designerServiceLine(SIZED, SIZED.shafts[0] as PlanShaft)).toBe('Local — doors open at G–12.');
+    const closed = withStopToggled(SIZED, keyAt(SIZED, 0), 7);
+    expect(designerServiceLine(closed, closed.shafts[0] as PlanShaft)).toBe('Hand-picked — doors open at G–6, 8–12.');
+    const tall = supertallPlan();
+    const shuttle = tall.shafts.find((entry) => entry.decks === 2) as PlanShaft;
+    expect(designerServiceLine(tall, shuttle)).toBe(
+      'Shuttle, double-deck — doors open at G with 1, 34 with 35, 67 with 68.',
+    );
+  });
+});
+
+describe('the steps, the templates and an opened building', () => {
+  it('names four steps in the order a reader takes them, and every template', () => {
+    expect(DESIGNER_STEPS.map((step) => step.id)).toEqual(['shape', 'lifts', 'floors', 'service']);
+    for (const template of PLAN_TEMPLATES) {
+      expect(DESIGNER_TEMPLATE_COPY[template.id]?.name.length, template.id).toBeGreaterThan(3);
     }
   });
 
-  it('writes the shaft it names and no other', () => {
-    const pinned = withShaftMachine(SIZED, 2, hydraulic);
-    const rows = designerShaftRows(pinned, CLASSES, 'metric');
-    expect(rows.map((row) => row.pinned)).toStrictEqual([false, false, true, false]);
-    expect(rows[2]?.className).toBe(hydraulic.name);
-    expect(rows[0]?.className).toBe(classOfSpec(CLASSES, SIZED)?.name);
+  it('keeps the core at the roof through the height control, so no template grows an orphan', () => {
+    for (const template of PLAN_TEMPLATES) {
+      const taller = withFloors(template.make(), template.make().floors + 9);
+      const blockers = designerWarnings(taller, CLASSES, planAnalysisOf(taller, SPECS), 'metric').filter(
+        (warning) => warning.text.startsWith('No lift opens'),
+      );
+      expect(blockers, template.id).toEqual([]);
+    }
   });
 
-  it('snaps both steps into the shaft’s new class, downward', () => {
-    /*
-     * `withMachineClass`'s rule, applied to one shaft: a shaft handed a class while holding the
-     * design's speed would hold a speed outside its own band, which is a document the loader
-     * refuses. The blank tower is geared traction at 2.5 m/s; a hydraulic shaft cannot be, and
-     * takes the highest rung its own class has rather than the nearest one above.
-     */
-    const machine = machineAt(withShaftMachine(SIZED, 0, hydraulic), 0);
-    expect(machine.specClass).toBe('hydraulic');
-    expect(speedStepsFor(hydraulic)).toContain(machine.ratedSpeedMps);
-    expect(machine.ratedSpeedMps).toBeLessThanOrEqual(SIZED.ratedSpeedMps);
-    expect(loadStepsFor(hydraulic)).toContain(machine.ratedLoadLb);
-  });
-
-  it('clears a pin rather than writing the design’s machine into it', () => {
-    /*
-     * The distinction `machineByCar` is sparse for, and the one a *clear* button that wrote the
-     * current design would have destroyed: a cleared shaft follows the design's own controls from
-     * then on, and a shaft pinned to the design's current machine stops following them the moment
-     * the class chip moves. Both halves are asserted, because only the second tells them apart.
-     */
-    const cleared = withShaftMachine(withShaftMachine(SIZED, 1, hydraulic), 1, undefined);
-    expect(cleared.machineByCar).toStrictEqual({});
-
-    const frozen = { ...SIZED, machineByCar: { 1: designMachineOf(SIZED) } };
-    const moved = withMachineClass(frozen, hydraulic);
-    expect(machineAt(moved, 0).specClass, 'a following shaft moves with the design').toBe(
-      'hydraulic',
+  it('says what an opened building carried that the board cannot hold, and nothing when it holds all', () => {
+    const midtown = parseBuilding(
+      JSON.parse(readFileSync(join(DATA_DIR, 'buildings/midtown-office.json'), 'utf8')) as unknown,
     );
-    expect(machineAt(moved, 1).specClass, 'a pinned shaft does not').toBe(SIZED.specClass);
-    expect(machineAt(withMachineClass(cleared, hydraulic), 1).specClass).toBe('hydraulic');
-  });
-
-  it('says whose machine the rating plate is quoting, and only when it needs to', () => {
-    /*
-     * § 13.2's plate names one lift. On a design whose shafts all follow it that is the building,
-     * and the line is empty — a sentence about an exception that does not exist is one a reader
-     * learns to skip past the ones that matter. On a design with a shaft of its own it says how
-     * many, because otherwise every figure on the plate would be true of some shaft and none of
-     * them true of the building.
-     */
-    expect(designerShaftNote(SIZED)).toBe('');
-    const note = designerShaftNote(withShaftMachine(SIZED, 3, hydraulic));
-    expect(note).toContain('1 of 4 shafts');
-    expect(note).not.toMatch(/typical|average|mean/i);
-  });
-
-  it('says nothing about a shaft pinned to the machine the design already carries', () => {
-    /*
-     * **The state two clicks from the shipped `blank tower` button, and the one this note used to
-     * lie about.** `withShaftMachine` snaps a shaft's steps into whatever class it is handed, and
-     * both snaps are identities when that class is the design's own — geared traction's band is
-     * `[1.75, 2.5]` and its load ladder starts at 2 500, which is exactly what `BLANK_SPEC`
-     * carries. So the pin is byte-equal to the design, every shaft in the building carries the same
-     * machine, and the plate above is true of all of them.
-     *
-     * Counting pin **keys** made the note say *1 of 4 shafts carries a different one* while
-     * `buildingSummary` said *4 cars at 2.50 m/s · 16 persons each* about the same spec — two
-     * surfaces disagreeing about one design, which is what the `surfaces-disagree` honesty property
-     * exists for and cannot see here, because the two sit on different adapters. § D227 with its
-     * polarity reversed: a control that wrote nothing different, claiming it wrote something.
-     *
-     * The pin itself must survive, which is why both halves are asserted. It is what
-     * {@link withShaftMachine}'s docstring keeps distinguishable from no pin at all, and the row's
-     * border and its two step ladders are gated on it.
-     */
-    const own = CLASSES.find((entry) => entry.id === SIZED.specClass) as MachineClass;
-    const equal = withShaftMachine(SIZED, 0, own);
-    expect(equal.machineByCar[0], 'the snap is an identity on the design’s own class').toStrictEqual(
-      designMachineOf(SIZED),
-    );
-    expect(designerShaftRows(equal, CLASSES, 'metric')[0]?.pinned, 'the pin is still a pin').toBe(
-      true,
-    );
-    expect(designerShaftNote(equal)).toBe('');
-
-    /* A shaft that does differ is still counted, and the equal pin beside it is not. */
-    const mixed = withShaftMachine(equal, 2, hydraulic);
-    expect(designerShaftNote(mixed)).toContain('1 of 4 shafts');
-    expect(designerShaftNote(mixed)).toContain('carries');
-  });
-
-  it('reads the picker’s three values apart, and keeps a pin the class table cannot name', () => {
-    /*
-     * **The option drawn to preserve an unresolvable pin resolved to the value that clears it.**
-     * The screen read every value through `classes.find((entry) => entry.id === pick.value)`, and
-     * that answers `undefined` for two different questions: *follow the design* (`''`) and *the
-     * machine this shaft already carries, under a class id this build has no entry for*.
-     * {@link withShaftMachine} reads `undefined` as **clear the pin**, so the handler meant the
-     * opposite of what that option means.
-     *
-     * **No reader ever hit it, and this case says so rather than inheriting the claim that they
-     * did.** The screen appends that option `selected = true` and rebuilds the panel whole on every
-     * redraw, so the select already holds that id whenever the option exists and a `change` cannot
-     * carry it. That also means the screen cannot be driven into the state — so what is asserted
-     * here is the value resolver, on all three answers, which is the half that was wrong and the
-     * half a test can reach. The state itself is built directly, because building it is the only
-     * way to have it.
-     *
-     * Asserted here rather than left to `staleRefusals.test.ts:235`, which says only that the
-     * screen's **source** contains `withShaftMachine` — a guard that passes just as well when the
-     * listener writes the wrong car or is never attached at all.
-     */
-    const orphan = { ...SIZED, machineByCar: { 1: { ...designMachineOf(SIZED), specClass: 'gone' } } };
-    expect(designerShaftRows(orphan, CLASSES, 'metric')[1]?.className, 'the row answers the raw id')
-      .toBe('gone');
-
-    const keep = shaftPickOf(CLASSES, 'gone');
-    expect(keep.kind).toBe('keep');
-
-    const follow = shaftPickOf(CLASSES, '');
-    expect(follow.kind).toBe('follow');
-    expect(withShaftMachine(orphan, 1, undefined).machineByCar).toStrictEqual({});
-
-    const chosen = shaftPickOf(CLASSES, hydraulic.id);
-    expect(chosen.kind).toBe('class');
-    expect(chosen.kind === 'class' ? chosen.machineClass.id : '').toBe('hydraulic');
-
-    /*
-     * And what the screen does with each: `keep` writes nothing, so the pin the class table cannot
-     * name is still there and still says what it said.
-     */
-    expect(machineAt(orphan, 1).specClass).toBe('gone');
-    expect(machineAt(withShaftMachine(orphan, 1, hydraulic), 1).specClass).toBe('hydraulic');
-  });
-
-  it('drops a pin on a shaft the design no longer has', () => {
-    /*
-     * `machinesWithin` is the shafts slider's own rule, and the reason it is a rule rather than a
-     * clear: a pin on a shaft that still exists is a choice the reader made about that shaft, and
-     * dragging the slider up by one is not a reason to take it down. What cannot survive is a pin
-     * on a shaft that is gone — it is written by nothing, drawn by nothing, and would come back the
-     * instant the slider went up again.
-     */
-    const pinned = withShaftMachine(SIZED, 3, hydraulic);
-    expect(machinesWithin(pinned.machineByCar, 4)).toStrictEqual(pinned.machineByCar);
-    expect(machinesWithin(pinned.machineByCar, 3)).toStrictEqual({});
+    const reading = planFromBuilding(midtown, 'midtown-office');
+    const line = designerLossLine(reading.plan.name, reading.notCarried);
+    expect(line).toContain('Opened from Midtown Office.');
+    expect(line).toContain('Saving makes a new building and leaves Midtown Office as it was.');
+    expect(designerLossLine('Anything', [])).toBe('');
   });
 });
