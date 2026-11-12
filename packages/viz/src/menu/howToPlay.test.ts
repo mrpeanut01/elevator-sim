@@ -425,7 +425,7 @@ describe('the figures the guide quotes are the figures the code computes', () =>
     const text = proseOf(await guide());
     // Six is the count `AWT_INVALID_GROUNDS` derives from its own table, and the whole point of
     // that table is that a seventh ground enters the enumeration by existing. If it ever does,
-    // this sentence is wrong and says so here. It said five until § D1630 added the escalator
+    // this sentence is wrong and says so here. It said five until § D1631 added the escalator
     // ground, and this case is what caught the guide still saying so.
     expect(AWT_INVALID_GROUNDS.length).toBe(6);
     expect(text, 'the guide names a different number of suppression grounds').toContain(
