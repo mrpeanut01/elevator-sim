@@ -32,6 +32,12 @@ RUN npm ci
 COPY tsconfig.base.json tsconfig.json ./
 COPY packages/ packages/
 COPY data/ data/
+# `tsc -b` compiles the test files too, and the repository guards among them import dependency-free
+# scripts from outside `packages/` (`scripts/*.mjs`, `infra/checks/*.mjs`, with their `.d.mts`). Without
+# these two lines the build fails with fifteen TS2307/TS7006 errors. Build stage only: nothing in them
+# reaches the runtime image.
+COPY scripts/ scripts/
+COPY infra/checks/ infra/checks/
 
 # The library build (`tsc -b`, into each package's `dist/`) and then the viewer's web bundle
 # (Vite, into `packages/viz/dist-web/`). Two outputs, two directories, deliberately not one — see
