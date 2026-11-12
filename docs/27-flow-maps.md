@@ -376,11 +376,11 @@ there are"*.
 
 | | |
 |---|---|
-| **Happy** | Rail → author a building against the class ladder, watch the specification block re-derive as controls move → *Run a day in it* applies the spec, starts a run, lands on the stage |
+| **Happy** | Rail → pick a starting point or keep the standing building → four steps over a drawing of the tower, each acting on the shaft or floor picked in it: **Shape** (height, shafts, how far each reaches — the tallest are the core, shorter ones alternate either side), **Lifts** (class, speed and load steps, double deck, two cars in a shaft, duty), **Floors** (sky lobbies, escalators, people), **Service** (local, express, shuttle or hand-picked stops) → the figures and the *before you run it* list re-derive on every edit → *Run a day in it* applies the plan, starts a run, lands on the stage |
 | **Empty** | The board opens on the standing building, never on nothing |
 | **Restored** | Saved buildings survive in the library slot; the in-progress drawing does not |
 | **Unavailable** | Not applicable |
-| **Recovery** | `⌂ Modes`. Its note is standing: *"Nothing here is scored. It is a drawing board."* Its own register names five things the board does not do |
+| **Recovery** | `⌂ Modes`. Its note is standing: *"Nothing here is scored. It is a drawing board."* Its own register is empty: what an opened building carried that the board cannot hold is said on the screen when it opens |
 
 ### F10 — Tune the tower
 

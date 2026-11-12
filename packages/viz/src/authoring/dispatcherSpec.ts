@@ -37,7 +37,7 @@
  *    honest spelling, because it does not claim the dispatcher considers something it does not.
  */
 
-import { COST_TERMS_BY_ID, buildingDeclaresDuty, type DispatcherProfile } from '@elevator-sim/core/browser';
+import { COST_TERMS_BY_ID, buildingDeclaresDuty, type DispatcherProfile, type FormulaTermConfig } from '@elevator-sim/core/browser';
 import {
   applyPatch,
   candidateFromProfile,
@@ -90,6 +90,18 @@ export interface DispatcherSpec {
    * optimizer's winner goes through, not a second one written here.
    */
   readonly families: Readonly<Record<string, ParameterValue>>;
+  /**
+   * The dispatcher's own formulas — `core`'s `DispatcherProfile.formulas`, edited through
+   * `authoring/formulaSpec.ts`. In the profile's own shape, weight included, because a formula is
+   * not one of the fourteen sliders and has no 0–100 position of its own.
+   *
+   * **Three states, and the difference is written by {@link profileFromSpec}.** Absent means
+   * *this surface did not touch them*: the base profile's formulas are kept, which is what every
+   * spec built before the field existed says. An empty list means *none*, and removes them. A
+   * non-empty list is written. {@link specFromProfile} sets the key only for a profile that has
+   * some, so a profile without formulas round-trips to a spec that is the object it always was.
+   */
+  readonly formulas?: readonly FormulaTermConfig[] | undefined;
 }
 
 /**
@@ -226,7 +238,7 @@ const BYPASS_OFF = 1;
  */
 let searchSpace: SearchSpace | undefined;
 
-function familySpace(): SearchSpace {
+export function familySpace(): SearchSpace {
   searchSpace ??= collectSearchSpace();
   return searchSpace;
 }
@@ -271,6 +283,7 @@ export function specFromProfile(profile: DispatcherProfile, name?: string): Disp
   return {
     name: name ?? `Copy of ${profile.name}`,
     weights,
+    ...(profile.formulas === undefined || profile.formulas.length === 0 ? {} : { formulas: profile.formulas }),
     // Empty, and never read back off the profile: the profile *is* the base the family controls
     // are moves against, so a record populated from it would say every field had been moved and
     // `profileFromSpec` would author the lot.
@@ -379,6 +392,11 @@ export function profileFromSpec(spec: DispatcherSpec, options: ToProfileOptions)
   assignOrDelete(profile, 'dispatch', dispatch);
   assignOrDelete(profile, 'answer', answer);
   assignOrDelete(profile, 'idle', idle);
+  // Absent keeps the base's, empty removes them, anything else is written — see the field.
+  if (spec.formulas !== undefined) {
+    if (spec.formulas.length === 0) delete profile['formulas'];
+    else profile['formulas'] = spec.formulas;
+  }
   return profile as unknown as DispatcherProfile;
 }
 
@@ -542,6 +560,7 @@ export function specIsDirty(spec: DispatcherSpec, source: DispatcherProfile | un
   for (const term of terms) {
     if ((original.weights[term] ?? 0) !== (spec.weights[term] ?? 0)) return true;
   }
+  if (JSON.stringify(spec.formulas ?? source.formulas ?? []) !== JSON.stringify(source.formulas ?? [])) return true;
   return (
     original.flags.pool !== spec.flags.pool ||
     original.flags.zone !== spec.flags.zone ||

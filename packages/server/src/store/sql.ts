@@ -30,7 +30,13 @@
  * gap it exists to close: the query text `store.ts` writes is the query text PostgreSQL receives,
  * in tests and in production alike. What differs between the two is the transport and nothing else.
  *
- * {@link PgSql} is the production driver and its non-test caller is `bootstrap.ts`.
+ * **Since § D1630 there are two production drivers, and the argument above still holds for both.**
+ * `SqliteSql` (`sqlite.ts`) runs the same query text, because the store's SQL is now written in the
+ * subset both engines parse, and the store's own tests run on each (`testSql.test-helper.ts`). So
+ * neither engine is the one *"nothing runs"*: each is the engine a CI run exercises and a deployment
+ * may pick (`connect.ts#sqlFor`).
+ *
+ * {@link PgSql} is the PostgreSQL driver and its non-test caller is `bootstrap.ts`, through `main.ts`.
  * `pglite.test-helper.ts` is the other implementation and is named as a test helper because that is
  * all it is — an in-process build of PostgreSQL itself, so what it runs is not an emulation of the
  * dialect but the dialect.
@@ -45,8 +51,22 @@ export interface SqlResult {
   readonly rowCount: number;
 }
 
+/**
+ * Which engine is behind the seam — § D1630.
+ *
+ * Read in exactly one place, `store.ts#applyMigrations`, because a migration written before SQLite
+ * was supported may use a statement SQLite has no form of (`ADD COLUMN IF NOT EXISTS`). Every query
+ * the store runs is the same text on both engines; a second reader of this field would be the
+ * dialect translation the paragraph above refuses.
+ */
+export type SqlDialect = 'postgres' | 'sqlite';
+
 export interface Sql {
-  /** One parameterised statement. `$1`-style placeholders, which is PostgreSQL's own syntax. */
+  readonly dialect: SqlDialect;
+  /**
+   * One parameterised statement. `$1`-style placeholders, which is PostgreSQL's own syntax and a
+   * named parameter SQLite accepts as written, so the text is identical on both engines.
+   */
   query(text: string, params?: readonly unknown[]): Promise<SqlResult>;
   /** Multi-statement DDL with no parameters. Used once, for the schema. */
   exec(text: string): Promise<void>;
@@ -61,6 +81,7 @@ export interface Sql {
  * leaderboard for a simulator, and a tuned pool size would be a number nobody measured.
  */
 export class PgSql implements Sql {
+  readonly dialect = 'postgres';
   readonly #pool: Pool;
 
   constructor(connectionString: string) {

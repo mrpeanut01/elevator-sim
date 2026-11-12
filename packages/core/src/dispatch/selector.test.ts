@@ -194,6 +194,27 @@ describe('resolving the arms refuses every configuration it cannot keep', () => 
     expect(() => resolveWeightSets(unmapped, SELECTION, 'p')).toThrow(/no weightSetsByPattern/);
   });
 
+  it('lays a profile’s own entries over the file’s map, pattern by pattern', () => {
+    // The profile says only where it differs: `up` is its own, `down` stays the file's.
+    const sets = resolveWeightSets(LIBRARY, SELECTION, 'p', { up: 'down-arm' });
+    expect(sets?.arms.map((arm) => [arm.patternId, arm.weightSetId])).toEqual([
+      ['up', 'down-arm'],
+      ['down', 'down-arm'],
+    ]);
+    expect(sets?.arms[0]?.weights).toBe(LIBRARY.weightsByProfileId.get('down-arm'));
+    // And no entries is exactly the file's map, which is every profile written before the field.
+    expect(resolveWeightSets(LIBRARY, SELECTION, 'p', {})).toEqual(resolveWeightSets(LIBRARY, SELECTION, 'p'));
+  });
+
+  it('refuses a profile’s entry for a pattern the detector cannot report, or a profile nobody authored', () => {
+    expect(() => resolveWeightSets(LIBRARY, SELECTION, 'p', { sideways: 'up-arm' })).toThrow(
+      /declares no such pattern/,
+    );
+    expect(() => resolveWeightSets(LIBRARY, SELECTION, 'p', { up: 'not-a-profile' })).toThrow(
+      /not an authored/,
+    );
+  });
+
   it('keeps the declared pattern order, which is what breaks ties', () => {
     const sets = resolveWeightSets(LIBRARY, SELECTION, 'p');
     expect(sets?.arms.map((arm) => arm.patternId)).toEqual(['up', 'down']);

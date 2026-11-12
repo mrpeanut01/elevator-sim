@@ -4,7 +4,7 @@
  *
  * ```
  * npm run build
- * ELEVATOR_SIM_DB=postgres://… npm run dashboard --workspace @elevator-sim/server
+ * ELEVATOR_SIM_DB=file:/data/elevator-sim.db (or postgres://…) npm run dashboard --workspace @elevator-sim/server
  * ```
  *
  * ## Why a command and not a route
@@ -39,7 +39,7 @@
  * no longer configures.
  */
 
-import { PgSql } from '../store/sql.js';
+import { sqlFor } from '../store/connect.js';
 import { Store } from '../store/store.js';
 
 import { dashboardOf } from './dashboard.js';
@@ -58,7 +58,7 @@ export async function dashboardMain(
   const url = env['ELEVATOR_SIM_DB'];
   if (url === undefined || url.trim().length === 0) {
     throw new Error(
-      'ELEVATOR_SIM_DB is not set. It is the PostgreSQL connection string the dashboard reads. ' +
+      'ELEVATOR_SIM_DB is not set. It is the database the dashboard reads, a SQLite file or a PostgreSQL URL. ' +
         'There is deliberately no default: an empty local database read as a live one is how this ' +
         'dashboard would publish "nothing happened" about a product nobody had asked.',
     );
@@ -69,7 +69,7 @@ export async function dashboardMain(
    * reading, so a run cannot sweep against one moment and draw a cohort against another.
    */
   const nowMs = Date.now();
-  const store = await Store.open({ sql: new PgSql(url), now: () => nowMs });
+  const store = await Store.open({ sql: sqlFor(url), now: () => nowMs });
   const events = await store.telemetryEventsForDashboard();
   write(renderDashboard(dashboardOf(events, { nowMs })));
 }

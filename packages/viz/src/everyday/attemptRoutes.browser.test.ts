@@ -50,6 +50,9 @@ import {
 import { ATTEMPT_KEY } from '../persist/attempt.js';
 import { SESSION_KEY } from '../persist/types.js';
 import { PRACTICE_DAY_SENTENCES } from '../shift/scoredCrowd.js';
+import { TODAY_ASKS_HEADING } from '../shift/goals.js';
+import { TEST_SIMULATION_LEAVE } from './actionBar.js';
+import { STAGE_GOALS_COPY } from './stageScreenModel.js';
 
 let site: ShippedSite;
 let browser: Browser;
@@ -210,14 +213,27 @@ describe.skipIf(!HAS_BROWSER)('the attempt’s routes, before it begins and at i
         .toBe(`${PRACTICE_DAY_SENTENCES.practiceCrowd} This sandbox day keeps car D booked out of passenger service as the day had.`);
       expect(await storedAttempt(page), 'the workshop’s run began the day’s attempt').toBeUndefined();
 
-      await page.locator('.everyday-bar-back').click();
-      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
-      expect(await textOf(page, '.everyday-brief'), 'the brief after the practice run is not the brief before it').toBe(brief);
+      /*
+       * § D1627: a test simulation's bar goes back to its bench, with no leave strip and no `‹ Brief`,
+       * because the run did not come through a brief. The brief is then reached the way a player
+       * reaches it, from the lobby's floor.
+       */
+      expect(await page.locator('.everyday-bar-back').count(), 'a bench run offered a way back to a brief').toBe(0);
+      expect(await textOf(page, '.everyday-bar-leave')).toBe(TEST_SIMULATION_LEAVE);
+      /* And its goals strip does not claim a day: the eyebrow is the test's, with the sentence under it. */
+      expect(await textOf(page, '.everyday-stage-goals-heading')).toBe(STAGE_GOALS_COPY.testHeading);
+      expect(await textOf(page, '.everyday-stage-goals-contract')).toBe(STAGE_GOALS_COPY.testNote);
+      await page.locator('.everyday-bar-leave').click();
+      await page.waitForSelector('.everyday-workshop', { timeout: 15_000 });
+      await page.locator('.everyday-rail-menu').click();
+      await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
+      expect(await toCrownsBrief(page), 'the brief after the practice run is not the brief before it').toBe(brief);
       expect(await textOf(page, '.everyday-bar-primary'), 'the practice run began the attempt').toBe('Start the day');
 
       await page.locator('.everyday-bar-primary').click();
       await stageWithARun(page);
       expect(await crowdOnScreen(page), 'Start the day did not play the day’s own crowd').toBe(DATE_CROWD);
+      expect(await textOf(page, '.everyday-stage-goals-heading'), 'a played day kept the test’s eyebrow').toBe(TODAY_ASKS_HEADING);
       expect((await storedAttempt(page))?.seed, 'the attempt did not begin on the day’s own crowd').toBe(DATE_CROWD);
       expect(await textOf(page, '.everyday-stage-practice')).toBe('');
       expect((await storedWeek(page))?.filed).toBe(0);

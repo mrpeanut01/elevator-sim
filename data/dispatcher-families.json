@@ -1,0 +1,42 @@
+{
+  "$comment": "The shelves the dispatcher workshop's industry chooser draws over data/dispatcher-profiles.json. A file of its own, not a block in that one, because that document is part of every run's configuration: the shipped fix-it mornings are pinned to a digest of it, and a heading on a shelf is not something a run depends on. Every shipped profile is on exactly one shelf, which packages/viz/src/authoring/dispatcherFamilies.test.ts holds, so adding a profile without shelving it fails a test rather than leaving it under 'more this build ships'. A line says what a family's designs share and never ranks one family over another: only a paired-t interval says that.",
+  "version": 1,
+  "families": [
+    {
+      "id": "the-basics",
+      "name": "The basics",
+      "line": "The designs lifts have run on for decades. One idea each, and nothing else.",
+      "profileIds": ["nearest-car", "eta", "collective", "collective-enroute"]
+    },
+    {
+      "id": "one-thing-first",
+      "name": "One thing first",
+      "line": "Each puts one concern ahead of the rest, and pays for it somewhere else.",
+      "profileIds": ["fairness-first", "capacity-aware", "energy-aware"]
+    },
+    {
+      "id": "divide-the-tower",
+      "name": "Divide the tower",
+      "line": "Each car is given part of the building to look after.",
+      "profileIds": ["zoned-uppeak"]
+    },
+    {
+      "id": "ask-the-destination",
+      "name": "Ask where they are going",
+      "line": "Riders give their floor before they board, so a car can be filled by destination.",
+      "profileIds": ["destination-eta", "destination-panel"]
+    },
+    {
+      "id": "cars-that-bid",
+      "name": "Cars that bid",
+      "line": "Each car prices the call for itself, and the bids decide who goes.",
+      "profileIds": ["auction", "auction-multi-round"]
+    },
+    {
+      "id": "everything-at-once",
+      "name": "Everything at once",
+      "line": "Many concerns weighed together, with a forecast of where the crowd will be.",
+      "profileIds": ["predictive-balanced"]
+    }
+  ]
+}

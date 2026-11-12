@@ -52,8 +52,9 @@ export interface BootstrapOptions {
    *
    * Injected rather than built here, for the reason the mailer is: this function assembles a
    * server out of things it is handed, and a bootstrap that constructed its own connection could
-   * only ever be tested against the database it chose. `main.ts` builds the production `PgSql`
-   * from the environment and is the named non-test caller; tests hand it a `PgliteSql`, which is
+   * only ever be tested against the database it chose. `main.ts` builds the production driver
+   * from the environment through `store/connect.ts#sqlFor` (SQLite or PostgreSQL, § D1630) and is
+   * the named non-test caller; tests hand it a `PgliteSql`, which is
    * PostgreSQL in-process rather than a stand-in for one.
    */
   readonly sql: Sql;

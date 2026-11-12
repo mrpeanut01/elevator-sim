@@ -524,6 +524,17 @@ Named so the next lane does not discover it. None of it is built by this page.
   recorded as a handoff deviation.
 - [`25-vertical-slice.md`](25-vertical-slice.md)'s slice is unchanged in content and its mode is
   renamed: one *today's scenario*.
+- **How the modes are moved between, built 2026-11-11** ([§ D1627](../DECISIONS.md), the owner's
+  direction). The game is laid out as a building, `packages/viz/src/everyday/floors.ts`: Scenario on
+  3, Career on 2, Rush on 1, the player's records on M, the lobby on L and the design floor on B. The
+  left tray draws the shaft with a car at the player's floor, a floor is one press from anywhere, and
+  motion is drawn over a press and never waited on. The lobby is the main menu, one screen
+  ([§ D1628](../DECISIONS.md)): the three modes are its top landings, and a first visit is offered
+  the walkthrough there by name. A run started from the design floor is a *test
+  simulation* and files nothing; a building is played on a mode's floor. **§ 2.1's *Build your own*
+  is built in part** ([§ D1629](../DECISIONS.md)): the Scenario floor lists the buildings a player
+  saved and plays a day in one, on a week of its own that banks nothing. A goal, a budget, a
+  survivor count and sharing are not built.
 
 ## 4. What this does not change
 

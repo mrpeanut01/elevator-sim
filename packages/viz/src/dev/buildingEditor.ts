@@ -115,6 +115,7 @@ import {
   type SpecTransportMode,
   type SpecUpPeakAnalysis,
 } from '../authoring/buildingSpec.js';
+import { buildingFromPlan, type TowerPlan } from '../authoring/towerPlan.js';
 import {
   CREDENTIAL_STATES,
   STATE_GLYPHS,
@@ -1505,6 +1506,27 @@ export function savedBuildingFrom(
     id,
     config: parseBuilding(buildingFromSpec(named, { specs }) as unknown, `${id}.json`),
   };
+}
+
+/**
+ * {@link savedBuildingFrom} for the drawing board's plan (`authoring/towerPlan.ts`): a fresh id,
+ * and the document through the real loader, or the loader's own refusal thrown.
+ *
+ * It is **resolved** as well as parsed, and the result discarded. A plan can write a document that
+ * parses and cannot be built — a rope class too short for the travel is one — and that refusal
+ * belongs here, where the board that pressed can quote it, rather than at the run.
+ */
+export function savedBuildingFromPlan(
+  plan: TowerPlan,
+  state: ViewerState,
+  resources: BrowserResources,
+): SavedBuildingResult {
+  const id = nextSavedId('bld', allBuildingIds(resources, state.savedBuildings));
+  const specs = specsWithSaved(resources, state.savedClasses);
+  const file = `${id}.json`;
+  const config = parseBuilding(buildingFromPlan({ ...plan, id }, specs) as unknown, file);
+  resolveBuilding(config, specs, { file });
+  return { id, config };
 }
 
 /**

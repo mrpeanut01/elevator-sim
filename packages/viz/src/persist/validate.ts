@@ -870,6 +870,7 @@ const SAVED_BUILDING_CHECKS: Readonly<Record<keyof SavedBuilding, FieldCheck>> =
 const SAVED_DISPATCHER_CHECKS: Readonly<Record<keyof SavedDispatcher, FieldCheck>> = Object.freeze({
   id: isNonEmptyString,
   profile: isDocument('a dispatcher profile'),
+  basedOn: isNonEmptyString,
 });
 
 const SAVED_PATTERN_CHECKS: Readonly<Record<keyof SavedPattern, FieldCheck>> = Object.freeze({
@@ -1093,7 +1094,7 @@ export function restoreLibrary(value: unknown, context: LibraryContext): Library
   const dispatchers = restoreShelf<SavedDispatcher>(
     'dispatcher',
     shelves.dispatchers,
-    isObjectOf(SAVED_DISPATCHER_CHECKS, 'a saved dispatcher'),
+    isObjectOf(SAVED_DISPATCHER_CHECKS, 'a saved dispatcher', ['basedOn']),
     (entry) => dispatcherIssue(entry, context),
     dropped,
   );

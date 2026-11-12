@@ -623,6 +623,26 @@ describe('the one intervention kind a submission may not carry, and the switch t
     });
     expect(issues.join(' ')).toMatch(/whenValue is not one of the values/u);
   });
+
+  it('holds a row’s further conditions to the same vocabulary, the same values and core’s bound', () => {
+    const claimed = { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true };
+    const issuesFor = (and: unknown, then = 'jump-queue'): string =>
+      submissionIssues({
+        run: {
+          ...RUN,
+          ruleRows: [{ when: 'call-waited', whenValue: 30, and, then } as never],
+        },
+        claimed,
+      }).join(' ');
+    expect(issuesFor([{ when: 'lobby-queue-passes', whenValue: 12 }])).toBe('');
+    expect(issuesFor([{ when: 'invent-a-condition' }])).toMatch(/and\[0\]\.when .* not a declared rule condition/u);
+    expect(issuesFor([{ when: 'lobby-queue-passes', whenValue: 13 }])).toMatch(/and\[0\]\.whenValue is not one/u);
+    expect(issuesFor([])).toMatch(/between 1 and 2 conditions/u);
+    expect(issuesFor([{ when: 'shaft-out' }, { when: 'shaft-out' }, { when: 'shaft-out' }])).toMatch(
+      /between 1 and 2 conditions/u,
+    );
+    expect(issuesFor('shaft-out')).toMatch(/between 1 and 2 conditions/u);
+  });
 });
 
 describe('a submission is accepted only if it replays', () => {

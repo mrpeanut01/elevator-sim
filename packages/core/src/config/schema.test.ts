@@ -69,12 +69,18 @@ describe('objectSectionsOf, against the shipped dispatcher profile', () => {
     expect(objectSectionsOf(dispatcherProfileSchema)).toStrictEqual([...SHIPPED_SECTIONS]);
   });
 
-  it('excludes the two pseudo-sections and the scalars, and each for its own reason', () => {
+  it('excludes the four pseudo-sections and the scalars, and each for its own reason', () => {
     // `weights` and `hardConstraints` are real profile fields and are **not** written as
     // `profile.<section>.<key>` — `encode.ts` translates both itself, `weights` because it is an
     // open record with no fixed keys and `hardConstraints` because a set is not something a
     // generic optimizer samples. Their absence here is what makes that translation the only one.
-    for (const pseudo of ['weights', 'hardConstraints']) {
+    // `patternWeightSets` is the third, and a record for `weights`' own reason: an open map, here
+    // of traffic pattern to the profile whose priorities run under it. It holds no declared
+    // tunable — a categorical choice per pattern over a set that is itself data — so nothing
+    // samples it and `encode.ts` writes nothing under it.
+    // `formulas` is the fourth, an array for `hardConstraints`' reason: a formula is a tree, and
+    // a search over structure is not a search over a range (`dispatch/formula.ts`).
+    for (const pseudo of ['weights', 'hardConstraints', 'patternWeightSets', 'formulas']) {
       expect(Object.hasOwn(dispatcherProfileSchema.shape, pseudo)).toBe(true);
       expect(DISPATCHER_PROFILE_OBJECT_SECTIONS).not.toContain(pseudo);
     }
@@ -91,6 +97,8 @@ describe('objectSectionsOf, against the shipped dispatcher profile', () => {
         ...SHIPPED_SECTIONS,
         'weights',
         'hardConstraints',
+        'patternWeightSets',
+        'formulas',
         '$comment',
         'id',
         'name',
@@ -204,17 +212,19 @@ function parserAcceptsEmptyObjectAt(key: string): boolean {
 }
 
 describe('the derived section list, cross-checked against the parser', () => {
-  it('agrees with the parser key for key, with `weights` the one documented difference', () => {
+  it('agrees with the parser key for key, with the two records the documented difference', () => {
     const accepted = Object.keys(dispatcherProfileSchema.shape).filter(parserAcceptsEmptyObjectAt);
 
     // `weights` accepts `{}` because it is a record and an empty map is a valid one — which is
     // the same fact that makes it a pseudo-section rather than a section, and the same fact the
     // blind-spot assertion above records. Everything else the parser accepts as an empty object
     // is a section, and every section is accepted.
-    expect(accepted.filter((key) => key !== 'weights')).toStrictEqual([
+    // `patternWeightSets` is the second record, and differs from a section the same way.
+    const RECORDS: readonly string[] = ['weights', 'patternWeightSets'];
+    expect(accepted.filter((key) => !RECORDS.includes(key))).toStrictEqual([
       ...DISPATCHER_PROFILE_OBJECT_SECTIONS,
     ]);
-    expect(accepted).toContain('weights');
+    for (const record of RECORDS) expect(accepted).toContain(record);
 
     // The oracle discriminates: it must not be answering `true` for everything.
     expect(accepted.length).toBeLessThan(Object.keys(dispatcherProfileSchema.shape).length);

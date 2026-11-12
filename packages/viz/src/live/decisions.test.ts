@@ -173,6 +173,16 @@ describe('the empty state is the design’s', () => {
   });
 });
 
+describe('a formula of the dispatcher’s own is called what its author called it', () => {
+  it('uses the name on the row and in the tooltip, never the id', () => {
+    const own = { termId: 'mine-1', name: 'Late and full', weight: 0.5, raw: 0.4, contribution: 0.2 };
+    const row = decisionRowsAt(syntheticRecording({ decisions: [decision({ terms: [own] })] }), 300)[0];
+    expect(row?.why).toBe('Late and full 0.4 won it · 0.42 clear of the next car');
+    expect(row?.title).toContain('Late and full: 0.4');
+    expect(`${row?.why ?? ''} ${row?.title ?? ''}`).not.toContain('mine-1');
+  });
+});
+
 describe('the three outcomes each say something honest', () => {
   it('assigns with the dominant term’s raw value and a dimensionless margin', () => {
     const row = decisionRowsAt(syntheticRecording({ decisions: [decision()] }), 300)[0];

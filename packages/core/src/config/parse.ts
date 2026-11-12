@@ -671,7 +671,7 @@ export function resolveBuilding(
      * meaning exactly, it is every shipped building, and it is what makes every pinned run in
      * this project byte-identical across this change.
      */
-    const shafts = resolveShafts(bank, cars, at, addIssue);
+    const shafts = resolveShafts(bank, cars, floorsById, at, addIssue);
 
     banks.push({
       id: bank.id,
@@ -994,6 +994,7 @@ export function crossCheckDispatcherProfiles(
 function resolveShafts(
   bank: BankConfig,
   cars: readonly ResolvedCar[],
+  floorsById: ReadonlyMap<string, FloorConfig>,
   at: string,
   addIssue: (path: string, message: string, code: string) => void,
 ): readonly ResolvedShaft[] {
@@ -1043,7 +1044,16 @@ function resolveShafts(
     declared.map((shaft, shaftIndex) => {
       const path = `${at}.shafts[${shaftIndex}]`;
       const carIds: readonly string[] = Object.freeze([...shaft.carIds]);
-      if (carIds.length < 2) return { id: shaft.id, carIds };
+      if (carIds.length < 2) {
+        if (shaft.sectorBoundaryFloorId !== undefined) {
+          addIssue(
+            `${path}.sectorBoundaryFloorId`,
+            `shaft "${shaft.id}" of bank "${bank.id}" declares sector boundary "${shaft.sectorBoundaryFloorId}" and holds one car. A sector boundary divides a hoistway between two cars; one car has the whole of it.`,
+            ISSUE_CODES.twinSectorInvalid,
+          );
+        }
+        return { id: shaft.id, carIds };
+      }
 
       /*
        * **A TWIN shaft in a double-deck bank is refused, because nobody designed it.**
@@ -1120,7 +1130,37 @@ function resolveShafts(
         return { id: shaft.id, carIds };
       }
 
-      return { id: shaft.id, carIds, separation };
+      /*
+       * **The sector boundary, when the shaft declares one** — `docs/11` § 3.2 regime R1. Checked
+       * here so a boundary nobody can honour is a located error: the lower car's sector always
+       * holds the boundary floor itself, so the only sector that can come out empty is the upper
+       * car's, when no served floor lies a full required gap above the boundary.
+       */
+      const boundaryId = shaft.sectorBoundaryFloorId;
+      if (boundaryId === undefined) return { id: shaft.id, carIds, separation };
+      const boundary = bank.servesFloors.includes(boundaryId) ? floorsById.get(boundaryId) : undefined;
+      if (boundary === undefined) {
+        addIssue(
+          `${path}.sectorBoundaryFloorId`,
+          `shaft "${shaft.id}" of bank "${bank.id}" declares sector boundary "${boundaryId}", which the bank does not serve. The boundary is the highest floor the lower car answers, so it is one of the bank's own floors.`,
+          ISSUE_CODES.twinSectorInvalid,
+        );
+        return { id: shaft.id, carIds, separation };
+      }
+      const gapM = separation.standingClearanceM + separation.bufferM;
+      const upperHasAFloor = bank.servesFloors.some(
+        (floorId) => (floorsById.get(floorId)?.heightM ?? Number.NEGATIVE_INFINITY) >= boundary.heightM + gapM,
+      );
+      if (!upperHasAFloor) {
+        addIssue(
+          `${path}.sectorBoundaryFloorId`,
+          `shaft "${shaft.id}" of bank "${bank.id}" declares sector boundary "${boundaryId}" at ${boundary.heightM} m, and the bank serves no floor at or above ${Number((boundary.heightM + gapM).toFixed(3))} m — one required gap (${gapM} m) higher. The upper car's sector would hold no floor. Lower the boundary.`,
+          ISSUE_CODES.twinSectorInvalid,
+        );
+        return { id: shaft.id, carIds, separation };
+      }
+
+      return { id: shaft.id, carIds, separation, sectorBoundaryFloorId: boundaryId };
     }),
   );
 }

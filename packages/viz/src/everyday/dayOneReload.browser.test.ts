@@ -28,7 +28,6 @@ import {
   leaveTutorialIfOffered,
   openEverydayBrief,
   openPage,
-  skipTheLobby,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -55,7 +54,6 @@ const DATE = '2026-10-10';
 describe.skipIf(!HAS_BROWSER)('a reload with the first day begun — § D1369', () => {
   it('opens on the picker with Continue your week, and the tile leads back to Resume', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-    await skipTheLobby(page);
     try {
       await page.clock.setFixedTime(new Date(`${DATE}T12:00:00Z`));
       await page.goto(origin, { waitUntil: 'load' });
@@ -101,15 +99,14 @@ describe.skipIf(!HAS_BROWSER)('a reload with the first day begun — § D1369', 
     }
   });
 
-  it('still offers a genuine first arrival the landing page — the gate moved only for a begun day', async () => {
+  /* § D1628: the lobby is the front door for everybody, so a first arrival is offered the walkthrough on it. */
+  it('still offers a genuine first arrival the walkthrough, on the lobby — the gate moved only for a begun day', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-    await skipTheLobby(page);
     try {
       await page.clock.setFixedTime(new Date(`${DATE}T12:00:00Z`));
       await page.goto(origin, { waitUntil: 'load' });
-      await page.waitForSelector('.everyday-landing, .everyday-tutorial, .everyday-mode[data-screen]', { timeout: 30_000 });
-      expect(await page.locator('.everyday-landing').count()).toBe(1);
-      await leaveTutorialIfOffered(page);
+      await page.waitForSelector('.everyday-lobby-walkthrough', { state: 'visible', timeout: 30_000 });
+      expect(await page.locator('.everyday-landing').count()).toBe(0);
       expect(await page.locator('.everyday-continue-week').count()).toBe(0);
     } finally {
       await page.close();

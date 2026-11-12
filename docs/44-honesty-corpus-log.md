@@ -19,6 +19,72 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave BA
+
+**Wave BA moves +2.00 strings a case always-on, with the surface set unchanged.** One lane: a test
+simulation's goals strip no longer reads *what today asks* ([§ D1627](../DECISIONS.md)). The base is
+wave AZ's row, and `main` at `5039086` is the tree that row was measured on (`git diff` against
+`558e061` is empty), so it stands. The move is two keys on
+`everyday/stageScreenModel.ts#STAGE_GOALS_COPY`, which its adapter sweeps once a case: the test's eyebrow
+and its sentence. The deep row still names `c181913`.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base, `main` at `5039086` (wave AZ's row) | 1 162 652 | | | 80 |
+| wave BA's head | **1 162 750** | **+98** | **+2.00** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
+## Wave AZ
+
+**Wave AZ moves +43.00 strings a case always-on, with the surface set unchanged.** One lane: a building
+the player drew is played from the Scenario floor ([§ D1629](../DECISIONS.md)). The base was re-measured
+on `main` at `9211636` and read 1 160 545, not the 1 151 823 wave AY's row published: #658 merged after
+that row was taken and moved it by 8 722, that lane's, not decomposed here. Measured once
+on wave AZ's head after `main` was merged in. The same 80 surfaces speak, so the move is text on existing
+producers: the Scenario hub's *Your buildings*, and the bar's test simulation and lobby cells. The deep
+row still names `c181913` until the first nightly after wave AZ merges.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| wave AY's row, as published (`398eed9`) | 1 151 823 | | | 80 |
+| base re-measured, `main` at `9211636` (#658) | 1 160 545 | +8 722 | | 80 |
+| wave AZ's head, `main` merged in | **1 162 652** | **+2 107** | **+43.00** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
+## Wave AY
+
+**Wave AY moves +1 657.45 strings a case always-on, with the surface set unchanged.** One lane, the
+Design a building board, in two merges. The base is wave AX's row, re-measured on `e134f2a` and
+reproduced to the string. The first merge (#655) and the Dispatcher Workshop (#656) both reached `main`
+unmeasured, so each tree is measured here and nothing is split by quotient (§ D256); #656's step is its
+own lane's and is shown, not claimed. The same 80 surfaces speak throughout: this wave's move is the
+board's adapter in `EVERYDAY_STANDALONE_SCREENS`. No decision heading was spent (§ D405). The deep row
+still names `c181913` until the first nightly after wave AY merges.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base, wave AX's row (re-measured on `e134f2a`) | 1 047 333 | | | 80 |
+| `main` after #655 (`6822ce0`) | 1 118 872 | +71 539 | +1 459.98 | 80, **same set** |
+| `main` after #656 (`457a1d4`), not this wave's | 1 142 147 | +23 275 | +475.00 | 80, **same set** |
+| wave AY's head (`398eed9`) | **1 151 823** | **+9 676** | **+197.47** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
+## Wave AX
+
+**Wave AX moves −132.00 strings a case always-on, with the surface set unchanged.** The base is wave AW's
+row, re-measured on `39840df` before the comparison and reproduced to the string. Measured once on wave
+AX's head, which is one lane. The same 80 surfaces speak, so the move is text on existing producers: the
+lobby's adapter drives a machine with no phases to seed where § D1445's ride had six
+([§ D1627](../DECISIONS.md)), the lobby is the main menu and lost its key and its Settings row
+([§ D1628](../DECISIONS.md)), and the tray's and the bar's adapters gain the floors and the test
+simulation's words. The deep row still names `c181913` until the first nightly after wave AX merges.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base, wave AW's row (re-measured on `39840df`) | 1 053 801 | | | 80 |
+| wave AX's head (`38fa319`) | **1 047 333** | **−6 468** | **−132.00** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
 ## Wave AW
 
 **Wave AW moves +3.00 strings a case always-on, with no new surface.** The base is wave AV's row, which the

@@ -403,7 +403,7 @@ export const TUTORIAL_COPY = Object.freeze({
     'This is a tutorial, so the answer is on the screen. From here on you get the building and the letter, and the answer is yours: the diagnosis waits until you ask for it.',
   finish: 'Start playing',
   /* § D993: it read *"The day is filed and the main menu is next."* Nothing is filed now. */
-  finishNote: 'Nothing is filed. The main menu is next, and the first day on your week is one you play.',
+  finishNote: 'Nothing is filed. The lobby is next, and the first day on your week is one you play.',
 });
 
 /* -------------------------------------------------------------------------- *

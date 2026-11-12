@@ -37,7 +37,11 @@ import {
   readbackOf,
   ruleIssues,
   rowWithThen,
+  canAddCondition,
+  rowWithAndAt,
+  rowWithAnotherCondition,
   rowWithWhen,
+  rowWithoutAndAt,
   templateHasClock,
   type RuleIssue,
   type RuleRow,
@@ -190,6 +194,50 @@ export function mountRuleEditor(elements: RuleEditorElements, context: MountCont
         patch({ ...row, whenValue: value });
       },
     );
+    /*
+     * The row's further conditions — `ruleSpec.ts`'s `and`, the same model the Everyday workshop
+     * edits, so a row written on either surface is editable on the other. Each is the two selects
+     * the first condition is, with a chip to drop it, and one chip adds another while
+     * `canAddCondition` allows.
+     */
+    const extras: HTMLElement[] = [];
+    (row.and ?? []).forEach((extra, at) => {
+      const ordinal = `row ${String(index + 1)} further condition ${String(at + 1)}`;
+      extras.push(
+        el(doc, 'span', { className: 'rule-row-word', text: 'and' }),
+        idSelect(conditionOptions(), extra.when, ordinal, (id) => {
+          patch(rowWithAndAt(row, at, id as RuleConditionId, extra.whenValue));
+        }),
+      );
+      const extraValue = valueSelect(whenValueOptions(extra.when), extra.whenValue, `${ordinal} value`, (value) => {
+        patch(rowWithAndAt(row, at, extra.when, value));
+      });
+      if (extraValue !== undefined) extras.push(extraValue);
+      const drop = el(doc, 'button', {
+        className: 'chip',
+        text: 'drop',
+        attrs: { type: 'button', title: 'drop this further condition', 'aria-label': `drop ${ordinal}` },
+      });
+      drop.addEventListener('click', () => {
+        patch(rowWithoutAndAt(row, at));
+      });
+      extras.push(drop);
+    });
+    if (canAddCondition(row)) {
+      const more = el(doc, 'button', {
+        className: 'chip',
+        text: 'and…',
+        attrs: {
+          type: 'button',
+          title: 'require a further condition as well',
+          'aria-label': `add a further condition to row ${String(index + 1)}`,
+        },
+      });
+      more.addEventListener('click', () => {
+        patch(rowWithAnotherCondition(row));
+      });
+      extras.push(more);
+    }
     const then = idSelect(actionOptions(), row.then, `row ${String(index + 1)} action`, (id) => {
       patch(rowWithThen(row, id as RuleActionId));
     });
@@ -226,6 +274,7 @@ export function mountRuleEditor(elements: RuleEditorElements, context: MountCont
             el(doc, 'span', { className: 'rule-row-word', text: 'when' }),
             when,
             ...(whenValue === undefined ? [] : [whenValue]),
+            ...extras,
             el(doc, 'span', { className: 'rule-row-word', text: 'then' }),
             then,
             ...(thenValue === undefined ? [] : [thenValue]),
