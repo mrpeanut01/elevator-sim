@@ -244,3 +244,60 @@ describe.skipIf(!HAS_BROWSER)('the transport keyboard moves the playhead', () =>
     await page.close();
   }, 120_000);
 });
+
+/* ---- § D1632: the Engineer menu is a shaft of landings, and a landing's plate is its key ---- */
+describe.skipIf(!HAS_BROWSER)('§ D1632 — the Engineer menu’s floors', () => {
+  async function openMenu(): Promise<Page> {
+    const page = await openPage(browser, { viewport: { width: 1280, height: 900 } });
+    await page.goto(origin, { waitUntil: 'load' });
+    await enterEngineerStage(page);
+    await reopenEngineerMenu(page);
+    return page;
+  }
+
+  /** The car's centre and a landing's, in page pixels. */
+  const centres = (page: Page, plate: string): Promise<{ car: number; landing: number }> =>
+    page.evaluate((which) => {
+      const mid = (selector: string): number => {
+        const box = document.querySelector(selector)?.getBoundingClientRect();
+        return box === undefined ? Number.NaN : box.top + box.height / 2;
+      };
+      return { car: mid('.menu-floor-car'), landing: mid(`.menu-list [data-floor="${which}"]`) };
+    }, plate);
+
+  it('stands the car at the landing pointed at, and draws every landing’s plate on the shaft', async () => {
+    const page = await openMenu();
+    try {
+      expect(await page.locator('.menu-list[data-floors] > [data-floor]').count()).toBe(8);
+      await page.locator('.menu-list [data-floor="M"]').hover();
+      await expect
+        .poll(async () => {
+          const at = await centres(page, 'M');
+          return Math.abs(at.car - at.landing);
+        }, { message: 'the car did not come to the landing pointed at', timeout: 5_000 })
+        .toBeLessThanOrEqual(2);
+      /* The plate is the stylesheet's, read off the attribute: the row's words are still its own. */
+      const plate = await page.evaluate(
+        () => getComputedStyle(document.querySelector('.menu-list [data-floor="M"]') as Element, '::before').content,
+      );
+      expect(plate).toBe('"M"');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('rides to a floor on its key without waiting on the car, and plates that floor’s title', async () => {
+    const page = await openMenu();
+    try {
+      await page.keyboard.press('s');
+      await expect.poll(() => page.textContent('.menu-title')).toBe('Settings');
+      expect(await page.getAttribute('.menu-title', 'data-floor')).toBe('S');
+      expect(await page.locator('.menu-list[data-floors]').count(), 'a floor drew the root’s shaft').toBe(0);
+      /* On a floor, a letter is a letter again: nothing rides anywhere from Settings. */
+      await page.keyboard.press('m');
+      expect(await page.textContent('.menu-title')).toBe('Settings');
+    } finally {
+      await page.close();
+    }
+  });
+});

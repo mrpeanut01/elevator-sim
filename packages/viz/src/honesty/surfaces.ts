@@ -6894,6 +6894,8 @@ const MENU: SurfaceAdapter = {
     'menu/client.ts#CLIENT_FAILURES',
     'menu/screens.ts#screenOf',
     'menu/screens.ts#titleOf',
+    'menu/screens.ts#MAIN_FLOORS',
+    'menu/screens.ts#FLOOR_OF_SCREEN',
     'menu/screens.ts#applyIntent',
     /*
      * `docs/16` S7's sentence — GitHub issue #178 item 1. `screenOf` appends it as the last notice
@@ -7257,7 +7259,12 @@ const MENU: SurfaceAdapter = {
           if (row.disabledWhy !== undefined) {
             seeds.push({ field: `${at}.${row.id}.why`, text: row.disabledWhy, role: 'reason' });
           }
+          /* § D1632: the landing's plate is drawn beside the row, so it is swept with it. */
+          if (row.floor !== undefined) {
+            seeds.push({ field: `${at}.${row.id}.floor`, text: row.floor, role: 'label' });
+          }
         }
+        if (view.floor !== undefined) seeds.push({ field: `${at}.floor`, text: view.floor, role: 'label' });
       }
     }
 

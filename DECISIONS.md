@@ -55788,6 +55788,8 @@ holed.
 
 ## D1629 — a building you drew is played from the Scenario floor, saving only saves, and the building's loose ends are closed
 
+> **Status 2026-11-12: AMENDED by [§ D1632](#d1632)** (the product owner). Clause 9's last sentence, *the Engineer shell's own menu is unchanged*, no longer holds: that menu's root is drawn as floors.
+>
 > **Status 2026-11-12: AMENDED by [§ D1631](#d1631)** (on the owner's delegation). Clause 3, *saving only saves*, is confirmed. A saved building can now be renamed and removed, which this entry named as not built, and the first-visit question is closed: a first visit meets the lobby.
 
 > **Taken 2026-11-11 by the product owner** ("continue with all of it, starting with playing your own
@@ -55972,4 +55974,47 @@ attempt stands) and `everyday/lobby.browser.test.ts` (the bar's height, the lobb
 undrawn leave at 320 × 320).
 
 **Numbers spent.** Wave BB took the charter row's **D1631** and moved the row to D1632; nothing is
+holed.
+
+## D1632 — the Engineer menu's root is drawn as a building: every row a landing with a plate, a car at the one pointed at, and a plate is its key
+
+> **Taken 2026-11-12 by the product owner** ("restyle the Engineer shell's menu as floors"), after
+> [§ D1629](#d1629) recorded that menu as unchanged, and built the same day by one session (wave BC,
+> a single lane). **Amends § D1629's** clause 9 in that one sentence. **Owner-reversible**: the
+> change is how one screen is drawn and keyed.
+
+**Why an entry.** It carries [§ D1627](#d1627)'s floors from the Everyday shell into the Engineer
+shell, adds a field to the menu's row model that the panel, the stylesheet and the corpus all read,
+and gives eight keys a meaning on the menu's root.
+
+**What is ruled.**
+
+1. **Every root row is a landing.** `menu/screens.ts#MAIN_FLOORS` gives each of the root's eight
+   rows one plate, top floor first, in the order the rows already had: `▲` Start here, `3`
+   Scenarios, `2` Free play, `1` This week's challenge, `M` Leaderboard, `A` Account, `S` Settings,
+   `R` Resume. Scenarios stands on 3 and the board on M, as they do in Everyday. The rows, their
+   words, their order and their intents are untouched.
+2. **The root is drawn as a shaft.** The panel marks the root's list, and the stylesheet draws a
+   hoistway down its left with each landing's plate on it (`content: attr(data-floor)`, so the
+   row's words stay its own). A car stands at the landing the pointer or the focus is on, and at
+   the recommended row on a fresh draw.
+3. **Motion is drawn after the press.** The car's glide is one eased transform, switched off under
+   reduced motion. No handler waits on it: a click and a key are `dispatch`, as a click was.
+4. **A plate is its key.** On the root, a bare press of a landing's letter or digit asks for
+   exactly what its click asks (`floorRowFor`). Never with a modifier, never from a control that
+   takes text, never for a refused row, and never off the root. `▲` is a mark and not a key: *Start
+   here* is a recommendation about another floor.
+5. **A floor says which it is.** A screen reached from a landing carries that landing's plate
+   beside its title (`FLOOR_OF_SCREEN`). Commissioning, which no root row opens, carries none.
+
+**What is not built, named.** The Engineer surface has no left tray, so there is no shaft beside a
+floor's own screen: the plate by the title is the whole of it. The two shells keep separate floor
+directories, because their rows differ; only the plates they share are held to agree.
+
+**Held by** `dev/menuPanel.test.ts` (one distinct plate a row, none off the root, a key asks what a
+click asks, a refused row and a mark press nothing) and `dev/keyboard.browser.test.ts` (the car
+comes to the landing pointed at, the plate is drawn, a key rides to its floor and a letter is a
+letter again once there).
+
+**Numbers spent.** Wave BC took the charter row's **D1632** and moved the row to D1633; nothing is
 holed.

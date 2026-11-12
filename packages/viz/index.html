@@ -1675,6 +1675,43 @@
       }
       .menu-row-primary .menu-row-name { font-size: 15px; }
       .menu-back { background: transparent; margin-top: 4px; }
+      /* § D1632: the Engineer menu's root drawn as a building. Each row is a landing with its
+         floor's plate on a shaft down the left, and a car stands at the landing being pointed at.
+         The plate is `content: attr(data-floor)`, so the words stay the row's own and a reader
+         without the stylesheet loses nothing. The car's glide is decoration: a press never waits
+         on it, and reduced motion switches the easing off. */
+      .menu-list[data-floors] { position: relative; padding-left: 58px; }
+      .menu-list[data-floors]::before {
+        content: ""; position: absolute; left: 10px; top: 0; bottom: 0; width: 34px;
+        border: 1px solid var(--edge-strong); border-radius: 6px; background: var(--card);
+        background-image: linear-gradient(var(--edge-strong), var(--edge-strong)),
+                          linear-gradient(var(--edge-strong), var(--edge-strong));
+        background-size: 1px 100%; background-repeat: no-repeat;
+        background-position: 8px 0, 24px 0;
+      }
+      .menu-list[data-floors] > [data-floor] { position: relative; }
+      .menu-list[data-floors] > [data-floor]::before {
+        content: attr(data-floor); position: absolute; left: -48px; top: 50%;
+        width: 34px; height: 24px; margin-top: -12px;
+        display: grid; place-items: center;
+        font: 600 13px var(--mono, ui-monospace, monospace); color: var(--text);
+        pointer-events: none; z-index: 2;
+      }
+      .menu-list[data-floors] > [data-car]::before { color: var(--accent-ink); }
+      .menu-floor-car {
+        position: absolute; left: 13px; top: -14px; width: 28px; height: 28px;
+        border-radius: 5px; background: var(--accent);
+        box-shadow: 0 1px 0 0 var(--edge-strong);
+        transition: transform 240ms cubic-bezier(.2, .7, .2, 1);
+        pointer-events: none; z-index: 1;
+      }
+      @media (prefers-reduced-motion: reduce) { .menu-floor-car { transition: none; } }
+      .menu-title[data-floor]::before {
+        content: attr(data-floor); display: inline-grid; place-items: center;
+        width: 34px; height: 30px; margin-right: 12px; vertical-align: 3px;
+        border: 1px solid var(--edge-strong); border-radius: 6px; background: var(--card);
+        font: 600 14px var(--mono, ui-monospace, monospace); color: var(--text);
+      }
       /* `flex-wrap` so a row may carry a third child on its own line — `.menu-hint` below. The
          label and its control still share the first line, because both have a `flex` basis and the
          hint is the only child that claims the whole width. */

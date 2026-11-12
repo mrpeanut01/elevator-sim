@@ -425,7 +425,58 @@ export interface MenuAffordance {
    * recommendations is no recommendation, which is the defect #90 reports about six equal rows.
    */
   readonly primary?: boolean | undefined;
+  /**
+   * **The plate of the floor this row is a landing on**, on the root screen and `undefined` on every
+   * other — [§ D1632](../../../../DECISIONS.md), {@link MAIN_FLOORS}. The panel draws the root's rows
+   * as a shaft with a plate beside each, and a plate that is one letter or digit is also the row's
+   * key ({@link floorRowFor}). Decoration and a shortcut, never the row's only name.
+   */
+  readonly floor?: string | undefined;
   readonly intent: MenuIntent;
+}
+
+/**
+ * **The Engineer menu as a building** — [§ D1632](../../../../DECISIONS.md), the owner's direction
+ * of 2026-11-12, after Everyday was laid out as floors ([§ D1627](../../../../DECISIONS.md)).
+ *
+ * One plate per root row, top floor first, which is the order {@link mainRows} already had. The
+ * three ways to play take the numbers, with Scenarios on 3 as it is in Everyday; the leaderboard is
+ * `M`, Everyday's Records floor; and the three that are not a mode take their own initial. *Start
+ * here* is the express and carries a mark that is not a key, because it is a recommendation about
+ * another floor and has none of its own.
+ *
+ * The rows, their words and their intents are untouched: this is how the root is drawn and keyed.
+ */
+export const MAIN_FLOORS: Readonly<Record<string, string>> = Object.freeze({
+  'main.start-here': '▲',
+  'main.campaign': '3',
+  'main.free-play': '2',
+  'main.challenge': '1',
+  'main.leaderboard': 'M',
+  'main.account': 'A',
+  'main.settings': 'S',
+  'main.resume': 'R',
+});
+
+/** The plate a screen stands on, drawn beside its title: the root row's that opens it. */
+export const FLOOR_OF_SCREEN: Readonly<Partial<Record<MenuScreen, string>>> = Object.freeze({
+  campaign: '3',
+  'free-play': '2',
+  challenge: '1',
+  leaderboard: 'M',
+  account: 'A',
+  settings: 'S',
+});
+
+/**
+ * The row a pressed key names, or `undefined`: an **enabled** row whose plate is that one letter or
+ * digit, either case. A refused row is not pressed by its key any more than by a click, and a mark
+ * that is not a letter or digit names nothing.
+ */
+export function floorRowFor(rows: readonly MenuAffordance[], key: string): MenuAffordance | undefined {
+  if (!/^[a-z0-9]$/iu.test(key)) return undefined;
+  const plate = key.toUpperCase();
+  return rows.find((row) => row.enabled && row.floor === plate);
 }
 
 /** One screen, as everything a renderer needs and nothing it could decide with. */
@@ -437,6 +488,8 @@ export interface MenuScreenView {
   /** Everything wrong with the current selection, in words a player can act on. */
   readonly issues: readonly string[];
   readonly rows: readonly MenuAffordance[];
+  /** The plate of the floor this screen stands on ({@link FLOOR_OF_SCREEN}), or `undefined`. */
+  readonly floor: string | undefined;
   /**
    * The how-to-play guide, on the root screen and `undefined` on every other.
    *
@@ -719,6 +772,7 @@ export function screenOf(input: MenuViewInput): MenuScreenView {
     notices,
     issues: view.issues,
     rows: screen === 'main' ? split.offered : Object.freeze([...split.offered, BACK]),
+    floor: FLOOR_OF_SCREEN[screen],
     withheld: Object.freeze(split.withheld.map((row) => row.id)),
     /*
      * The root only. A guide repeated under every screen would be six copies of one explanation
@@ -986,7 +1040,7 @@ function mainRows(
   });
   const social = (id: string, label: string, detail: string, target: MenuScreen): MenuAffordance =>
     to(id, label, `${detail}${note}`, target);
-  return Object.freeze([
+  const rows: readonly MenuAffordance[] = [
     /*
      * **First, and it is the whole of GitHub issue #90.** The six rows below are a complete set of
      * *choices* and were an empty set of *recommendations*: every option looked like the right answer,
@@ -1020,7 +1074,9 @@ function mainRows(
     social('main.account', 'Account', 'An emailed link, no password — sign in to post a score', 'account'),
     to('main.settings', 'Settings', 'Presentation only — nothing here changes a run', 'settings'),
     resumeRow(hasRun, neverLeft),
-  ]);
+  ];
+  /* § D1632: every root row is a landing, and carries its floor's plate. */
+  return Object.freeze(rows.map((row) => ({ ...row, floor: MAIN_FLOORS[row.id] })));
 }
 
 /* ----------------------------------------------------------- how to play */
