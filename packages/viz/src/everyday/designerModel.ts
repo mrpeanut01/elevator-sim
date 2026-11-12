@@ -71,6 +71,7 @@ import {
   layoutOf,
   orphanFloorsOf,
   pairedOnlyGroupsOf,
+  sectorBoundaryOf,
   planFloorId,
   planLowestFloor,
   planPopulationAt,
@@ -643,7 +644,7 @@ export interface DesignerFix {
 /**
  * One warning line. `severity` splits three things a reader answers differently: `blocker` is a
  * building that will not run as drawn, `class` is a machine outside what it is built for, and
- * `comfort` is a building that runs and will feel slow.
+ * `comfort` is a building that runs and will feel slow, or runs in a way the drawing does not show.
  */
 export interface DesignerWarning {
   readonly severity: 'blocker' | 'class' | 'comfort';
@@ -724,26 +725,33 @@ export function designerWarnings(
   }
 
   /*
-   * A pair beside ordinary shafts loads and runs, and in this build it locks. Measured 2026-11-11
-   * on `zonedTowerPlan` with one shaft paired, 1 800 s, every shipped profile: under up/down
-   * buttons a rider's floor is not known until they board, so each car of the pair takes riders
-   * the other stands in the way of, and 8 of 13 profiles left riders unboarded where the same
-   * building without the pair left none. `docs/11` § 3.2 names the remedy (a sectored shaft) and
-   * says it is not built. Said once, for the shafts that are not already in a blocker above.
+   * A pair beside ordinary shafts runs sectored (`docs/11` § 3.2, R1): `towerPlan.ts` writes the
+   * group's middle stop as the shaft's boundary, and each car keeps to its own side of it. Before
+   * the boundary was written a pair locked against itself and this line said so; measured again
+   * 2026-11-11 on `zonedTowerPlan` with one shaft paired, 1 800 s, seed 7000, every shipped
+   * profile left nobody unboarded and nobody aboard. What the reader still has to be told is what a
+   * sector costs: the upper car has no way to the floors below the boundary, so in a group that
+   * starts at the lobby it carries only trips inside the upper half. Whether a pair carries more
+   * than the one car it replaces is unmeasured, and this line does not say. One line per shaft,
+   * for the shafts that are not already in a blocker below.
    */
   const pairedOnly = new Set(pairedOnlyGroupsOf(plan).flatMap((group) => group.shafts));
-  const mixedPairs = plan.shafts.flatMap((shaft, index) => (shaft.cars === 2 && !pairedOnly.has(index) ? [index] : []));
-  if (mixedPairs.length > 0) {
-    const labels = mixedPairs.map(shaftLabelOf).join(', ');
-    const keys = mixedPairs.map((index) => plan.shafts[index]?.key ?? '');
+  const groups = groupsOf(plan);
+  plan.shafts.forEach((shaft, index) => {
+    if (shaft.cars !== 2 || pairedOnly.has(index)) return;
+    const group = groups.find((entry) => entry.shafts.includes(index));
+    const boundary = group === undefined ? undefined : sectorBoundaryOf(group);
+    if (boundary === undefined) return;
+    const label = shaftLabelOf(index);
+    const at = planFloorId(plan, boundary);
     warnings.push({
-      severity: 'class',
+      severity: 'comfort',
       text:
-        `${mixedPairs.length === 1 ? `Shaft ${labels} has` : `Shafts ${labels} have`} a pair of cars. In this build a pair locks against itself: ` +
-        'each car takes riders the other is in the way of, and in test runs riders on the group were left waiting. One car to a shaft avoids it.',
-      fix: { label: mixedPairs.length === 1 ? 'Leave one car in it' : 'Leave one car in each', apply: (current) => withCars(current, keys, 1) },
+        `Shaft ${label} has a pair of cars, and each keeps to its own part of the shaft. The lower car serves ${at} and below; ` +
+        `the upper car serves only the floors above ${at} and never comes down past it, so a rider crossing ${at} takes another shaft of the group.`,
+      fix: { label: `Leave one car in shaft ${label}`, apply: (current) => withCars(current, [shaft.key], 1) },
     });
-  }
+  });
   for (const group of pairedOnlyGroupsOf(plan)) {
     const letters = groupLettersOf(group);
     const lastKey = plan.shafts[group.shafts.at(-1) ?? 0]?.key ?? '';
