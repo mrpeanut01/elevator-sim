@@ -19,6 +19,21 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave BA
+
+**Wave BA moves +2.00 strings a case always-on, with the surface set unchanged.** One lane: a test
+simulation's goals strip no longer reads *what today asks* ([§ D1627](../DECISIONS.md)). The base is
+wave AZ's row, and `main` at `5039086` is the tree that row was measured on (`git diff` against
+`558e061` is empty), so it stands. The move is two keys on
+`everyday/stageScreenModel.ts#STAGE_GOALS_COPY`, which its adapter sweeps once a case: the test's eyebrow
+and its sentence. The deep row still names `c181913`.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base, `main` at `5039086` (wave AZ's row) | 1 162 652 | | | 80 |
+| wave BA's head | **1 162 750** | **+98** | **+2.00** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
 ## Wave AZ
 
 **Wave AZ moves +43.00 strings a case always-on, with the surface set unchanged.** One lane: a building
