@@ -1773,6 +1773,23 @@ export interface ShaftConfig {
    * in the shaft, or the separation check stops being exact and `parse.ts` refuses the building.
    */
   readonly emergencyDecelerationMps2?: number | undefined;
+  /**
+   * **Run this two-car shaft sectored** — `docs/11` § 3.2's regime R1. The lower car serves every
+   * floor of the shaft up to and including this one; the upper car serves every floor at least
+   * one required gap (`standingClearanceM + bufferM`) above it. A car is offered, boards for,
+   * parks at and starts at floors of its own sector only.
+   *
+   * **Absent means the free regime (R2)**, which is what a two-car shaft was before this field
+   * existed: either car may be sent anywhere its mate allows. That regime is **not live** under
+   * most shipped dispatchers — `sim/twinShaftSector.test.ts` pins a run that ends with riders
+   * aboard — so a building that wants its pair to deliver everybody declares a boundary.
+   *
+   * Hardware and not strategy, on the footing of the three figures above: it says which landings
+   * each car's doors answer, which is signage and controller wiring. `parse.ts` refuses a
+   * boundary on a single-car shaft, one the bank does not serve, and one that leaves the upper
+   * car no floor (`twin-sector-invalid`).
+   */
+  readonly sectorBoundaryFloorId?: string | undefined;
 }
 
 /**
@@ -2280,6 +2297,8 @@ export interface ResolvedShaft {
   /** Lower car first. One or two. */
   readonly carIds: readonly string[];
   readonly separation?: ResolvedShaftSeparation | undefined;
+  /** Present only on a two-car shaft run sectored. See {@link ShaftConfig.sectorBoundaryFloorId}. */
+  readonly sectorBoundaryFloorId?: string | undefined;
 }
 
 /** A TWIN shaft's separation figures, defaults applied. See `model/car/separation.ts`. */

@@ -14,11 +14,56 @@
 > default**, so a run that does not ask for it produces the record it always did.
 >
 > **Not built, and most of it is the criterion:** every clause of § 6 is unmeasured — no saturation
-> census at a TWIN operating point (OQ-1), no equal-car paired-t interval on ΔTTD, no R1 sectored
-> arm (§ 3.2, § 6.2 clause 5) — the fuzz corpus is not widened (§ 3.6), no `shaftInterference` cost
+> census at a TWIN operating point (OQ-1), no equal-car paired-t interval on ΔTTD, no **measured**
+> R1 arm (§ 6.2 clause 5; the regime itself is built, see the 2026-11-11 block below) — the fuzz corpus is not widened (§ 3.6), no `shaftInterference` cost
 > term exists (§ 4.4, correctly: OQ-5 says measure before writing), and no building in
 > `data/buildings/` declares a TWIN shaft (OQ-6). **No performance figure in this document is a
 > result of this project, and that half is unchanged.**
+>
+> **Status, 2026-11-11: regime R1 is built, and it is the regime that is live.** § 3.2 named two
+> regimes and § D621 built only the free one (R2). On 2026-11-11 a mixed bank drawn on the Design a
+> building board lost riders under most shipped dispatchers, and the cause was R2 itself rather
+> than the board:
+>
+> | # | what R2 did | where |
+> |---|---|---|
+> | 1 | boarded riders for floors the car may never reach, because under up/down buttons no destination is disclosed until the rider is aboard and the doorway had a deck check and no shaft check | `Simulation#carCanCarry` |
+> | 2 | boarded riders whose destinations were admissible and **crossed** the mate's, so both cars stood loaded for the rest of the run: § 3.2's deadlock, reached through car calls | boarding, with no dynamic check |
+> | 3 | re-offered a refused rider's call to the car that had just refused them | `Simulation#dispatchBank` |
+>
+> `sim/twinShaft.test.ts` did not catch it. Its liveness property bounds the *longest deferral* by
+> a quarter of a 900 s run and reads riders aboard at the horizon as the regime's cost, so a pair
+> that crossed late stayed inside the bound. On that file's own fixture and seed, a 900 s run under
+> `eta`, the profile it uses, ends with riders aboard.
+>
+> **Built and tested (`sim/twinShaftSector.test.ts`, `config/twinShaftSector.test.ts`):**
+> `ShaftConfig.sectorBoundaryFloorId` declares floor *k*. The lower car serves every shaft floor up
+> to and including *k* and the upper car every floor at least one required gap above *k*. A car is
+> offered, boards for, parks at and starts at floors of its own sector only. On the same fixture
+> with *k* at mid-rise, every shipped profile delivers every journey with nobody aboard at the end
+> and **zero** separation deferrals, under a two-way and an interfloor-heavy demand. Rows 1 and 3
+> are closed for both regimes (`#shaftAllows`, `#withoutShaftStrangers`); row 2 is closed only by a
+> sector.
+>
+> **Three things a reader must not take from that.**
+>
+> - **R2 is still not live**, and a run on it now says so in its warnings. Making it live needs the
+>   dynamic boarding-time and car-call-time refusal § 3.2 describes. It was not attempted.
+> - **The sectors are disjoint, which is narrower than § 3.2's *"overlapping only at k"*.** With
+>   both cars allowed to stop at *k* the pair can still block itself whenever the required gap
+>   exceeds a floor pitch (`model/car/separation.ts#sectorHeightRangeM` carries the counterexample),
+>   and a regime that is deadlock-free only for some clearances is not R1.
+> - **No performance figure is published for either regime, and none is implied.** The property
+>   tested is *the run ended with everybody delivered*. § 3.2's price is real and visible in the
+>   test: the upper car's sector holds no entrance, so on a lobby-bound peak it carries only riders
+>   travelling between two upper floors. A bank made only of sectored pairs still cannot carry a
+>   rider from one sector to the other; an ordinary shaft in the group does that. § 6's equal-car
+>   paired-t contrast, with R1 as an arm, is still unmeasured.
+>
+> Under up/down buttons the candidate filter uses one fact a direction button does not carry:
+> which sector the rider is bound for. It models a sectored group's separate risers and is stated
+> in `#withoutShaftStrangers`; no cost term sees a destination. This block and those docstrings
+> are the record ([§ D405](../DECISIONS.md)).
 >
 > **Answered by the implementation:** OQ-2 (conservative), OQ-3 (measured, in the narrow form
 > § D621 states), Q-PP (no), OQ-8 (yes, opt-in), OQ-9 (out, and the type enforces it). **Still

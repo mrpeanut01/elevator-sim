@@ -181,6 +181,14 @@ export const ISSUE_CODES = {
    * whose safety check is exact only under an unstated premise is worse than one with no check.
    */
   twinSeparationUnstated: 'twin-separation-unstated',
+  /**
+   * **A two-car shaft's sector boundary cannot be honoured** — `docs/11` § 3.2 regime R1,
+   * {@link ShaftConfig.sectorBoundaryFloorId}. Three refusals under one code: a boundary on a
+   * shaft holding one car (there is nothing to partition), a boundary the bank does not serve,
+   * and a boundary so high that no served floor lies a full required gap above it, which would
+   * leave the upper car a sector with no floor in it. Raised on no shipped building.
+   */
+  twinSectorInvalid: 'twin-sector-invalid',
 } as const;
 
 /** Stable codes for non-fatal diagnostics. */
@@ -1702,6 +1710,7 @@ export const shaftConfigSchema = z.strictObject({
   standingClearanceM: z.number().gt(0).optional(),
   bufferM: z.number().min(BANK_SHAFT_TUNABLES.bufferM.min).optional(),
   emergencyDecelerationMps2: z.number().gt(0).optional(),
+  sectorBoundaryFloorId: identifier.optional(),
 });
 
 export const bankConfigSchema = z.strictObject({
