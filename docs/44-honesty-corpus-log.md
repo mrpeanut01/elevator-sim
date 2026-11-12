@@ -19,6 +19,21 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave BB
+
+**Wave BB moves +77.00 strings a case always-on, with the surface set unchanged.** One lane: the
+four questions the navigation left open ([§ D1631](../DECISIONS.md)). The base was re-measured on
+`main` at `53cd80b`, because #661 and #666 landed after wave BA's row was taken, and it read
+the published 1 162 750: that row stands. The same 80 surfaces speak, so the move is text on
+existing producers: the words of a saved building's *Rename* and *Remove*, their three refusals, and
+the drawing board's press to *Your buildings*. The deep row still names `c181913`.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base re-measured, `main` at `53cd80b` | 1 162 750 | 0 against wave BA's row | | 80 |
+| wave BB's head | **1 166 523** | **+3 773** | **+77.00** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
 ## Wave BA
 
 **Wave BA moves +2.00 strings a case always-on, with the surface set unchanged.** One lane: a test

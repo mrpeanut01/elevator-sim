@@ -110,6 +110,8 @@ export const DESIGNER_COPY = Object.freeze({
   saveLabel: 'Save as a new building',
   /** What a save did, and where the building is played — § D1629. */
   savedLine: 'Saved. Play a day in it from the Scenario floor, under Your buildings.',
+  /** The press under that line: the Scenario floor, where the building is listed — § D1631. */
+  goPlay: 'Go to Your buildings',
   nameLabel: 'What it is called',
   templatesEyebrow: 'START FROM',
   groupsEyebrow: 'LIFT GROUPS — SHAFTS THAT ANSWER THE SAME BUTTONS',
