@@ -559,6 +559,39 @@ describe.skipIf(!HAS_BROWSER)('the accessibility sweep — WCAG 2.1 A and AA ove
     120_000,
   );
 
+  /*
+   * **The workshop's editor, which the route table cannot reach.** `EVERYDAY_SCREEN_ROUTES.workshop`
+   * lands on the workshop's front door — its shelf — since the editor moved one press past it, so
+   * the per-screen case above sweeps the shelf and the page with nearly every control on it went
+   * unswept. This case opens a design, turns the depth to Engineer (the deepest: schema controls,
+   * the rule rows, the formula editor) and adds one rule with a further condition and one formula,
+   * so every kind of control the editor can draw is in the document when axe reads it.
+   *
+   * Held to the same register as every screen, under the workshop's own key. It is not added to
+   * `swept`, which the ghost check reads as one result per route.
+   */
+  it('the workshop’s editor, at its deepest, draws no violation the register does not already name', async () => {
+    const page = await coldLoad();
+    await EVERYDAY_SCREEN_ROUTES.workshop(page);
+    await page.click('.everyday-workshop-open[data-open-now], .everyday-workshop-industry .everyday-workshop-open');
+    await page.waitForSelector('.everyday-workshop-panel');
+    await page.click('.everyday-workshop-depth [data-depth="engineer"]');
+    await page.waitForSelector('.everyday-workshop-family-caller');
+    await page.click('.everyday-workshop-formula-add');
+    await page.waitForSelector('.everyday-workshop-formula');
+    await page.click('.everyday-workshop-rule-add');
+    await page.waitForSelector('.everyday-workshop-and-add');
+    await page.click('.everyday-workshop-and-add');
+    await page.waitForSelector('.everyday-workshop-and');
+    const result = await sweep(page, 'workshop');
+    await page.close();
+    expect(
+      result.findings.filter((found) => !isRegistered(found)).map(describeFinding),
+      'the workshop’s editor violates the standard in a way OUTSTANDING does not name. axe could not decide: ' +
+        (result.undecided.length === 0 ? 'nothing' : result.undecided.join(', ')),
+    ).toEqual([]);
+  }, 120_000);
+
   it('still finds every violation the register records — a register of ghosts is a suppression list', () => {
     expect(
       [...EVERYDAY_SCREENS_BUILT].filter((screen) => !swept.has(screen)),

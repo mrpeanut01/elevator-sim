@@ -343,7 +343,7 @@ export const REPORT_PRACTICE_AGAIN = Object.freeze({
 });
 
 /** The close's two secondary presses — {@link EverydayReportView.secondary}. */
-export const REPORT_SECONDARY = Object.freeze({ week: 'Your week', menu: 'Main menu' });
+export const REPORT_SECONDARY = Object.freeze({ week: 'Your week', menu: 'Lobby' });
 
 /**
  * **The levers' heading on a day every goal held** — wave AR, lane AR-4, GitHub issue #633, § D1543.

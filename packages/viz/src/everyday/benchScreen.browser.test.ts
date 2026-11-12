@@ -82,7 +82,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday test bench', () => {
   it('opens from the rail with § 3.3’s bench row, and the three standing notes present', async () => {
     const page = await openBench();
     expect(await page.textContent('.everyday-bench h1')).toBe('Find out whether it actually helps');
-    expect(await page.textContent('.everyday-bar-leave')).toBe('⌂ Modes');
+    expect(await page.textContent('.everyday-bar-leave')).toBe('⌂ Lobby');
     expect(await page.textContent('.everyday-bar-primary')).toBe('Run the suite');
     expect(await page.locator('.everyday-bench-standing li').count()).toBe(3);
     expect(await page.textContent('.everyday-bench-never')).toContain('is not a comparison');

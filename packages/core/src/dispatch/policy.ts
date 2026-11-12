@@ -58,6 +58,7 @@ import {
 } from './lifecycle.js';
 import { resolveNormalization } from './normalize.js';
 import { DISPATCH_DEFAULTS, DISPATCH_PARAMETERS } from './parameters.js';
+import { resolveFormulas } from './formula.js';
 import { rankScores, scoreCar } from './scoringEngine.js';
 import {
   ArrivalWindow,
@@ -279,7 +280,12 @@ export function resolveDispatchConfig(
   const weightSets =
     selection.policy === 'rules'
       ? undefined
-      : resolveWeightSets(options.weightSets, selection, source.id);
+      : resolveWeightSets(
+          options.weightSets,
+          selection,
+          source.id,
+          source.patternWeightSets ?? {},
+        );
   const waitTimeReference = options.normalization?.waitTimeS ?? source.normalization?.waitTimeS;
   const distanceReference = options.normalization?.distanceM ?? source.normalization?.distanceM;
 
@@ -289,6 +295,7 @@ export function resolveDispatchConfig(
     engine: 'weighted-cost',
     weights,
     pendingWeights,
+    formulas: resolveFormulas(source.formulas, source.id),
     declaredHardConstraints: Object.freeze([...hardConstraints]),
     constraints: Object.freeze({
       noDirectionReversal: hardConstraints.includes('noDirectionReversal'),
@@ -819,6 +826,10 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
           // every profile that does not ask for a selector.
           this.#weights,
           this.config.normalization,
+          undefined,
+          // The profile's own formulas ride every weight set: a selector swaps the vector and
+          // the formulas are the dispatcher's own, so they are charged under each arm alike.
+          this.config.formulas,
         ),
       );
     }

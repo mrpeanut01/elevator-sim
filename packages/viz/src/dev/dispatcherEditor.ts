@@ -873,7 +873,7 @@ function withCount(value: string, count: string | null): string {
  * and is converted through the declaration's own scale — reading `input.value` as the parameter
  * value would silently linearise every log-scaled dimension.
  */
-function familyValueFrom(
+export function familyValueFrom(
   control: Control,
   input: HTMLInputElement | HTMLSelectElement,
 ): ParameterValue {

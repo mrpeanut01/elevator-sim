@@ -257,6 +257,40 @@ This is the test of whether the framework is expressive enough. It is:
 
 Adding a strategy is a config entry. Only a genuinely novel *term* requires code.
 
+### A profile's own formulas
+
+A weight vector is linear: it can say *wait matters twice as much as crowding*, and it cannot say
+*a car that is both late and full is worse than the sum of the two*, or *judge a car by whichever
+of these is worst*. A profile may therefore carry up to four **formulas**, each an expression tree
+whose leaves are the **normalized** values of library terms (or constants) and whose nodes are
+`add`, `multiply`, `max` and `min`, added to the weighted sum at its own weight:
+
+```json
+{
+  "id": "late-and-full-example",
+  "name": "Wait, and worse when the car is full too",
+  "weights": { "waitTime": 1.0 },
+  "formulas": [
+    {
+      "id": "late-and-full",
+      "name": "Late and full",
+      "weight": 0.5,
+      "expression": { "op": "multiply", "of": [{ "term": "waitTime" }, { "term": "loadFactor" }] }
+    }
+  ]
+}
+```
+
+This is still data and still not a new code path per strategy. It is not a script that picks a
+car: `packages/core/src/dispatch/formula.ts#resolveFormulas` checks every tree before a run, and
+the three properties the scorer depends on hold by construction — it is pure (a leaf is a term's
+own pure `evaluate`), non-negative and finite (the four operators preserve both; subtraction and
+division are absent for that reason), and bounded in size. The leaves are normalized so a product
+of seconds and stops is never formed. A formula's weight is **not** a declared tunable and
+`tuning/space` does not sample it: a tree is structure, and a search over structure is not a
+search over a range. No published figure in this repository was measured with a formula, and no
+claim is made here that one helps; the workshop's test bed is where a player finds out.
+
 ### Where auction dispatch fits
 
 `AuctionDispatcher` uses the same term library — each car computes its own bid from
@@ -295,6 +329,20 @@ accordingly.
 **Per-pattern weight sets matter.** The optimum for up-peak is not the optimum for
 down-peak. A single global weight vector is leaving performance on the table, and
 `hysteresisS` prevents the detector from oscillating between patterns.
+
+**The map above is the file's, and a profile may lay its own over it.** Which patterns exist and
+how each is recognised is a statement about the detector, so the detector is file-level. Which
+priorities a dispatcher runs under each pattern is a statement about the dispatcher, so a profile
+may author `patternWeightSets` — pattern id to profile id — naming only the patterns where it
+differs. `resolveWeightSets` refuses an entry for a pattern the detector does not declare, which
+would otherwise be carried and read by nothing. It is a categorical choice over a set that is
+itself data, so it is not a declared tunable either.
+
+**A rule row may require more than one thing.** The Everyday rules (`selection.policy: "rules"`)
+are ordered when/then rows, first match wins. A row may carry up to two further conditions in
+`and`, and fires only when all of them hold, which makes the list a decision tree written out as
+its root-to-leaf paths. The compiler concatenates the clauses each condition compiles to, so a row
+without `and` compiles to exactly the arm it always did.
 
 ---
 

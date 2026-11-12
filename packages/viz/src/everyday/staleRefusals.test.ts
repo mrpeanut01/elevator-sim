@@ -52,7 +52,7 @@
  * |---|---|---|
  * | `campaignModel.ts` | *"the fourth test grades nothing"* | the `trips` goal reads `loadedDepartures` |
  * | `campaignModel.ts` | *"neither the complexity table nor `switchWeek` is reached"* | `offersView`, `take-offer`, `host.ts`'s `switchWeek` |
- * | `designerModel.ts` | *"nothing authors an escalator on either surface"* | `designerScreen.ts#drawEscalatorPanel`, § D518 |
+ * | `designerModel.ts` | *"nothing authors an escalator on either surface"* | `designerScreen.ts`'s escalator control (its Floors step now), § D518 |
  * | `rushScreenModel.ts` | *"The real source is the rush engine, which is not built"* | `everyday/rush.ts`, § D515 (#220) |
  * | `rushScreen.ts` | *"the model marks it inert because the climbing stream is not built"* | `rushBarModel` is `return base` |
  *
@@ -84,7 +84,8 @@ import { classesFromSpecs } from '../authoring/machineSpec.js';
 import { DIFFICULTIES } from '../campaign/economy.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 import { campaignTestGoals } from './campaignModel.js';
-import { DESIGNER_ABSENCES, withShaftMachine } from './designerModel.js';
+import { blankPlan } from '../authoring/towerPlan.js';
+import { DESIGNER_ABSENCES, withPlanMachineClass } from './designerModel.js';
 import { RUSH_ABSENCES, RUSH_SCREEN_COPY, rushBarModel } from './rushScreenModel.js';
 
 const sourceOf = (relative: string): string =>
@@ -187,8 +188,12 @@ describe('a refusal that outlived the thing it refused — GitHub issue #423', (
 
   it('does not say nothing authors an escalator, and the register agrees with itself', () => {
     onlyInRetraction(sourceOf('./designerModel.ts'), 'nothing authors an escalator', 'designerModel.ts');
-    /* The escalator panel writes `spec.transportModes`; § D518 took the rows out of the register. */
-    expect(sourceOf('./designerScreen.ts')).toContain('spec.transportModes');
+    /*
+     * The Floors step writes `plan.transportModes` through `towerPlan.ts#withEscalatorToggled`;
+     * § D518 took the rows out of the register. `authoring/towerPlan.test.ts` holds that the edit
+     * changes the run on the legs — this line only says the screen still names the writer.
+     */
+    expect(sourceOf('./designerScreen.ts')).toContain('withEscalatorToggled');
     for (const row of DESIGNER_ABSENCES) {
       expect(row, 'an escalator row is back in the register without the docstring coming back').not.toContain('escalator');
     }
@@ -225,23 +230,30 @@ describe('a refusal that outlived the thing it refused — GitHub issue #423', (
       ),
     ).find((entry) => entry.id === 'hydraulic');
     expect(hydraulic, 'the shipped hydraulic class').toBeDefined();
-    const pinned = withShaftMachine(BLANK_SPEC, 1, hydraulic);
-    expect(machineAt(pinned, 1).specClass, 'the model no longer holds one machine').toBe(
+    if (hydraulic === undefined) return;
+    /*
+     * On the plan the board now draws (`authoring/towerPlan.ts`) rather than on
+     * `BuildingSpec.machineByCar`: every shaft holds a machine of its own there, so the fact being
+     * guarded — *one shaft can be given a different lift* — is asked of that model.
+     */
+    const drawn = blankPlan();
+    const second = drawn.shafts[1]?.key ?? '';
+    const changed = withPlanMachineClass(drawn, [second], hydraulic);
+    expect(changed.shafts[1]?.machine.specClass, 'the model no longer holds one machine').toBe(
       'hydraulic',
     );
-    expect(machineAt(pinned, 0).specClass, 'and an unpinned shaft still follows the design').toBe(
-      BLANK_SPEC.specClass,
+    expect(changed.shafts[0]?.machine.specClass, 'and the shaft beside it keeps its own').toBe(
+      drawn.shafts[0]?.machine.specClass,
     );
     /*
      * **This line is a grep and is not the guard for the picker → model seam.** It passes when the
      * listener writes the wrong car index, and it passes when no listener is attached at all — an
      * independent review found exactly that hole, and the seam had nothing else standing over it.
-     * What drives the seam is `standaloneScreens.browser.test.ts`'s *writes one shaft's machine
-     * from its own picker*, on the page, through the shipped `<select>`; what drives the value the
-     * listener resolves is `designerModel.test.ts`'s `shaftPickOf` case. This one only says the
-     * screen still names the writer, which is what the retraction above needs.
+     * What drives the seam is `standaloneScreens.browser.test.ts`'s *gives one shaft a machine of
+     * its own*, on the page, through the shipped class chips. This one only says the screen still
+     * names the writer, which is what the retraction above needs.
      */
-    expect(sourceOf('./designerScreen.ts')).toContain('withShaftMachine');
+    expect(sourceOf('./designerScreen.ts')).toContain('withPlanMachineClass');
     for (const row of DESIGNER_ABSENCES) {
       expect(row, 'a class-per-shaft row is back without the docstring coming back').not.toContain(
         'machine class per shaft',
