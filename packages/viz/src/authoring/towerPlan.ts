@@ -657,6 +657,26 @@ function groupNameOf(plan: TowerPlan, group: PlanGroup): string {
   return `${decks}floors ${lowId} to ${highId}`.replace(/^f/, 'F');
 }
 
+/**
+ * **Where a two-car shaft is divided**: the middle stop of its group, or nothing for a group too
+ * short to divide.
+ *
+ * `docs/11` § 3.2's regime R1. The lower car answers the floors at or below this one and the upper
+ * car the floors one required gap above it, so neither boards a rider bound past its mate — the
+ * defect a pair has without a boundary, where `sim/twinShaftSector.test.ts` shows riders left in
+ * the cars. The board writes a clearance of one floor pitch and no buffer, so the gap is one floor
+ * and any stop above the boundary gives the upper car a floor; `(n − 1) / 2` rounded down is below
+ * the top stop for every group of two stops or more, which is what the loader requires.
+ *
+ * The middle is **chosen, not tuned**: no run here compares one boundary with another. And the
+ * upper half holds no entrance in a group that starts at the lobby, so the upper car carries only
+ * trips inside its own half — a property of R1, stated on the board by `designerModel.ts`.
+ */
+export function sectorBoundaryOf(group: PlanGroup): number | undefined {
+  if (group.stops.length < 2) return undefined;
+  return group.stops[Math.floor((group.stops.length - 1) / 2)];
+}
+
 /** The cars one shaft writes: one, or a lower and an upper. */
 function carIdsOf(index: number, shaft: PlanShaft): readonly string[] {
   const label = shaftLabelOf(index);
@@ -675,7 +695,8 @@ function carIdsOf(index: number, shaft: PlanShaft): readonly string[] {
  * - a **two-car shaft**'s `standingClearanceM` is one floor pitch and its
  *   `emergencyDecelerationMps2` is twice the class's comfort deceleration. Both are **chosen, not
  *   cited** — `docs/11` § 10 records that no source consulted publishes a separation in metres —
- *   and they are `sim/twinShaft.test.ts`'s own fixture values, written with a `$comment` that says so;
+ *   and they are `sim/twinShaft.test.ts`'s own fixture values, written with a `$comment` that says so.
+ *   Its `sectorBoundaryFloorId` is the group's middle stop ({@link sectorBoundaryOf});
  * - the **lobby** is flagged a transfer floor when more than one group opens there, because two
  *   banks sharing a lobby is somewhere people change lifts whether or not anybody drew a dot on it.
  */
@@ -735,16 +756,19 @@ export function buildingFromPlan(plan: TowerPlan, specs: ElevatorSpecs): Buildin
       }
       const label = shaftLabelOf(index);
       if (shaft.cars === 2) {
+        const boundary = sectorBoundaryOf(group);
         shafts.push({
           $comment:
             'Two cars in one hoistway. standingClearanceM is one floor pitch and ' +
             'emergencyDecelerationMps2 is twice the class comfort deceleration: both CHOSEN by the ' +
             'building designer, not cited. docs/11 § 10 records that no source consulted publishes ' +
-            'a separation in metres.',
+            'a separation in metres. sectorBoundaryFloorId is the middle stop, also CHOSEN: the ' +
+            'lower car keeps to the floors at or below it and the upper car to the floors above.',
           id: `shaft-${label}`,
           carIds: ids,
           standingClearanceM: Math.round(plan.floorHeightM * 1000) / 1000,
           emergencyDecelerationMps2: 2 * accelerationOf(shaft.machine.specClass),
+          ...(boundary === undefined ? {} : { sectorBoundaryFloorId: floorIdOf(frame, boundary) }),
         });
       } else {
         shafts.push({ id: `shaft-${label}`, carIds: ids });
@@ -829,7 +853,9 @@ const SAID_BY_THE_BOARD: ReadonlySet<string> = new Set([
  * low group's first shaft given a second car): the closed form moved the group's interval from
  * 40.1 s to 32.1 s, while the pair together carried fewer riders in every profile tried than the
  * one car it replaced. A figure that improves when the run does not is the one this screen may
- * not draw, so the group's row says why and the run is where the reader finds out.
+ * not draw, so the group's row says why and the run is where the reader finds out. That run was
+ * of a pair with no sector boundary; the board writes one now ({@link sectorBoundaryOf}), the
+ * comparison has not been repeated on it, and the closed form has no term for a sector either.
  */
 export const TWO_CAR_FIGURES_WITHHELD =
   'Not worked out for a group with two cars in one shaft: the round-trip sum counts every car as ' +

@@ -45,6 +45,11 @@
 > are closed for both regimes (`#shaftAllows`, `#withoutShaftStrangers`); row 2 is closed only by a
 > sector.
 >
+> **The building board writes one.** `authoring/towerPlan.ts#sectorBoundaryOf` gives every two-car
+> shaft the middle stop of its group, which is chosen and not tuned, so a pair drawn on the board
+> runs R1; `towerPlan.test.ts` pins that on the legs of `zonedTowerPlan` with one shaft paired.
+> No shipped building in `data/buildings/` declares a boundary.
+>
 > **Three things a reader must not take from that.**
 >
 > - **R2 is still not live**, and a run on it now says so in its warnings. Making it live needs the
