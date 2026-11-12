@@ -1236,7 +1236,7 @@ export function withEscalatorToggled(plan: TowerPlan, floor: number): TowerPlan 
 
 /**
  * Say how many people an hour the escalator above a floor carries in each direction, or lift the
- * limit again with `undefined` — § D1631.
+ * limit again with `undefined` — § D1632.
  *
  * `buildingSpec.ts#withTransportCapacity` does the write, so the Engineer editor's rule and this
  * board's are one rule. A floor with no escalator above it returns the plan unchanged.
@@ -1255,7 +1255,7 @@ export function withEscalatorCapacity(
 }
 
 /**
- * Whether any journey that rides a lift is routed over the escalator `modeId` — § D1631.
+ * Whether any journey that rides a lift is routed over the escalator `modeId` — § D1632.
  *
  * **The question the capacity control has to ask before it offers anything.** `traffic/route.ts`
  * plans a journey over an escalator only where that gives the fewest segments, and a journey that

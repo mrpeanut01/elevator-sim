@@ -11,7 +11,7 @@
  * | `sim.batchArrival` | a trace batch's time comes | materializes its passengers, lights the buttons, runs dispatch |
  * | `sim.transferArrival` | a sky-lobby walk completes | re-injects the journey's next leg as a fresh arrival |
  * | `sim.transportArrival` | a journey's *opening* escalator or stair hop completes | admits its first lift leg at the far landing |
- * | `sim.transportCleared` | a rider steps off a *closing* escalator that declares a carrying capacity (§ D1631) | nothing to the building; it makes the run last until they are off, so a queue still draining is not mistaken for a finished run |
+ * | `sim.transportCleared` | a rider steps off a *closing* escalator that declares a carrying capacity (§ D1632) | nothing to the building; it makes the run last until they are off, so a queue still draining is not mistaken for a finished run |
  * | `sim.dispatchTick` | a defer window closes, or a call is due to be re-offered | runs stages 2–5 for one bank |
  * | `sim.carArrived` | a car is levelled | completes the move and asks the car what to do next |
  * | `sim.carDoor` | the door's next automatic transition is due | runs the door forward; transfers passengers when it reaches open |
@@ -110,7 +110,7 @@ export interface TransportArrivalPayload {
 
 /**
  * A rider reaching the far landing of the escalator that **ends** their journey, on an escalator
- * that declares a carrying capacity (§ D1631).
+ * that declares a carrying capacity (§ D1632).
  *
  * {@link TransportArrivalPayload}'s docstring says a closing hop needs no event because it is a
  * constant added to the completion instant, and on an escalator with no declared capacity that is

@@ -136,7 +136,7 @@ describe('a mode naming a floor the building does not declare is fatal, and loca
 });
 
 /**
- * `capacityPersonsPerHour` — `DECISIONS.md` § D1631. What the loader accepts, what it refuses, and
+ * `capacityPersonsPerHour` — `DECISIONS.md` § D1632. What the loader accepts, what it refuses, and
  * the one thing it only warns about.
  */
 describe('an escalator may declare a carrying capacity, and a stair may not', () => {

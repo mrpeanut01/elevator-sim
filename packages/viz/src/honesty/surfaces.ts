@@ -10880,7 +10880,7 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'authoring/towerPlan.ts#TWO_CAR_FIGURES_WITHHELD',
     'everyday/designerModel.ts#designerGroupRows',
     'everyday/designerModel.ts#designerFloorFacts',
-    /* § D1631: the capacity chips, and the note that says a limit would change nothing. */
+    /* § D1632: the capacity chips, and the note that says a limit would change nothing. */
     'everyday/designerModel.ts#designerCapacityChoices',
     'everyday/designerModel.ts#designerEscalatorIdleNote',
     'everyday/designerModel.ts#designerServiceLine',
@@ -11215,7 +11215,7 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     const specs = context.elevatorSpecs;
     const classes = classesFromSpecs(specs);
     /*
-     * **The escalator capacity control's chips** (§ D1631): *no limit*, one per row the reference
+     * **The escalator capacity control's chips** (§ D1632): *no limit*, one per row the reference
      * table carries at the seeded speed, and the extra chip a figure off the table is shown as —
      * drawn here with a value no row holds, since no shipped building declares a capacity and the
      * chip would otherwise never render. The idle note is `DESIGNER_COPY`'s own and is seeded with

@@ -1693,7 +1693,7 @@ describe('the building editor is not decoration', () => {
 
   it('a carrying capacity changes the run on the clock, survives the round trip, and is cited or labelled', () => {
     /*
-     * § D1631, and `docs/14 § 5` criterion 2 again: the route and the leg count are the uncapped
+     * § D1632, and `docs/14 § 5` criterion 2 again: the route and the leg count are the uncapped
      * arm's, and the leg *times* are not, because riders who reach the escalator together now
      * step on one at a time. Lifting the limit restores the run exactly.
      */

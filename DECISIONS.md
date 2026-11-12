@@ -55923,7 +55923,7 @@ integers.
 
 **Numbers spent.** This session took the charter row's **D1630** and moved the row to D1631; nothing
 is holed.
-## D1631 — an escalator may declare a carrying capacity, and one that does has a queue
+## D1632 — an escalator may declare a carrying capacity, and one that does has a queue
 
 > **Taken 2026-11-11** on the product owner's request for escalator handling as an engine feature,
 > comprehensive and correct. **Moves a recorded refusal**: `config/types.ts` and `docs/02` both said
@@ -56028,4 +56028,4 @@ capacity; the control moves the legs at all three hop positions; conservation; t
 (the pinned digests, unchanged), and in the viewer `authoring/authoring.test.ts`,
 `authoring/towerPlan.test.ts`, `everyday/designerModel.test.ts` and `mode/disclosure.test.ts`.
 
-**Numbers spent.** One, **D1631**. The charter row moves to D1631.
+**Numbers spent.** One, **D1632**. The charter row moves to D1633.

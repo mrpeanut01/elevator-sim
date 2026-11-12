@@ -1031,7 +1031,7 @@ export interface DesignerFloorFacts {
   readonly zones: readonly { readonly id: string; readonly line: string }[];
   /**
    * Riders an hour the escalator above the picked floor carries each way, or `undefined` where
-   * it has no limit or there is no escalator — § D1631.
+   * it has no limit or there is no escalator — § D1632.
    */
   readonly escalatorCapacity: number | undefined;
   /** The crowd every picked floor shares, as a profile id, or `undefined` where they differ. */
@@ -1061,7 +1061,7 @@ export const DESIGNER_PANEL_COPY: Readonly<Record<CallType | 'controller', strin
 });
 /**
  * What the board says under the capacity control when a limit there would change no run, or `''`
- * where it would — `towerPlan.ts#escalatorCarriesLiftJourneys` is the question, § D1631.
+ * where it would — `towerPlan.ts#escalatorCarriesLiftJourneys` is the question, § D1632.
  *
  * `''` as well where the loader refused the building: there is no resolved building to ask, and
  * the refusal is already on the board in its own words.

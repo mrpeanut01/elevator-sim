@@ -1,5 +1,5 @@
 /**
- * Escalator queues: what a run recorded at each boarding landing, and what it means — § D1631.
+ * Escalator queues: what a run recorded at each boarding landing, and what it means — § D1632.
  *
  * An escalator that declares `capacityPersonsPerHour` has a first-come, first-served queue at
  * each of its two landings (`config/types.ts#TransportModeConfig.capacityPersonsPerHour`). This

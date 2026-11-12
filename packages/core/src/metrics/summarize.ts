@@ -290,7 +290,7 @@ export function buildJourneys(records: readonly PassengerRecord[]): readonly Jou
     // the leg rather than an event, because nothing a dispatcher does can change them — but
     // dropping them would make removing a spurious lift leg look like free time saved.
     const alightedAt = last.alightedAt;
-    // § D1631: a rider the drain deadline cut on a closing escalator finished their lift ride and
+    // § D1632: a rider the drain deadline cut on a closing escalator finished their lift ride and
     // not their journey, so it has no completion instant and no time-to-destination.
     const isComplete = last.isFinalLeg && alightedAt !== undefined && last.egressCut !== true;
     const completedAt =
@@ -1924,7 +1924,7 @@ export function summarizeRun(record: RunRecord, options: SummarizeOptions = {}):
     ...(awtInvalidity === undefined
       ? {}
       : { awtInvalidReason: awtInvalidity.reason, awtInvalidGround: awtInvalidity.ground }),
-    // Present exactly when the record carries escalator queues (§ D1631), so a summary of a
+    // Present exactly when the record carries escalator queues (§ D1632), so a summary of a
     // building that declares no capacity is the object it was.
     ...(record.transportQueues === undefined ? {} : { transportQueues }),
   });

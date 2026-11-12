@@ -480,7 +480,7 @@ underneath a published number.
 ### Escalator carrying capacity
 
 An escalator may declare `capacityPersonsPerHour`, persons per hour in **each** direction
-([`DECISIONS.md` § D1631](../DECISIONS.md)). Absent means no limit. There is no default, for the
+([`DECISIONS.md` § D1632](../DECISIONS.md)). Absent means no limit. There is no default, for the
 reason the stairs section gives for `use`: a default would put a planning figure nobody chose into
 every study that declared an escalator.
 
@@ -543,7 +543,7 @@ the stairs never enters the lift system, so the figure would be uncited and unre
 A direction: a one-way escalator is a real configuration and is not expressible, because nothing
 would read it. See `packages/core/src/config/types.ts`.
 
-*This list said two until § D1631. The second was "a capacity or headway (an escalator's handling
+*This list said two until § D1632. The second was "a capacity or headway (an escalator's handling
 capacity dwarfs a lift's, and modelling it would put a queue on the one edge that exists to remove
 one)". The first half of that is still why the field has no default. The second half was moved by
 the product owner's request for escalator handling as an engine feature: an escalator that declares

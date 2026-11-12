@@ -808,7 +808,7 @@ export class Simulation {
   /** How often the drain deadline refused to schedule something. `> 0` means it really bit. */
   #deadlineTruncations = 0;
 
-  /* ---- escalator carrying capacity (§ D1631, `sim/escalatorQueue.ts`) ---- */
+  /* ---- escalator carrying capacity (§ D1632, `sim/escalatorQueue.ts`) ---- */
 
   /**
    * The queue at each boarding landing of every escalator that declares a capacity.
@@ -2942,7 +2942,7 @@ export class Simulation {
       // Its leg 0 is admitted when the hop finishes; until then it is neither waiting nor
       // visible to a dispatcher, which is the whole difference between a hop and a leg.
       //
-      // § D1631: where that escalator declares a carrying capacity the rider first takes their
+      // § D1632: where that escalator declares a carrying capacity the rider first takes their
       // turn in its queue — in trace order within the batch — and the hop ends when the queue
       // says it does. `#joinEscalator` answers `undefined` for every other escalator, and the
       // branch below it is the one this method has always taken.
@@ -3011,7 +3011,7 @@ export class Simulation {
     }
     // `toPassengerInit` states the leg's `arrivedAt` as the batch instant plus the traversal
     // time, which is this instant exactly unless the rider also stood in an escalator queue
-    // (§ D1631). Then the leg begins waiting *now*, and saying otherwise would report the time
+    // (§ D1632). Then the leg begins waiting *now*, and saying otherwise would report the time
     // they spent at the foot of the escalator as time spent waiting for a lift.
     const init = toPassengerInit(record);
     const openingHop = transportHopBefore(record, 0);
@@ -5407,7 +5407,7 @@ export class Simulation {
     // landing-to-landing time **instead of** the sky-lobby walk, not on top of it: both numbers
     // are door-to-door times for the same movement, and charging both would double it.
     //
-    // § D1631: an escalator that declares a carrying capacity is queued for first, and the
+    // § D1632: an escalator that declares a carrying capacity is queued for first, and the
     // rider reaches the far landing when their turn plus the ride says so.
     const hop = this.#transportHopAfter(passenger);
     const turn = hop === undefined ? undefined : this.#joinEscalator(hop, passenger.journeyId, at);
@@ -5491,7 +5491,7 @@ export class Simulation {
   }
 
   /**
-   * Take a rider's turn at the queue for `hop`, and write it down — § D1631.
+   * Take a rider's turn at the queue for `hop`, and write it down — § D1632.
    *
    * `undefined` when the escalator declares no capacity, which is every escalator of every
    * shipped building: the caller then does the arithmetic it always did, and nothing here has
@@ -5521,7 +5521,7 @@ export class Simulation {
   }
 
   /**
-   * The escalator that ends a journey, when it declares a capacity — § D1631.
+   * The escalator that ends a journey, when it declares a capacity — § D1632.
    *
    * Without one this hop is a constant on the leg and needs nothing here. With one, the rider
    * who has just stepped off the lift takes their turn like anybody else: the wait goes on the
@@ -6297,7 +6297,7 @@ export class Simulation {
     const { audit, undelivered, problems } = this.#reconcile(bareRecord);
 
     // An escalator that did not keep up says so in the run's own warnings as well as in the
-    // summary's verdict (§ D1631), because a caller that reads only AWT and `warnings` — the CLI
+    // summary's verdict (§ D1632), because a caller that reads only AWT and `warnings` — the CLI
     // does — would otherwise see a suppressed mean and no account of what was suppressed.
     for (const queue of summary.transportQueues ?? []) {
       if (!queue.saturated) continue;
@@ -6652,7 +6652,7 @@ export class Simulation {
       }
       const legs = this.#legsByJourney.get(record.journeyId) ?? [];
       /*
-       * **A rider the deadline cut at an escalator is still in the system** (§ D1631), so they
+       * **A rider the deadline cut at an escalator is still in the system** (§ D1632), so they
        * are `undelivered` — unlike the rider who walked out or was turned away, who is in no
        * queue at all. Three shapes, and each would otherwise be filed wrongly: an opening hop has
        * no leg yet and would read as a passenger who stopped existing; a closing hop's lift leg
@@ -6800,7 +6800,7 @@ export class Simulation {
       );
     }
     /*
-     * **Every rider who joined an escalator queue left it, or is named** (§ D1631). `entered`
+     * **Every rider who joined an escalator queue left it, or is named** (§ D1632). `entered`
      * and `cleared` are counted at different events by different handlers, so the equality is a
      * check and not an identity: a hop that joined a queue and was then scheduled by a path that
      * forgot to count its arrival would show here and nowhere else.
@@ -6940,7 +6940,7 @@ export class Simulation {
        * different populations. Without the count that shortfall reads as a better building.
        */
       /*
-       * Present only where an escalator declares a carrying capacity (§ D1631), so the audit of
+       * Present only where an escalator declares a carrying capacity (§ D1632), so the audit of
        * every other building is the object it was. `entered === cleared + cut` is checked above.
        */
       ...(this.#escalators.isEmpty

@@ -1,5 +1,5 @@
 /**
- * Escalator queues: the carrying capacity of a transport mode, as a run sees it — § D1631.
+ * Escalator queues: the carrying capacity of a transport mode, as a run sees it — § D1632.
  *
  * ## What existed, and what this adds
  *

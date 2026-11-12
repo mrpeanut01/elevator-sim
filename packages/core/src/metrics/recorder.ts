@@ -275,7 +275,7 @@ export class MetricsRecorder {
    */
   readonly #carMoves: CarMoveRecord[] = [];
   /**
-   * Escalator queues, **only when the run declares them** — § D1631, `metrics/transportQueue.ts`.
+   * Escalator queues, **only when the run declares them** — § D1632, `metrics/transportQueue.ts`.
    *
    * Nothing calls {@link declareTransportQueue} unless a mode declares a capacity, so this stays
    * empty on every shipped run and the field is omitted from the record entirely. Insertion
@@ -749,7 +749,7 @@ export class MetricsRecorder {
   }
 
   /* ---------------------------------------------------------------- *
-   * Escalator queues (§ D1631)
+   * Escalator queues (§ D1632)
    * ---------------------------------------------------------------- */
 
   /**
@@ -1097,7 +1097,7 @@ export class MetricsRecorder {
         : { reportWindow: Object.freeze({ ...this.#reportWindow }) }),
       passengers: Object.freeze(this.passengerRecords()),
       // Omitted unless a queue was declared, so every record of a building with no escalator
-      // capacity is byte-identical to one written before § D1631.
+      // capacity is byte-identical to one written before § D1632.
       ...(this.#transportQueues.size === 0
         ? {}
         : {
@@ -1172,7 +1172,7 @@ function freezeLeg(leg: LegState): PassengerRecord {
     ...(source.egressTransitSeconds === 0
       ? {}
       : { egressTransitSeconds: source.egressTransitSeconds }),
-    // § D1631, and omitted by the same rule: only a rider who actually queued for a closing
+    // § D1632, and omitted by the same rule: only a rider who actually queued for a closing
     // escalator, or was cut on one, carries either key.
     ...(source.egressQueueSeconds === 0 ? {} : { egressQueueSeconds: source.egressQueueSeconds }),
     ...(source.egressCut ? { egressCut: true as const } : {}),

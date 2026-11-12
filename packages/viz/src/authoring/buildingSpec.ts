@@ -256,7 +256,7 @@ export interface SpecTransportMode {
   readonly use?: StairsUseConfig | undefined;
   /**
    * How many people one direction of an escalator carries, persons per hour — `core`'s
-   * `TransportModeConfig.capacityPersonsPerHour`, § D1631.
+   * `TransportModeConfig.capacityPersonsPerHour`, § D1632.
    *
    * **Absent means no limit**, which is what every machine this editor seeds has and what every
    * shipped building declares. Carried so a loaded figure survives the round trip, and written
@@ -1459,7 +1459,7 @@ export function withTransportSeconds(
 /**
  * One escalator's carrying capacity set or cleared — the capacity control's edit, as a value.
  *
- * `undefined` clears it, which is *no limit* and the model before § D1631. A figure is written as
+ * `undefined` clears it, which is *no limit* and the model before § D1632. A figure is written as
  * given: the building designer offers only the rows of `elevator-specs.json`'s
  * `escalatorCapacity` table ({@link escalatorCapacityChoices}), and a figure that reached here by
  * another route is the author's and is labelled so in the document's `$comment`.
@@ -1553,7 +1553,7 @@ export function transportModesOf(
 /**
  * The citation `TransportModeConfig.capacityPersonsPerHour` requires, appended to the traversal
  * time's on every machine that declares one — and nothing at all on a machine that does not, so
- * every document this editor wrote before § D1631 is written byte for byte as it was.
+ * every document this editor wrote before § D1632 is written byte for byte as it was.
  *
  * **Three branches, on {@link transportCommentFor}'s pattern.** A figure that is a row of the
  * reference table is cited as that row, with what the table is and what was and was not opened to
@@ -1574,7 +1574,7 @@ function capacityCommentFor(
     ` Carrying capacity DECLARED: ${declared} persons per hour in EACH direction (the mode is a ` +
     'pair, one belt up and one down, each with its own first-come queue at its boarding landing; ' +
     'riders step on one at a time, evenly spaced, are not re-routed around a full escalator and ' +
-    'do not give up in its queue). DECISIONS.md D1631.';
+    'do not give up in its queue). DECISIONS.md D1632.';
   if (reference === undefined) {
     return (
       `${model} NOT CHECKED against data/elevator-specs.json's escalatorCapacity table by the ` +
@@ -3264,7 +3264,7 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
      * surface saying so.
      *
      * **The claim is exactly six fields, and it is narrower than "lossless".** `id`, `connects`,
-     * `traversalTimeS`, `kind`, `use` and (§ D1631) `capacityPersonsPerHour` survive; `name` and `$comment` do not, and both losses are
+     * `traversalTimeS`, `kind`, `use` and (§ D1632) `capacityPersonsPerHour` survive; `name` and `$comment` do not, and both losses are
      * deliberate rather than overlooked:
      *
      * - `name` is a label naming floors — *"Ground lobby escalator pair (G <-> 2)"* — and there is
@@ -3299,7 +3299,7 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
         traversalTimeS: mode.traversalTimeS,
         ...(mode.kind === undefined ? {} : { kind: mode.kind }),
         ...(mode.use === undefined ? {} : { use: mode.use }),
-        // § D1631: carried when declared, so a loaded capacity is not silently lifted on save.
+        // § D1632: carried when declared, so a loaded capacity is not silently lifted on save.
         ...(mode.capacityPersonsPerHour === undefined
           ? {}
           : { capacityPersonsPerHour: mode.capacityPersonsPerHour }),

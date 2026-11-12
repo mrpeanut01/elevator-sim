@@ -257,7 +257,7 @@ export const WARNING_CODES = {
   floorAreaBuysNothing: 'floor-area-buys-nothing',
   /**
    * An escalator declares a `capacityPersonsPerHour` above the largest row of
-   * `elevator-specs.json`'s `escalatorCapacity` table — `DECISIONS.md` § D1631. Legal, and run as
+   * `elevator-specs.json`'s `escalatorCapacity` table — `DECISIONS.md` § D1632. Legal, and run as
    * declared; the warning exists because the likely causes are a both-directions total or a
    * slipped digit, and either makes the queue the field models never form.
    */
@@ -640,7 +640,7 @@ const shaftFootprintSchema = z.strictObject({
 });
 
 /**
- * `elevator-specs.json`'s `escalatorCapacity` block — § D1631.
+ * `elevator-specs.json`'s `escalatorCapacity` block — § D1632.
  *
  * Every figure strictly positive, and no two rows may describe the same step width and speed:
  * the designer looks a row up by that pair, and two answers would make the lookup depend on
@@ -1849,7 +1849,7 @@ export const transportModeSchema = z
     use: z.strictObject({ up: fraction, down: fraction }).optional(),
     // Persons per hour, one direction. Strictly positive and finite: zero would be a machine
     // nobody can ever board, which is a mode that should not be declared. No default — absent
-    // is "no limit", the model before § D1631. Active only on an escalator; see the refinement.
+    // is "no limit", the model before § D1632. Active only on an escalator; see the refinement.
     capacityPersonsPerHour: positive.optional(),
   })
   .refine((mode) => mode.connects[0] !== mode.connects[1], {

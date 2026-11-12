@@ -849,7 +849,7 @@ export function resolveBuilding(
       );
     });
     /*
-     * A declared carrying capacity above every row of the planning table (§ D1631). Legal — an
+     * A declared carrying capacity above every row of the planning table (§ D1632). Legal — an
      * author may cite a source this file does not carry — and worth saying, because the two ways
      * to arrive here by accident are a figure typed for both directions together and a digit too
      * many, and either one makes the escalator's queue quietly never form.

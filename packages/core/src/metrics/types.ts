@@ -259,7 +259,7 @@ export interface PassengerRecord {
    */
   readonly egressTransitSeconds?: number | undefined;
   /**
-   * Seconds this rider stood at the foot of that closing escalator before their turn — § D1631.
+   * Seconds this rider stood at the foot of that closing escalator before their turn — § D1632.
    *
    * **Absent, not `0`, unless they waited**, which needs an escalator that declares a
    * `capacityPersonsPerHour` and a queue ahead of them; so every record of every building that
@@ -270,7 +270,7 @@ export interface PassengerRecord {
   readonly egressQueueSeconds?: number | undefined;
   /**
    * Present, and `true`, when the closing escalator would have put this rider at their
-   * destination after the run's drain deadline — § D1631.
+   * destination after the run's drain deadline — § D1632.
    *
    * The lift leg finished; the journey did not. {@link buildJourneys} reports such a journey as
    * incomplete, with no time-to-destination, and the run names it in
@@ -1083,7 +1083,7 @@ export interface RunRecord {
   readonly passengers: readonly PassengerRecord[];
   /**
    * One entry per direction of every escalator that declares a carrying capacity, in declared
-   * order, `up` before `down` — § D1631, and see `metrics/transportQueue.ts`.
+   * order, `up` before `down` — § D1632, and see `metrics/transportQueue.ts`.
    *
    * **Absent on every run of every building that declares no `capacityPersonsPerHour`**, which is
    * every shipped building, so no record this project has written changes by a byte. Present, it
@@ -1835,7 +1835,7 @@ export interface RunSummary {
    * Every escalator queue over this window — entries, waits, peak length and whether it kept up.
    *
    * **Absent when the record carries no `transportQueues`**, so a summary of a building that
-   * declares no escalator capacity is the object it was before § D1631. A queue's wait is a wait
+   * declares no escalator capacity is the object it was before § D1632. A queue's wait is a wait
    * and is on the journey's {@link timeToDestination}; it is here, beside {@link waiting}, and
    * not inside it, because {@link waiting} is lift waiting time. A saturated queue withholds its
    * own mean and, through the `transport-saturated` ground, this summary's {@link awtIsValid}.

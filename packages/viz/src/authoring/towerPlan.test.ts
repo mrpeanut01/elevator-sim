@@ -506,7 +506,7 @@ describe('the drawing board is not decoration — every control moves the legs',
 
   it('an escalator’s carrying capacity changes the run where riders are routed over it, and only there', () => {
     /*
-     * § D1631. The edit is the one the board's chip makes — a row of the reference table — and
+     * § D1632. The edit is the one the board's chip makes — a row of the reference table — and
      * the comparison is on the legs. The plan is a two-level lobby drawn on the board: the lifts
      * start one floor up, at a sky lobby, and the escalator is the only way to them from the
      * street. Riders are routed over it; those who reach it together step on a slot apart and the

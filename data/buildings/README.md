@@ -330,11 +330,11 @@ down to **3,245** lift legs.
 
 One thing a mode deliberately cannot express, because nothing would read it: a direction, so a
 one-way escalator is not expressible. *(This sentence listed three. `kind` has shipped since the
-stairs work, and a capacity since [`DECISIONS.md` § D1631](../../DECISIONS.md).)*
+stairs work, and a capacity since [`DECISIONS.md` § D1632](../../DECISIONS.md).)*
 
 ### An escalator's carrying capacity
 
-`capacityPersonsPerHour` gives an escalator a queue ([§ D1631](../../DECISIONS.md)). What that
+`capacityPersonsPerHour` gives an escalator a queue ([§ D1632](../../DECISIONS.md)). What that
 means, and what it does not:
 
 - **A mode is a pair.** One belt up and one down, each at the declared figure, each with its own

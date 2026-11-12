@@ -104,7 +104,7 @@ export interface AwtValidityEvidence {
   /** The abandonment limit applied. `DEFAULT_MAX_ABANDONMENT_FRACTION` unless overridden. */
   readonly maxAbandonmentFraction: number;
   /**
-   * Every escalator queue over the window (§ D1631, `metrics/transportQueue.ts`).
+   * Every escalator queue over the window (§ D1632, `metrics/transportQueue.ts`).
    *
    * `[]` on every run of every building that declares no `capacityPersonsPerHour`, which is every
    * run this repository has published — so the sixth ground below cannot fire on one. Optional
@@ -163,7 +163,7 @@ const AWT_INVALID_GROUND_SPECS = [
   },
   {
     /*
-     * **The sixth ground: an escalator that could not carry its demand** (§ D1631).
+     * **The sixth ground: an escalator that could not carry its demand** (§ D1632).
      *
      * Placed with `abandoned`, and ahead of it, for `abandoned`'s own reason — precedence is by
      * cause. A saturated escalator *meters* the lifts behind it: the riders it is holding have

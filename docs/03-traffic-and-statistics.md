@@ -403,7 +403,7 @@ Three things about ground 4 are deliberate:
 
 #### A sixth ground: an escalator that could not carry its demand
 
-`transport-saturated` ([`DECISIONS.md` § D1631](../DECISIONS.md)) fires when any escalator queue in
+`transport-saturated` ([`DECISIONS.md` § D1632](../DECISIONS.md)) fires when any escalator queue in
 the window is saturated. It can only fire on a building that declares
 `capacityPersonsPerHour`, which no shipped building does, so no existing verdict moves.
 

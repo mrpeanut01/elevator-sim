@@ -936,7 +936,7 @@ export const UNDELIVERED_REASONS = [
   'transferring',
   /**
    * Queued for, or riding, an escalator that declares a carrying capacity when the drain deadline
-   * fell (§ D1631). Used only there: a walk or an uncapped escalator hop cut by the deadline is
+   * fell (§ D1632). Used only there: a walk or an uncapped escalator hop cut by the deadline is
    * still `transferring`, as it always was.
    */
   'on-transport',
@@ -1013,7 +1013,7 @@ export interface ConservationAudit {
    */
   readonly transportHops: number;
   /**
-   * Riders who joined an escalator queue, and what became of them — § D1631.
+   * Riders who joined an escalator queue, and what became of them — § D1632.
    *
    * **Absent on every building that declares no `capacityPersonsPerHour`**, which is every
    * shipped building. `entered === cleared + cut` on every run that was not aborted, and the

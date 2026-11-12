@@ -87,7 +87,7 @@ export const passengerRecordSchema = z.strictObject({
   // Absent on every run of every building that declares no transport mode, so a stored record
   // written before transport modes existed parses unchanged.
   egressTransitSeconds: z.number().nonnegative().finite().optional(),
-  // § D1631: absent unless the rider queued for a closing escalator that declares a capacity,
+  // § D1632: absent unless the rider queued for a closing escalator that declares a capacity,
   // and named here for `abandonedAt`'s reason — this is a strict object, so a run that wrote
   // either key could not otherwise be stored or replayed (invariant 5).
   egressQueueSeconds: z.number().positive().finite().optional(),
@@ -121,7 +121,7 @@ export const passengerRecordSchema = z.strictObject({
   assignedAt: simTime.optional(),
 });
 
-/** One direction of one capacity-bearing escalator — `RunRecord.transportQueues`, § D1631. */
+/** One direction of one capacity-bearing escalator — `RunRecord.transportQueues`, § D1632. */
 export const transportQueueRecordSchema = z.strictObject({
   modeId: identifier,
   direction: z.enum(DIRECTIONS),
@@ -251,7 +251,7 @@ export const runRecordSchema = z.strictObject({
   reportWindow: reportWindowSchema.optional(),
   warnings: z.array(z.string().min(1)).optional(),
   passengers: z.array(passengerRecordSchema),
-  // § D1631: absent on every building that declares no escalator capacity.
+  // § D1632: absent on every building that declares no escalator capacity.
   transportQueues: z.array(transportQueueRecordSchema).optional(),
   loadSamples: z.array(loadSampleSchema),
   queueSamples: z.array(queueSampleSchema),

@@ -399,7 +399,7 @@ export interface EscalatorCapacityRow {
 
 /**
  * **The escalator carrying-capacity planning table** — `elevator-specs.json`'s
- * `escalatorCapacity` block, § D1631.
+ * `escalatorCapacity` block, § D1632.
  *
  * Reference data and not a default: no code path reads a row and applies it to an escalator that
  * declared no capacity. It has two readers. `resolveBuilding` warns when a mode's
@@ -455,7 +455,7 @@ export interface ElevatorSpecs extends Commented {
    */
   readonly shaftFootprint?: ShaftFootprintTable | undefined;
   /**
-   * Escalator carrying capacity by step width and speed — § D1631. Optional for
+   * Escalator carrying capacity by step width and speed — § D1632. Optional for
    * {@link airPressure}'s reason: a data directory that declares none has no reference to check
    * a declared capacity against, and checks none.
    */
@@ -1863,7 +1863,7 @@ export interface ShaftConfig {
  * - ~~**No capacity or headway.**~~ *This read: "An escalator's handling capacity is enormous
  *   relative to a lift's and modelling it would put a queue on the one edge that exists to remove
  *   a queue."* The first half is still true and is why the field has no default. The second was
- *   moved by the product owner's request and by `DECISIONS.md` § D1631: an escalator may declare
+ *   moved by the product owner's request and by `DECISIONS.md` § D1632: an escalator may declare
  *   {@link capacityPersonsPerHour}, and one that does has a queue. One that does not is exactly
  *   the edge described here.
  *
@@ -1913,7 +1913,7 @@ export interface TransportModeConfig extends Commented {
    * desynchronizes common random numbers against every run already stored (CLAUDE.md invariant 2,
    * and `random/streams.ts`). The gain — a few seconds of spread on the ride itself — does not
    * buy back the comparison power. *(This read "on a segment nobody queues for". An escalator
-   * that declares {@link capacityPersonsPerHour} is queued for, since § D1631; the queue is
+   * that declares {@link capacityPersonsPerHour} is queued for, since § D1632; the queue is
    * deterministic too, for this paragraph's reason.)*
    *
    * **Reference value, so it must be cited** in the declaring building's `$comment`; see
@@ -1926,7 +1926,7 @@ export interface TransportModeConfig extends Commented {
    */
   readonly use?: StairsUseConfig | undefined;
   /**
-   * **How many people one direction of this escalator can carry, persons per hour** — § D1631.
+   * **How many people one direction of this escalator can carry, persons per hour** — § D1632.
    *
    * **Absent means no limit, which is the model this project shipped before the field existed**:
    * the hop takes {@link traversalTimeS} and any number of riders may step on at the same

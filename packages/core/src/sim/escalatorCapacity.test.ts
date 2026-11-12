@@ -1,5 +1,5 @@
 /**
- * An escalator's carrying capacity, proved rather than asserted — `DECISIONS.md` § D1631.
+ * An escalator's carrying capacity, proved rather than asserted — `DECISIONS.md` § D1632.
  *
  * Five claims, each of which a plausible-looking implementation could fail while every statistic
  * still looked reasonable:
