@@ -62,7 +62,17 @@ import { batchReport, populationLineOf, type BatchReport } from '../batch/report
 import { SuiteError, suiteCellViewOf, suitePlanOf, suiteSummaryOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult, type BatchWorkerMessage } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
-import { ACTION_BAR_ROWS, actionBarFor, confirmStripFor, TIMELINE_STEPS, WATCHING_NOTE_OWN } from '../everyday/actionBar.js';
+import {
+  ACTION_BAR_ROWS,
+  actionBarFor,
+  confirmStripFor,
+  LOBBY_WAY_OUT,
+  TEST_SIMULATION_NOTE,
+  TEST_SIMULATION_PRIMARY,
+  testSimulationBarOf,
+  TIMELINE_STEPS,
+  WATCHING_NOTE_OWN,
+} from '../everyday/actionBar.js';
 import {
   everydayWatchingCopyOf,
   everydayWatchingStrings,
@@ -105,20 +115,42 @@ import {
 } from '../everyday/benchModel.js';
 import {
   behaviourBlockOf,
-  carriedBlocksOf,
   constraintCardsOf,
-  libraryCardsOf,
   /* Aliased: `dev/leftRail.ts` and `dev/rightRail.ts` already export these two names. */
   mathsDisclosureOf as workshopMathsOf,
   nameplateOf as workshopNameplateOf,
-  playStyleAbsenceOf,
-  playStyleCardsOf,
+  discardQuestionOf as workshopDiscardQuestionOf,
+  removeQuestionOf as workshopRemoveQuestionOf,
+  saveBlockOf as workshopSaveBlockOf,
+  shelfOf as workshopShelfOf,
   rulesBlockOf,
   switchingBlockOf,
   termDisclosureOf,
   workshopLeversOf,
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
+import {
+  TEST_BED_COPY,
+  TEST_BED_CROWDS,
+  TEST_BED_VERDICT_WORDS,
+  testBedViewOf,
+  testBedWorkingProfileOf,
+} from '../everyday/testBedModel.js';
+import { JOURNEY_COPY, journeyOf } from '../everyday/workshopJourney.js';
+import { plainControlWordsOf } from '../everyday/plainControls.js';
+import {
+  FORMULA_COPY,
+  FORMULA_OP_ORDER,
+  FORMULA_OP_WORDS,
+  expressionOf,
+  formulaIssueOf,
+  formulaReadbackOf,
+  formulaTermOptions,
+  withFormulaAt,
+  withNewFormula,
+} from '../authoring/formulaSpec.js';
+import { DISPATCHER_FAMILIES } from '../authoring/dispatcherFamilies.js';
+import { versionedNameOf } from '../authoring/dispatcherShelf.js';
 import {
   BRIEF_DRIVER_LOCKED,
   BRIEF_WAY_THROUGH_HEADING,
@@ -141,7 +173,7 @@ import {
   DOOR_STEPS,
   sameForEveryoneLine,
 } from '../everyday/doorView.js';
-import { HOST_PENDING_REASON } from '../everyday/host.js';
+import { HOST_PENDING_REASON, OWN_BUILDING_GONE } from '../everyday/host.js';
 import {
   BUILD_NOTES_POINTER,
   buildNotesSummaryOf,
@@ -153,16 +185,43 @@ import { AVATAR_SWATCHES } from '../everyday/profile.js';
 import {
   DESIGNER_ABSENCES,
   DESIGNER_COPY,
-  classOfSpec,
+  DESIGNER_DUTY_COPY,
+  DESIGNER_KIND_COPY,
+  DESIGNER_PANEL_COPY,
+  DESIGNER_SERVICE_COPY,
+  DESIGNER_STEPS,
+  DESIGNER_TEMPLATE_COPY,
+  classOfMachine,
   designerCapacityLine,
   designerFigures,
+  designerFloorFacts,
+  designerGroupRows,
+  designerLossLine,
   designerPlateRows,
   designerReading,
-  designerShaftNote,
+  designerServiceLine,
   designerShaftRows,
   designerWarnings,
-  withShaftMachine,
+  withPlanMachineClass,
 } from '../everyday/designerModel.js';
+import {
+  PLAN_TEMPLATES,
+  blankPlan,
+  planAnalysisOf,
+  planFromBuilding,
+  skyLobbyPlan,
+  withAccessZoneAdded,
+  withCars,
+  withDecks,
+  withDescentSpeed,
+  withPanel,
+  withStairsAdded,
+  withPopulation,
+  withSkyLobbyToggled,
+  withStopToggled,
+  type PlanLoss,
+  type TowerPlan,
+} from '../authoring/towerPlan.js';
 import { RAIL_DRAWER_COPY, railModel, stageSublineOf, sublineFor } from '../everyday/rail.js';
 import {
   RUSH_ABSENCES,
@@ -313,7 +372,13 @@ import {
   RUN_CONTEXTS,
   SHELL_SKIP_LABEL,
 } from '../everyday/types.js';
-import { SCENARIO_COPY, SCENARIO_ENTRIES, scenarioHubViewOf } from '../everyday/scenarioModel.js';
+import {
+  OWN_BUILDINGS_COPY,
+  SCENARIO_COPY,
+  SCENARIO_ENTRIES,
+  ownBuildingsViewOf,
+  scenarioHubViewOf,
+} from '../everyday/scenarioModel.js';
 import { SCENARIO_LADDER_COPY, type ScenarioLadderRung } from '../scenario/ladder.js';
 import {
   TUTORIAL_ABSENCES,
@@ -643,26 +708,9 @@ import {
   LANDING_FIRST_SESSION_CALL_TO_ACTION,
   landingViewOf,
 } from '../everyday/landingView.js';
-import {
-  LOBBY_COPY,
-  LOBBY_FLOORS,
-  LOBBY_INITIAL,
-  LOBBY_WARNINGS,
-  lobbyArrived,
-  lobbyCall,
-  lobbyClose,
-  lobbyDepart,
-  lobbyFloorOf,
-  lobbyHold,
-  lobbyPick,
-  lobbyRideBack,
-  lobbyStepToward,
-  lobbyTick,
-  lobbyTurnKey,
-  lobbyViewOf,
-  type LobbyFloorKey,
-  type LobbyState,
-} from '../everyday/lobbyModel.js';
+import { GAME_FLOORS } from '../everyday/floors.js';
+import { TEST_SIMULATION_LABEL } from '../everyday/types.js';
+import { LOBBY_COPY, LOBBY_INITIAL, lobbyPoint, lobbyViewOf, type LobbyState } from '../everyday/lobbyModel.js';
 import {
   SURVIVOR_COPY,
   survivorSentenceFor,
@@ -693,6 +741,7 @@ import {
   profileFromSpec,
   specFromProfile,
   type DispatcherSpec,
+  familySpace,
 } from '../authoring/dispatcherSpec.js';
 import {
   classesFromSpecs,
@@ -9469,7 +9518,51 @@ const RULES_EDITOR: SurfaceAdapter = {
         true,
       ],
       ['out-of-list', [{ when: 'call-waited', whenValue: 61, then: 'jump-queue' }], true],
+      // A row's further conditions: their own out-of-list and clockless refusals, the bound, and
+      // the whole-run ceiling that can carry none.
+      [
+        'and-out-of-list',
+        [{ when: 'shaft-out', and: [{ when: 'call-waited', whenValue: 61 }], then: 'jump-queue' }],
+        true,
+      ],
+      [
+        'and-clockless',
+        [{ when: 'shaft-out', and: [{ when: 'day-period', whenValue: 'lunch' }], then: 'jump-queue' }],
+        false,
+      ],
+      [
+        'and-too-many',
+        [
+          {
+            when: 'shaft-out',
+            and: [{ when: 'shaft-out' }, { when: 'shaft-out' }, { when: 'shaft-out' }],
+            then: 'jump-queue',
+          },
+        ],
+        true,
+      ],
+      [
+        'and-on-ceiling',
+        [{ when: 'car-fuller-than', whenValue: 0.8, and: [{ when: 'shaft-out' }], then: 'no-new-pickups' }],
+        true,
+      ],
     ];
+    // A row that asks for more than one thing, over every condition as its further one: the
+    // readback's "and" join and the provenance pill's, each from the same table.
+    RULE_CONDITIONS.forEach((when) => {
+      const value = RULE_CONDITION_WORDS[when].values?.[0]?.value;
+      const row: RuleRow = {
+        when: 'shaft-out',
+        and: [{ when, ...(value === undefined ? {} : { whenValue: value }) }],
+        then: 'jump-queue',
+      };
+      seeds.push({ field: `readback.and.${when}`, text: `Reads as: ${readbackOf(row)}`, role: 'label' });
+      seeds.push({
+        field: `provenance.and.${when}`,
+        text: ruleProvenanceName(`rule-1:shaft-out+${when}${value === undefined ? '' : `:${String(value)}`}`) ?? '',
+        role: 'label',
+      });
+    });
     for (const [name, rows, hasClock] of refusalArms) {
       for (const [index, issue] of ruleIssues(rows, { hasClock }).entries()) {
         seeds.push({
@@ -10297,12 +10390,19 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     /* Wave AS, lane AS-4 (#636 item 6): the played day's subline with the stage's clock. */
     'everyday/rail.ts#stageSublineOf',
     'everyday/rail.ts#STAGE_RAIL_PHASE_WORDS',
-    'everyday/rail.ts#railGroups',
+    'everyday/rail.ts#railShaft',
     'everyday/rail.ts#railFooter',
     'everyday/rail.ts#railModel',
     'everyday/actionBar.ts#ACTION_BAR_ROWS',
     'everyday/actionBar.ts#actionBarFor',
     'everyday/actionBar.ts#confirmStripFor',
+    /* § D1627: a test simulation's stage and report, with the way back to the bench. */
+    'everyday/actionBar.ts#TEST_SIMULATION_LEAVE',
+    'everyday/actionBar.ts#TEST_SIMULATION_PRIMARY',
+    'everyday/actionBar.ts#TEST_SIMULATION_NOTE',
+    /* § D1628: the way home, where the guide's cells read Modes and Main Menu. */
+    'everyday/actionBar.ts#LOBBY_WAY_OUT',
+    'everyday/actionBar.ts#testSimulationBarOf',
     /* § D1218 — the brief's resume and held driver, and the strip over a day whose attempt stands. */
     'shift/attempt.ts#DAY_ATTEMPT_COPY',
     'everyday/actionBar.ts#TIMELINE_STEPS',
@@ -10405,17 +10505,20 @@ const EVERYDAY_MENU: SurfaceAdapter = {
       const where = inCampaign ? 'in-campaign' : 'no-campaign';
       seeds.push({ field: `rail.${where}.brand`, text: model.brand, role: 'label' });
       seeds.push({ field: `rail.${where}.mode`, text: model.mode, role: 'label' });
-      for (const group of model.groups) {
-        seeds.push({ field: `rail.${where}.${group.title}`, text: group.title, role: 'label' });
-        for (const item of group.items) {
+      for (const floor of model.shaft.floors) {
+        seeds.push({ field: `rail.${where}.${floor.key}`, text: floor.name, role: 'label' });
+        if (floor.unavailable !== undefined) {
+          seeds.push({ field: `rail.${where}.${floor.key}.unavailable`, text: floor.unavailable, role: 'reason' });
+        }
+        for (const item of floor.rooms) {
           seeds.push({
-            field: `rail.${where}.${group.title}.${item.screen}`,
+            field: `rail.${where}.${floor.key}.${item.screen}`,
             text: item.label,
             role: 'label',
           });
           if (item.unavailable !== undefined) {
             seeds.push({
-              field: `rail.${where}.${group.title}.${item.screen}.unavailable`,
+              field: `rail.${where}.${floor.key}.${item.screen}.unavailable`,
               text: item.unavailable,
               role: 'reason',
             });
@@ -10423,6 +10526,33 @@ const EVERYDAY_MENU: SurfaceAdapter = {
         }
       }
     }
+
+    /*
+     * § D1627: a test simulation's stage and report, in the tray's voice, with and without the
+     * stage's clock. The words are the design floor's own label, so the bar and the tray agree.
+     */
+    seeds.push({
+      field: 'rail.subline.stage.test',
+      text: stageSublineOf({ screen: 'stage', ctx: 'daily' }, undefined, true),
+      role: 'label',
+    });
+    seeds.push({
+      field: 'rail.subline.stage.test.running',
+      text: stageSublineOf({ screen: 'stage', ctx: 'daily' }, { clock: '08:41', phase: 'running' }, true),
+      role: 'label',
+    });
+    for (const screen of ['stage', 'report'] as const) {
+      const tested = testSimulationBarOf(actionBarFor({ screen, ctx: 'daily' }), 'workshop');
+      seeds.push({ field: `bar.test.${screen}.leave`, text: tested.leave.label, role: 'label' });
+      seeds.push({ field: `bar.test.${screen}.primary`, text: tested.primary.label, role: 'label' });
+      if (tested.note !== undefined) seeds.push({ field: `bar.test.${screen}.note`, text: tested.note, role: 'prose' });
+    }
+    void [LOBBY_WAY_OUT, TEST_SIMULATION_NOTE, TEST_SIMULATION_PRIMARY].length;
+    seeds.push({
+      field: 'rail.subline.report.test',
+      text: stageSublineOf({ screen: 'report', ctx: 'daily' }, undefined, true),
+      role: 'label',
+    });
 
     /*
      * **The two words the small-screen drawer is worked by** — GitHub issue #240.
@@ -10730,9 +10860,42 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/designerModel.ts#designerWarnings',
     'everyday/designerModel.ts#designerPlateRows',
     'everyday/designerModel.ts#designerCapacityLine',
-    /* § 13.3 per shaft — GitHub issue #420, driven on the `mixed` arm seeded below. */
+    /* One row per shaft, driven on every arm seeded below — a shaft has its own machine by construction. */
     'everyday/designerModel.ts#designerShaftRows',
-    'everyday/designerModel.ts#designerShaftNote',
+    /*
+     * **The drawing board over `authoring/towerPlan.ts`.** The steps, the starting points and the
+     * pattern, duty and kind names are copy tables; the group rows, the floor facts, the service
+     * line and the opened-building line are sentences about one drawing and are driven on the arms
+     * below. `designerShaftNote` left with the per-shaft pin it counted: a plan has no pin.
+     */
+    'everyday/designerModel.ts#DESIGNER_STEPS',
+    'everyday/designerModel.ts#DESIGNER_TEMPLATE_COPY',
+    'everyday/designerModel.ts#DESIGNER_SERVICE_COPY',
+    /* `DESIGNER_DUTY_COPY` is four single words, which the derivation does not read as prose; it
+       is seeded below all the same, because a label is still something a player reads. */
+    'everyday/designerModel.ts#DESIGNER_KIND_COPY',
+    'everyday/designerModel.ts#DESIGNER_PANEL_COPY',
+    /* Drawn on the group row and under the headline figures, by the `paired-one` arm below. */
+    'authoring/towerPlan.ts#TWO_CAR_FIGURES_WITHHELD',
+    'everyday/designerModel.ts#designerGroupRows',
+    'everyday/designerModel.ts#designerFloorFacts',
+    'everyday/designerModel.ts#designerServiceLine',
+    'everyday/designerModel.ts#designerLossLine',
+    /*
+     * **The plan's own strings that reach a player**, claimed here because these are the arms that
+     * draw them. A template's `name` is what the name box opens on and what the building is saved
+     * as. `buildingFromPlan` names each bank, and the stage draws a bank's name.
+     * `planAnalysisOf` passes the loader's refusals and advisories through untouched, and the
+     * folded document prints them whole — so all three are seeded below, off every arm.
+     */
+    'authoring/towerPlan.ts#PLAN_TEMPLATES',
+    'authoring/towerPlan.ts#blankPlan',
+    'authoring/towerPlan.ts#zonedTowerPlan',
+    'authoring/towerPlan.ts#skyLobbyPlan',
+    'authoring/towerPlan.ts#podiumPlan',
+    'authoring/towerPlan.ts#supertallPlan',
+    'authoring/towerPlan.ts#buildingFromPlan',
+    'authoring/towerPlan.ts#planAnalysisOf',
     /*
      * `designerReading` is deliberately **not** claimed. It authors no prose: it reads
      * `SpecBankAnalysis.reading`, which is `authoring/buildingSpec.ts`'s own arm of § 10's
@@ -11006,91 +11169,174 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     }
 
     /* ------------------------------------------------------- § 13 designer */
+    const designerProse = new Set(['specNote', 'lede', 'notScored', 'groupsHint', 'groupNotSized', 'stairsRefused', 'accessOpen']);
     for (const [key, text] of Object.entries(DESIGNER_COPY)) {
       seeds.push({
         field: `designer.copy.${key}`,
         text,
-        role: key === 'specNote' || key === 'lede' || key === 'notScored' ? 'prose' : 'label',
+        role: designerProse.has(key) || key.endsWith('Hint') || key.endsWith('NoSelection') ? 'prose' : 'label',
       });
+    }
+    for (const step of DESIGNER_STEPS) {
+      seeds.push({ field: `designer.step.${step.id}.label`, text: step.label, role: 'label' });
+      seeds.push({ field: `designer.step.${step.id}.hint`, text: step.hint, role: 'prose' });
+    }
+    for (const [id, copy] of Object.entries(DESIGNER_TEMPLATE_COPY)) {
+      seeds.push({ field: `designer.template.${id}.name`, text: copy.name, role: 'label' });
+      seeds.push({ field: `designer.template.${id}.blurb`, text: copy.blurb, role: 'prose' });
+    }
+    for (const [kind, copy] of Object.entries(DESIGNER_SERVICE_COPY)) {
+      seeds.push({ field: `designer.service.${kind}.name`, text: copy.name, role: 'label' });
+      seeds.push({ field: `designer.service.${kind}.blurb`, text: copy.blurb, role: 'prose' });
+    }
+    for (const [duty, text] of Object.entries(DESIGNER_DUTY_COPY)) {
+      seeds.push({ field: `designer.duty.${duty}`, text, role: 'label' });
+    }
+    for (const [kind, text] of Object.entries(DESIGNER_KIND_COPY)) {
+      seeds.push({ field: `designer.kind.${kind}`, text, role: 'label' });
+    }
+    for (const [panel, text] of Object.entries(DESIGNER_PANEL_COPY)) {
+      seeds.push({ field: `designer.panel.${panel}`, text, role: 'label' });
     }
 
     const specs = context.elevatorSpecs;
     const classes = classesFromSpecs(specs);
+    /* The standing building as the Engineer editor's spec — the tuner's arms below still read it. */
     const sized = specFromBuilding(context.building.config, context.building.id);
     /*
-     * The refusing arm, built by the one edit that produces it: a design whose only shaft is taken
-     * out of the lobby serves nothing the closed form can board anybody at, so `analyzeUpPeak`
-     * throws and every figure must come back `—` with the reason beside it rather than as a number.
-     */
-    const refused: typeof sized = { ...sized, cars: 1, noLobby: { 0: true }, bandByCar: { 0: [sized.floors, sized.floors] } };
-    /* A design past its class's ceiling, for § 10's first warning — both numbers, named. */
-    const overClass: typeof sized = { ...sized, specClass: 'hydraulic', floors: 40, ratedSpeedMps: 0.75, ratedLoadLb: 2500 };
-    /*
-     * **A design whose shafts do not all carry the same machine** — GitHub issue #420. The arm is
-     * here rather than folded into `sized` because the two are different products: `sized` is the
-     * document's own fleet, and this is that fleet with one more machine in it.
+     * **The arms are drawings a player produces, each chosen for a sentence only it draws.**
      *
-     * **`sized` is not the homogeneous half, and this comment used to say it was.** It read *"Both
-     * are states a player produces, and only one of them draws `designerShaftNote`"*, which is
-     * false on every shipped building whose document authored more than one lift:
-     * `specFromBuilding` derives a pin for each car unlike the headline, so `crown-hotel`'s service
-     * lift, `st-jude-hospital`'s two and the tall towers' many are pinned straight off the document
-     * and `sized` draws the note by itself. What is true of both arms is narrower — `mixed` draws
-     * the note with one more shaft in it than `sized` does, so the arm *adds* a machine rather than
-     * introducing the sentence, and on the buildings authored with one lift throughout it is the
-     * arm that introduces it. § D227: a sentence that has gone false leaves on the commit that
-     * makes it false.
-     *
-     * The pin is the **first** shaft and the class is the shipped hydraulic, so it exists on every
-     * building the corpus draws from; `withShaftMachine` snaps its two steps into that class's own
-     * ladder, which is the same rule the design's class chips follow one panel up. That snap is
-     * also why this arm reliably *differs* from the design rather than merely being pinned — a pin
-     * byte-equal to the design draws nothing, which is what `designerShaftNote` counts. It lands on
-     * hydraulic's own rungs, which no shipped building's design sits on: measured, including
-     * `garden-apartments`, whose design *is* hydraulic and whose 0.63 m/s snaps down to 0.50.
+     * - `opened` is the case's own building read onto the board, which is what the screen shows when
+     *   it is opened — and the only arm whose loss line is the document's own.
+     * - `empty` has no shaft, so every closed-form figure must come back `—` with the reason beside
+     *   it rather than as a number.
+     * - `over-class` hangs the shipped hydraulic in every shaft, past its rise on most buildings.
+     * - `stranded` is the sky-lobby template with the dot taken off its lobby: floors with a lift
+     *   nobody can board, and the one-press fix that names the floor.
+     * - `paired` hangs two cars in every shaft of a group, and `decked` puts a second deck on a
+     *   shaft with an odd number of landings: the two refusals that carry a fix of their own.
+     * - `hand` closes one floor's doors and sets one floor's people by hand.
+     * - every **template**, because each is a button on the screen and the supertall is the one
+     *   drawing whose shuttle the closed form sizes against almost nobody.
      */
-    const mixed: typeof sized = withShaftMachine(
-      sized,
-      0,
-      classes.find((entry) => entry.id === 'hydraulic') ?? classes[0],
-    );
-
-    for (const [arm, drawn] of [
-      ['sized', sized],
-      ['refused', refused],
-      ['over-class', overClass],
-      ['mixed', mixed],
-    ] as const) {
-      const analysis = upPeakAnalysisOf(drawn, specs);
-      for (const figure of designerFigures(drawn, analysis)) {
-        seeds.push({
-          field: `designer.${arm}.figure.${figure.label}`,
-          text: figure.value,
-          role: figure.withheld ? 'label' : 'observation',
-        });
-        seeds.push({
-          field: `designer.${arm}.figure.${figure.label}.note`,
-          text: figure.note,
-          role: figure.withheld ? 'reason' : 'observation',
-        });
-      }
-      for (const [index, warning] of designerWarnings(drawn, classOfSpec(classes, drawn), analysis).entries()) {
-        seeds.push({
-          field: `designer.${arm}.warning.${String(index)}`,
-          text: warning.text,
-          role: 'prose',
-        });
-      }
+    const opened = planFromBuilding(context.building.config, context.building.id);
+    const small = blankPlan();
+    const firstKey = small.shafts[0]?.key ?? '';
+    const hydraulic = classes.find((entry) => entry.id === 'hydraulic') ?? classes[0];
+    const arms: (readonly [string, TowerPlan])[] = [
+      ['opened', opened.plan],
+      ['empty', { ...opened.plan, shafts: [] }],
+      [
+        'over-class',
+        hydraulic === undefined
+          ? opened.plan
+          : withPlanMachineClass(opened.plan, opened.plan.shafts.map((shaft) => shaft.key), hydraulic),
+      ],
+      ['stranded', withSkyLobbyToggled(skyLobbyPlan(), [30])],
+      ['paired', withCars(small, small.shafts.map((shaft) => shaft.key), 2)],
+      /* One pair beside ordinary shafts: the group loads, and its figures are withheld with the reason. */
+      ['paired-one', withCars(small, [firstKey], 2)],
+      ['decked', withDecks(small, [firstKey], 2)],
+      /* A stair, a landing panel, floors kept for one group and a slower descent, on one block. */
+      [
+        'fitted-out',
+        withDescentSpeed(
+          withAccessZoneAdded(
+            withPanel(withStairsAdded(small, 1, { upS: 26, downS: 19, up: 0.35, down: 0.55 }), [1], 'destination-entry'),
+            [2, 3],
+            'tenants',
+          ),
+          [firstKey],
+          1,
+        ),
+      ],
+      ['hand', withPopulation(withStopToggled(small, firstKey, 7), [5], 200)],
       /*
-       * **The machine-class band's range and rise, in both preferences.** The band's own sentence
-       * (*"… · up to 20 floors and 61 m of rise"*) is authored inline in `designerScreen.ts` and is
-       * excluded on the DOM mounts' shared ground, so what enters the corpus is the two figures
-       * rather than the sentence around them — which is what makes claiming `speedRangeFigure`
-       * above a coverage claim rather than a hope.
+       * Equipment a small block has no use for — a pressurised cabin, a rope and a regenerative
+       * drive on twelve floors — so the loader's *this buys nothing* advisories are drawn, which
+       * are the ones the folded document prints in the loader's own words.
        */
-      const band = classOfSpec(classes, drawn);
-      if (band !== undefined) {
-        for (const units of EVERYDAY_UNITS) {
+      [
+        'equipped',
+        {
+          ...small,
+          regenerativeDrive: true,
+          ropeClass: specs.ropeClasses?.classes[0]?.id,
+          shafts: small.shafts.map((shaft) => ({ ...shaft, pressurised: true })),
+        },
+      ],
+      ...PLAN_TEMPLATES.map((template) => [`template-${template.id}`, template.make()] as const),
+    ];
+
+    for (const [arm, drawn] of arms) {
+      const analysis = planAnalysisOf(drawn, specs);
+      seeds.push({ field: `designer.${arm}.name`, text: drawn.name, role: 'label' });
+      /* What the loader said, as the folded document prints it, and the names the banks were given. */
+      for (const [index, refusal] of analysis.refusals.entries()) {
+        seeds.push({ field: `designer.${arm}.refusal.${String(index)}`, text: refusal, role: 'reason' });
+      }
+      for (const [index, advisory] of analysis.advisories.entries()) {
+        seeds.push({ field: `designer.${arm}.advisory.${String(index)}`, text: advisory, role: 'reason' });
+      }
+      for (const bank of analysis.resolved?.banks ?? []) {
+        if (bank.name !== undefined) {
+          seeds.push({ field: `designer.${arm}.bank.${bank.id}.name`, text: bank.name, role: 'label' });
+        }
+      }
+      for (const bank of analysis.banks) {
+        seeds.push({
+          field: `designer.${arm}.bank.${bank.bankId}.line`,
+          text: bank.refusal !== '' ? bank.refusal : bank.line,
+          role: bank.refusal !== '' ? 'reason' : 'observation',
+        });
+        for (const [index, warning] of bank.warnings.entries()) {
+          seeds.push({ field: `designer.${arm}.bank.${bank.bankId}.warning.${String(index)}`, text: warning, role: 'prose' });
+        }
+      }
+      for (const units of EVERYDAY_UNITS) {
+        for (const figure of designerFigures(drawn, analysis, units)) {
+          seeds.push({
+            field: `designer.${arm}.${units}.figure.${figure.label}`,
+            text: figure.value,
+            role: figure.withheld ? 'label' : 'observation',
+          });
+          seeds.push({
+            field: `designer.${arm}.${units}.figure.${figure.label}.note`,
+            text: figure.note,
+            role: figure.withheld ? 'reason' : 'observation',
+          });
+        }
+        for (const [index, warning] of designerWarnings(drawn, classes, analysis, units).entries()) {
+          seeds.push({ field: `designer.${arm}.${units}.warning.${String(index)}`, text: warning.text, role: 'prose' });
+          if (warning.fix !== undefined) {
+            seeds.push({ field: `designer.${arm}.${units}.warning.${String(index)}.fix`, text: warning.fix.label, role: 'label' });
+          }
+        }
+        /*
+         * One row per shaft, in both preferences: a shaft's figure carries a rated speed, and
+         * `Units` reaches it. The plate is the first shaft's, as the screen draws it.
+         */
+        for (const row of designerShaftRows(drawn, classes, units)) {
+          seeds.push({ field: `designer.${arm}.shaft.${row.label}.${units}.class`, text: row.className, role: 'label' });
+          seeds.push({ field: `designer.${arm}.shaft.${row.label}.${units}.figure`, text: row.figure, role: 'observation' });
+          seeds.push({ field: `designer.${arm}.shaft.${row.label}.${units}.reach`, text: row.reach, role: 'observation' });
+          for (const [index, mark] of row.marks.entries()) {
+            seeds.push({ field: `designer.${arm}.shaft.${row.label}.${units}.mark.${String(index)}`, text: mark, role: 'label' });
+          }
+        }
+        const plated = drawn.shafts[0];
+        if (plated !== undefined) {
+          for (const row of designerPlateRows(drawn, plated, classOfMachine(classes, plated.machine), units)) {
+            seeds.push({ field: `designer.${arm}.plate.${units}.${row.key}`, text: row.value, role: 'observation' });
+          }
+        }
+        /*
+         * **The machine-class band's range and rise, in both preferences.** The band's own sentence
+         * is authored inline in `designerScreen.ts` and is excluded on the DOM mounts' shared
+         * ground, so what enters the corpus is the two figures rather than the sentence around them.
+         */
+        const band = plated === undefined ? undefined : classOfMachine(classes, plated.machine);
+        if (band !== undefined) {
           seeds.push({
             field: `designer.${arm}.class.${units}.speeds`,
             text: speedRangeFigure(band.speedMinMps, band.speedMaxMps, units),
@@ -11103,55 +11349,72 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
           });
         }
       }
-      /*
-       * **Both units preferences, on the one surface that has a plate** — GitHub issue #170's Units
-       * half, § D448. § 15.1's `Units` row switches machine specifications between metres and feet,
-       * so `RATED SPEED` and `TRAVEL` have two faces a player can produce and a corpus that saw one
-       * of them would be blind to half a screen. The other four rows are identical under both by
-       * construction, which is asserted in `designerModel.test.ts` rather than assumed here.
-       */
-      for (const units of EVERYDAY_UNITS) {
-        for (const row of designerPlateRows(drawn, classOfSpec(classes, drawn), units)) {
-          seeds.push({
-            field: `designer.${arm}.plate.${units}.${row.key}`,
-            text: row.value,
-            role: 'observation',
-          });
-        }
+      for (const row of designerGroupRows(drawn, analysis)) {
+        seeds.push({ field: `designer.${arm}.group.${String(row.index)}.name`, text: row.name, role: 'label' });
+        seeds.push({ field: `designer.${arm}.group.${String(row.index)}.shafts`, text: row.shafts, role: 'label' });
+        seeds.push({ field: `designer.${arm}.group.${String(row.index)}.pattern`, text: row.pattern, role: 'observation' });
+        seeds.push({ field: `designer.${arm}.group.${String(row.index)}.stops`, text: row.stops, role: 'observation' });
+        seeds.push({
+          field: `designer.${arm}.group.${String(row.index)}.figure`,
+          text: row.figure,
+          role: row.withheld ? 'reason' : 'observation',
+        });
       }
-      seeds.push({
-        field: `designer.${arm}.capacity`,
-        text: designerCapacityLine(drawn),
-        role: 'observation',
-      });
-      /*
-       * § 13.3's per-shaft rows, in both preferences for the plate's own reason: a shaft's figure
-       * carries a rated speed, and `Units` reaches it. The note is a `reason` — it exists to say
-       * which shafts the plate above does **not** describe, which is R3's exemption for a refusal
-       * that has to name what it is refusing — and is drawn only where there is one.
-       */
-      for (const units of EVERYDAY_UNITS) {
-        for (const row of designerShaftRows(drawn, classes, units)) {
-          seeds.push({
-            field: `designer.${arm}.shaft.${row.label}.${units}.class`,
-            text: row.className,
-            role: 'label',
-          });
-          seeds.push({
-            field: `designer.${arm}.shaft.${row.label}.${units}.figure`,
-            text: row.figure,
-            role: 'observation',
-          });
-        }
+      seeds.push({ field: `designer.${arm}.capacity`, text: designerCapacityLine(drawn), role: 'observation' });
+      /* One service line per pattern the drawing has, which is every sentence the function can say of it. */
+      const said = new Set<string>();
+      for (const shaft of drawn.shafts) {
+        const kind = `${shaft.service}/${String(shaft.decks)}`;
+        if (said.has(kind)) continue;
+        said.add(kind);
+        seeds.push({ field: `designer.${arm}.service.${kind}`, text: designerServiceLine(drawn, shaft), role: 'observation' });
       }
-      const shaftNote = designerShaftNote(drawn);
-      if (shaftNote !== '') {
-        seeds.push({ field: `designer.${arm}.shaftNote`, text: shaftNote, role: 'reason' });
+      /* The lobby, one floor, a sky lobby if it has one, a hand-set floor if it has one, and a range. */
+      const ranges: (readonly [number, number])[] = [
+        [0, 0],
+        [1, 1],
+        [1, Math.min(drawn.floors, 4)],
+        ...drawn.skyLobbies.slice(0, 1).map((floor) => [floor, floor] as const),
+        ...Object.keys(drawn.populationByFloor)
+          .slice(0, 1)
+          .map((floor) => [Number(floor), Number(floor)] as const),
+      ];
+      for (const range of ranges) {
+        const facts = designerFloorFacts(drawn, range);
+        const at = `designer.${arm}.floor.${String(range[0])}-${String(range[1])}`;
+        seeds.push({ field: `${at}.title`, text: facts.title, role: 'label' });
+        seeds.push({ field: `${at}.people`, text: String(facts.people), role: 'observation' });
+        seeds.push({ field: `${at}.peopleNote`, text: facts.peopleNote, role: 'reason' });
+        if (facts.stairs !== '') seeds.push({ field: `${at}.stairs`, text: facts.stairs, role: 'observation' });
+        for (const zone of facts.zones) {
+          seeds.push({ field: `${at}.zone.${zone.id}`, text: zone.line, role: 'observation' });
+        }
       }
       const reading = designerReading(analysis);
       if (reading !== '') {
         seeds.push({ field: `designer.${arm}.reading`, text: reading, role: 'prose' });
       }
+    }
+    /*
+     * The opened-building line, on the case's own document and on **every** code at once — the
+     * second because no shipped building declares a service schedule, so a
+     * corpus drawn only from documents would never render one of the seven clauses.
+     */
+    const everyLoss: readonly PlanLoss[] = [
+      'uneven-floor-heights',
+      'floor-labels',
+      'floor-areas',
+      'car-timings',
+      'service-events',
+      'notes',
+      'mixed-bank-equipment',
+    ];
+    for (const [arm, losses] of [
+      ['opened', opened.notCarried],
+      ['every', everyLoss],
+    ] as const) {
+      const line = designerLossLine(opened.plan.name, losses);
+      if (line !== '') seeds.push({ field: `designer.loss.${arm}`, text: line, role: 'reason' });
     }
 
     /* ---------------------------------------------------------- § 18 tuner */
@@ -11391,11 +11654,6 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
      * shipped default, so the row is never swept in one state only.
      */
     'everyday/audio.ts#SOUND_ROW_COPY',
-    /*
-     * § D1445's *Skip the lobby* row. Both faces are reached: `muted` below also carries
-     * `skipLobby: true`, and every other case draws the default.
-     */
-    'everyday/settingsView.ts#LOBBY_ROW_COPY',
   ],
   render(context) {
     void context;
@@ -11479,7 +11737,7 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
        * without it the row's `off` face would ship unswept — which is the defect `keyedPlate`
        * shipped for a whole milestone and this corpus exists to catch.
        */
-      ['muted', { profile: stored, reduceMotion: false, soundOn: false, skipLobby: true }],
+      ['muted', { profile: stored, reduceMotion: false, soundOn: false }],
       /*
        * GitHub issue #368's tally in the two arms a balance of zero cannot reach — the review of
        * PR #485, medium 8. Every case above constructs no `chimeBalance`, so `balanceLineOf` drew
@@ -15488,6 +15746,10 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/scenarioModel.ts#stageParNoteOf',
     'everyday/scenarioModel.ts#stageParLineOf',
     'everyday/scenarioModel.ts#SCENARIO_ABSENCES',
+    /* § D1629: the hub's *Your buildings* block, with a list and with none, and the host's one refusal there. */
+    'everyday/scenarioModel.ts#OWN_BUILDINGS_COPY',
+    'everyday/scenarioModel.ts#ownBuildingsViewOf',
+    'everyday/host.ts#OWN_BUILDING_GONE',
     /*
      * The hub's two session shapes — GitHub issue #559, [§ D753](../../../../DECISIONS.md). They
      * are the shapes `ENTRIES` carries, which `scenarioHubViewOf` above already seeds one row at a
@@ -16110,6 +16372,19 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
 
         /* ---- Scenario: § D525's hub, the first tile's whole surface (issue #364) ---- */
         const hub = scenarioHubViewOf(context.scenarioPath);
+        for (const [which, own] of [
+          ['none', ownBuildingsViewOf([])],
+          ['some', ownBuildingsViewOf([{ id: 'bld-1', name: '⟨building⟩' }])],
+        ] as const) {
+          const at = `${arm}.scenario.own.${which}`;
+          seeds.push({ field: `${at}.heading`, text: own.heading, role: 'label' });
+          seeds.push({ field: `${at}.lede`, text: own.lede, role: 'prose' });
+          seeds.push({ field: `${at}.play`, text: own.playLabel, role: 'label' });
+          seeds.push({ field: `${at}.design`, text: own.designLabel, role: 'label' });
+          if (own.empty !== undefined) seeds.push({ field: `${at}.empty`, text: own.empty, role: 'prose' });
+        }
+        seeds.push({ field: `${arm}.scenario.own.gone`, text: OWN_BUILDING_GONE, role: 'reason' });
+        void OWN_BUILDINGS_COPY;
         seeds.push({ field: `${arm}.scenario.eyebrow`, text: hub.eyebrow, role: 'prose' });
         seeds.push({ field: `${arm}.scenario.title`, text: hub.title, role: 'prose' });
         seeds.push({ field: `${arm}.scenario.lede`, text: hub.lede, role: 'prose' });
@@ -16875,24 +17150,38 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
   id: 'everyday/workshopModel.ts#WORKSHOP_COPY',
   covers: [
     'everyday/workshopModel.ts#WORKSHOP_COPY',
-    'everyday/workshopModel.ts#playStyleAbsenceOf',
+    'everyday/workshopModel.ts#shelfOf',
+    'everyday/workshopModel.ts#saveBlockOf',
+    'everyday/workshopModel.ts#removeQuestionOf',
+    'everyday/workshopModel.ts#discardQuestionOf',
+    // The names a save files — `My dispatcher`, `⟨name⟩ v2` — are read on the shelf and in every picker.
+    'authoring/dispatcherShelf.ts#versionedNameOf',
     'everyday/workshopModel.ts#termDisclosureOf',
     'everyday/workshopModel.ts#mathsDisclosureOf',
     'everyday/workshopModel.ts#behaviourBlockOf',
     'everyday/workshopModel.ts#constraintCardsOf',
-    'everyday/workshopModel.ts#carriedBlocksOf',
+    'everyday/workshopJourney.ts#JOURNEY_COPY',
+    'everyday/testBedModel.ts#TEST_BED_COPY',
+    'everyday/testBedModel.ts#TEST_BED_CROWDS',
+    'everyday/testBedModel.ts#TEST_BED_VERDICT_WORDS',
+    'everyday/testBedModel.ts#testBedVerdictWordOf',
+    'everyday/testBedModel.ts#testBedViewOf',
+    'everyday/testBedModel.ts#testBedWorkingProfileOf',
+    'everyday/workshopJourney.ts#journeyOf',
+    'authoring/formulaSpec.ts#FORMULA_COPY',
+    'authoring/formulaSpec.ts#FORMULA_OP_WORDS',
+    'authoring/formulaSpec.ts#formulaReadbackOf',
+    'authoring/formulaSpec.ts#formulaIssueOf',
+    'authoring/formulaSpec.ts#withNewFormula',
     'everyday/workshopModel.ts#switchingBlockOf',
     'everyday/workshopModel.ts#rulesBlockOf',
     'everyday/workshopModel.ts#nameplateOf',
     /*
-     * Three exports are deliberately **not** listed and are rendered anyway:
-     * `playStyleCardsOf`, `libraryCardsOf` and `workshopLeversOf`. The derivation does not find
-     * them, and it is right not to — none of them authors a phrase. The style cards carry
-     * `data/dispatcher-profiles.json`'s own `name` and `trade` (swept above, seed by seed), the
-     * library cards carry each profile's `name`, and the lever views are `mode/plainLevers.ts`'s,
-     * already driven by the editor adapter. Listing them would be a coverage claim about
-     * functions that produce no prose of their own, which is the stale-coverage half of
-     * `derive.test.ts`'s guard.
+     * `prioritiesOf` and `workshopLeversOf` are deliberately **not** listed and are rendered
+     * anyway. Neither authors a phrase: a priority bar carries `core`'s own player name for a
+     * term, and the lever views are `mode/plainLevers.ts`'s, already driven by the editor adapter.
+     * Listing them would be a coverage claim about functions that produce no prose of their own,
+     * which is the stale-coverage half of `derive.test.ts`'s guard.
      */
   ],
   render(context) {
@@ -16903,20 +17192,78 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       seeds.push({ field: `copy.${key}`, text, role: 'prose', provenance: 'authored' });
     }
 
-    /* ---- the left panel: six style cards, the rest of the shelf, the nameplate ---- */
-    for (const card of playStyleCardsOf(file, 'collective', DEFAULT_LEVERS, blankSpec([]))) {
-      seeds.push({ field: `style.${card.id}.name`, text: card.name, role: 'label', provenance: 'authored' });
-      seeds.push({ field: `style.${card.id}.trade`, text: card.trade, role: 'prose', provenance: 'authored' });
+    /* ---- the shelf: the player's own, then every industry design under its family ---- */
+    const firstProfile = file.profiles[0];
+    const shelved =
+      firstProfile === undefined
+        ? []
+        : [{ id: 'yours-1', profile: { ...firstProfile, id: 'yours-1', name: 'Morning patience' }, basedOn: firstProfile.id }];
+    for (const [state, saved] of [['empty', []], ['saved', shelved]] as const) {
+      const shelf = workshopShelfOf(file, DISPATCHER_FAMILIES, saved, firstProfile?.id ?? '');
+      seeds.push({ field: `shelf.${state}.industryHint`, text: shelf.industryHint, role: 'prose', provenance: 'authored' });
+      if (shelf.yoursEmpty !== undefined) {
+        seeds.push({ field: `shelf.${state}.yoursEmpty`, text: shelf.yoursEmpty, role: 'reason', provenance: 'authored' });
+      }
+      for (const card of shelf.yours) {
+        if (card.basedOn !== undefined) {
+          seeds.push({ field: `shelf.${state}.yours.${card.id}.basedOn`, text: `based on ${card.basedOn}`, role: 'label' });
+        }
+      }
+      for (const family of shelf.families) {
+        seeds.push({ field: `shelf.${state}.${family.id}.name`, text: family.name, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `shelf.${state}.${family.id}.line`, text: family.line, role: 'prose', provenance: 'authored' });
+        for (const card of family.cards) {
+          const at = `shelf.${state}.${family.id}.${card.profileId}`;
+          seeds.push({ field: `${at}.name`, text: card.name, role: 'label', provenance: 'authored' });
+          if (card.blurb !== undefined) {
+            seeds.push({ field: `${at}.blurb`, text: card.blurb, role: 'prose', provenance: 'authored' });
+          }
+          for (const alias of card.aliases) {
+            seeds.push({ field: `${at}.alias`, text: alias, role: 'label', provenance: 'authored' });
+          }
+          for (const variation of card.variations) {
+            seeds.push({ field: `${at}.${variation.styleId}.name`, text: variation.name, role: 'label', provenance: 'authored' });
+            seeds.push({ field: `${at}.${variation.styleId}.trade`, text: variation.trade, role: 'prose', provenance: 'authored' });
+          }
+          for (const bar of card.priorities) {
+            seeds.push({ field: `${at}.priority`, text: bar.name, role: 'label' });
+          }
+        }
+      }
     }
-    /* The refusal a build with no declared styles draws — reachable only through a file that has
-     * none, so it is manufactured here rather than left as a sentence no run has seen. */
-    const { playStyles: _styles, ...bare } = file;
-    const absence = playStyleAbsenceOf(bare);
-    if (absence !== undefined) {
-      seeds.push({ field: 'style.absent', text: absence, role: 'reason', provenance: 'authored' });
+    /* With no shelves declared the library is one unnamed shelf — manufactured, as the shipped file declares six. */
+    for (const family of workshopShelfOf(file, [], [], '').families) {
+      seeds.push({ field: `shelf.unfiled.${family.id}.name`, text: family.name, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `shelf.unfiled.${family.id}.line`, text: family.line, role: 'prose', provenance: 'authored' });
     }
-    for (const card of libraryCardsOf(file, 'collective')) {
-      seeds.push({ field: `library.${card.profileId}`, text: card.name, role: 'label', provenance: 'authored' });
+    seeds.push(
+      { field: 'shelf.removeQuestion', text: workshopRemoveQuestionOf('Morning patience'), role: 'prose', provenance: 'authored' },
+      { field: 'shelf.discardQuestion', text: workshopDiscardQuestionOf('Morning patience'), role: 'prose', provenance: 'authored' },
+    );
+
+    for (const [field, name, taken] of [
+      ['unnamed', '', []],
+      ['copy', 'Morning patience', ['Morning patience']],
+    ] as const) {
+      seeds.push({ field: `save.name.${field}`, text: versionedNameOf(name, taken), role: 'label' });
+    }
+
+    /* ---- the save block, in every state a dispatcher can stand in ---- */
+    for (const kind of ['industry', 'yours', 'gone'] as const) {
+      for (const unsaved of [false, true]) {
+        const block = workshopSaveBlockOf({
+          kind,
+          savedName: kind === 'yours' ? 'Morning patience' : undefined,
+          basedOn: kind === 'gone' ? undefined : firstProfile?.name,
+          unsaved,
+        });
+        const at = `save.${kind}.${unsaved ? 'unsaved' : 'clean'}`;
+        seeds.push({ field: `${at}.state`, text: block.state, role: 'label', provenance: 'authored' });
+        if (block.basedOn !== undefined) seeds.push({ field: `${at}.basedOn`, text: block.basedOn, role: 'label' });
+        if (block.save.replaces !== undefined) {
+          seeds.push({ field: `${at}.replaces`, text: block.save.replaces, role: 'prose', provenance: 'authored' });
+        }
+      }
     }
 
     /* ---- the ladder, once per shipped style, so every vector is swept ---- */
@@ -16973,9 +17320,6 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       for (const card of constraintCardsOf(profile)) {
         seeds.push({ field: `${label}.constraint.${card.id}`, text: `${card.name} — ${card.effect}`, role: 'reason' });
       }
-      for (const entry of carriedBlocksOf(profile)) {
-        seeds.push({ field: `${label}.carried.${entry.block}`, text: entry.words, role: 'reason', provenance: 'authored' });
-      }
     }
 
     /*
@@ -16988,10 +17332,138 @@ const EVERYDAY_WORKSHOP: SurfaceAdapter = {
       if (!card.unnamed) continue;
       seeds.push({ field: 'constraint.unnamed', text: `${card.name} — ${card.effect}`, role: 'reason' });
     }
-    /* Every carried-block sentence, over a profile that carries all of them it can. */
+    /*
+     * ---- one call, start to finish: every stage's sentence, over every shipped profile ----
+     * Every shipped profile rather than the styled ones, because the sentences branch on settings
+     * only some designs hold — an auction, a panel, a reassignment budget, a forecast.
+     */
+    for (const text of [
+      JOURNEY_COPY.heading,
+      JOURNEY_COPY.hint,
+      JOURNEY_COPY.depthLabel,
+      ...Object.values(JOURNEY_COPY.depths),
+      ...Object.values(JOURNEY_COPY.depthNotes),
+      JOURNEY_COPY.unrunnable,
+    ]) {
+      seeds.push({ field: 'journey.copy', text, role: 'prose', provenance: 'authored' });
+    }
     for (const profile of file.profiles) {
-      for (const entry of carriedBlocksOf(profile)) {
-        seeds.push({ field: `carried.${entry.block}`, text: entry.words, role: 'reason', provenance: 'authored' });
+      for (const card of journeyOf(profile)) {
+        seeds.push({ field: `journey.${profile.id}.${card.stage}.title`, text: card.title, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `journey.${profile.id}.${card.stage}.readback`, text: card.readback, role: 'prose' });
+      }
+    }
+    /* ---- the test bed's own words; every sentence about a result is `batch/report.ts`'s, swept there ---- */
+    for (const [key, text] of Object.entries(TEST_BED_COPY)) {
+      seeds.push({ field: `testBed.copy.${key}`, text, role: 'prose', provenance: 'authored' });
+    }
+    for (const crowd of TEST_BED_CROWDS) {
+      seeds.push({ field: `testBed.crowd.${crowd.id}`, text: crowd.label, role: 'label', provenance: 'authored' });
+    }
+    for (const [key, text] of Object.entries(TEST_BED_VERDICT_WORDS)) {
+      seeds.push({ field: `testBed.verdict.${key}`, text, role: 'label', provenance: 'authored' });
+    }
+
+    /* What the dock composes itself: the line saying what ran, and the name the working copy is reported under. */
+    const bedProfile = file.profiles[0];
+    if (bedProfile !== undefined) {
+      seeds.push({
+        field: 'testBed.working.name',
+        text: testBedWorkingProfileOf(
+          {
+            spec: specFromProfile(bedProfile, bedProfile.name),
+            levers: DEFAULT_LEVERS,
+            selector: defaultSelectorSpec(selectorContextFrom(file, 900)),
+            rows: [],
+          },
+          bedProfile,
+          selectorContextFrom(file, 900),
+        ).name,
+        role: 'label',
+      });
+    }
+    seeds.push({
+      field: 'testBed.ran',
+      text:
+        testBedViewOf({
+          buildingName: 'Midtown Office',
+          demandClause: 'at 2 % of population arriving per 5 minutes',
+          replications: 50,
+          crnSentence: '',
+          budgetNote: null,
+          arms: [],
+          comparisons: [{ rows: [], summary: { sentence: '' } }],
+        } as unknown as BatchReport)?.ran ?? '',
+      role: 'label',
+    });
+
+    /*
+     * A priority of the player's own — `authoring/formulaSpec.ts`. Every authored line of the
+     * block, every operation's label and meaning, the readback over each operation and over a
+     * nested hand-written tree, a new formula's default name, and the one refusal.
+     */
+    for (const [key, text] of Object.entries(FORMULA_COPY)) {
+      seeds.push({ field: `formula.copy.${key}`, text, role: 'prose', provenance: 'authored' });
+    }
+    const formulaTerms = formulaTermOptions().map((option) => option.id);
+    for (const op of FORMULA_OP_ORDER) {
+      seeds.push({ field: `formula.op.${op}.label`, text: FORMULA_OP_WORDS[op].label, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `formula.op.${op}.meaning`, text: FORMULA_OP_WORDS[op].meaning, role: 'prose', provenance: 'authored' });
+      const [made] = withFormulaAt(withNewFormula([]), 0, {
+        expression: expressionOf({ op, termIds: formulaTerms.slice(0, 3) }),
+      });
+      if (made !== undefined) {
+        seeds.push({ field: `formula.${op}.name`, text: made.name, role: 'label' });
+        seeds.push({ field: `formula.${op}.readback`, text: formulaReadbackOf(made), role: 'label' });
+      }
+    }
+    for (const option of formulaTermOptions()) {
+      seeds.push({ field: `formula.term.${option.id}`, text: option.name, role: 'label' });
+    }
+    seeds.push({
+      field: 'formula.nested.readback',
+      text: formulaReadbackOf({
+        id: 'hand',
+        name: 'Hand',
+        weight: 1,
+        expression: { op: 'multiply', of: [{ term: 'waitTime' }, { op: 'add', of: [{ term: 'loadFactor' }, { value: 1 }] }] },
+      }),
+      role: 'label',
+    });
+    seeds.push({
+      field: 'formula.issue',
+      text: formulaIssueOf([{ id: 'x', name: 'X', weight: 1, expression: { term: 'no-such-term' } }]) ?? '',
+      role: 'reason',
+    });
+
+    /* The Detailed depth's plain name, and effect where core authors one, for every setting it draws. */
+    for (const id of familySpace().byId.keys()) {
+      const words = plainControlWordsOf(id);
+      seeds.push({ field: `plain.${id}.name`, text: words.name, role: 'label' });
+      if (words.effect !== undefined) seeds.push({ field: `plain.${id}.effect`, text: words.effect, role: 'prose' });
+    }
+
+    /* The arms no shipped profile reaches, manufactured so each sentence has been rendered once. */
+    const journeyBase = file.profiles[0];
+    if (journeyBase !== undefined) {
+      const arms: readonly DispatcherProfile[] = [
+        { ...journeyBase, weights: {} },
+        { ...journeyBase, dispatch: { reassignmentPolicy: 'continuous', maxReassignmentsPerCall: 1 } },
+        { ...journeyBase, dispatch: { reassignmentPolicy: 'until-commitment', commitmentPoint: 'on-assignment' } },
+        { ...journeyBase, idle: { parkingStrategy: 'lobby' } },
+        { ...journeyBase, idle: { parkingStrategy: 'fixed-floor', parkingFloorIndex: 5 } },
+        { ...journeyBase, eligibility: { maxLoadFactorForAssignment: 0.7 } },
+        { ...journeyBase, answer: { bypassLoadThreshold: 0.8, dwellPolicy: 'adaptive' } },
+        { ...journeyBase, selection: { policy: 'fuzzy' } },
+        { ...journeyBase, selection: { policy: 'fuzzy' }, patternWeightSets: { 'up-peak': journeyBase.id } },
+        { ...journeyBase, selection: { policy: 'fuzzy' }, patternWeightSets: { 'up-peak': journeyBase.id, idle: journeyBase.id } },
+        { ...journeyBase, selection: { policy: 'rules' }, rules: { rows: [{ when: 'shaft-out', then: 'nearest-car' }] } },
+        { ...journeyBase, engine: 'no-such-engine' },
+      ];
+      for (const [index, arm] of arms.entries()) {
+        for (const card of journeyOf(arm)) {
+          seeds.push({ field: `journey.arm${String(index)}.${card.stage}`, text: card.readback, role: 'prose' });
+        }
       }
     }
 
@@ -18189,102 +18661,69 @@ const EVERYDAY_LANDING: SurfaceAdapter = {
  * -------------------------------------------------------------------------- */
 
 /**
- * **The elevator a cold launch opens on, at every stop of its machine.**
+ * **The lobby, which is the main menu, at every landing of its machine** — § D1445 as redrawn by
+ * [§ D1627](../../../../DECISIONS.md) and made one screen with the menu by
+ * [§ D1628](../../../../DECISIONS.md).
  *
- * `everyday/lobbyModel.ts` carries the words and the door decisions; `everyday/lobbyScreen.ts` is
- * the mount and is excluded on the DOM mounts' shared ground. The display changes with the phase,
- * the choice, the hold, the key and the first-visit question, so the drive below rides the car the
- * way a player does: CALL, every floor chosen in turn, a warning of each kind, a hold, a departure
- * up and one down to the basement, an arrival with and without the key, and the ride back. Each
- * state's whole view is seeded, so a sentence that only one of them draws is still read.
+ * `everyday/lobbyModel.ts` carries the words and the small machine; `everyday/lobbyScreen.ts` is the
+ * mount and is excluded on the DOM mounts' shared ground. The display changes with the landing the
+ * car is pointed at and the first-visit question, so the drive below points at every landing in
+ * turn, for a first visit and a return, and seeds each state's whole view, every room's label
+ * among it.
  *
- * The play floors' words are the menu tiles' and the Scenario hub's (`modes.ts`, `scenarioModel.ts`),
- * which their own adapters already sweep; they are seeded here again because this is a second
- * surface that draws them, and `SCENARIO_ENTRIES` is claimed here because the lobby is the reader
- * that made it an export.
+ * The floors themselves are `everyday/floors.ts`'s, which the tray's shaft draws as well; they are
+ * claimed here because this surface draws every word of them (name, body, status and the rooms).
+ * The play floors' words are the menu tiles' (`modes.ts`), which `EVERYDAY_MENU` already sweeps.
+ * `SCENARIO_ENTRIES` stays claimed here from the § D1445 panel, which was the reader that made it
+ * an export; the Scenario hub draws it now, and its strings are seeded below as they were.
  */
 const EVERYDAY_LOBBY: SurfaceAdapter = {
   id: 'everyday/lobbyModel.ts#lobbyViewOf',
   covers: [
     'everyday/lobbyModel.ts#lobbyViewOf',
     'everyday/lobbyModel.ts#LOBBY_COPY',
-    'everyday/lobbyModel.ts#LOBBY_FLOORS',
-    'everyday/lobbyModel.ts#LOBBY_WARNINGS',
-    'everyday/lobbyModel.ts#lobbyFloorOf',
-    'everyday/lobbyModel.ts#lobbyPick',
-    'everyday/lobbyModel.ts#lobbyClose',
-    'everyday/lobbyModel.ts#lobbyHold',
-    'everyday/lobbyModel.ts#lobbyTick',
+    'everyday/floors.ts#GAME_FLOORS',
+    'everyday/floors.ts#gameFloorOf',
+    'everyday/types.ts#TEST_SIMULATION_LABEL',
     'everyday/scenarioModel.ts#SCENARIO_ENTRIES',
   ],
   render(this: SurfaceAdapter, context) {
     void context;
     const seeds: TextSeed[] = [];
     const seen = new Set<string>();
+    const push = (field: string, text: string, role: NonNullable<TextSeed['role']>): void => {
+      if (text === '' || seen.has(`${field.split('.').at(-1) ?? ''}:${text}`)) return;
+      seen.add(`${field.split('.').at(-1) ?? ''}:${text}`);
+      seeds.push({ field, text, role });
+    };
     const seed = (arm: string, state: LobbyState, firstVisit: boolean): void => {
       const view = lobbyViewOf(state, { firstVisit });
-      const fields: readonly (readonly [string, string, NonNullable<TextSeed['role']>])[] = [
-        ['kicker', view.kicker, 'label'],
-        ['title', view.title, 'label'],
-        ['body', view.body, 'prose'],
-        ['status', view.status, 'prose'],
-        ['statusLine', view.statusLine, 'reason'],
-        ['hint', view.hint, 'prose'],
-        ['lcdLine', view.lcdLine, 'label'],
-        ['arrivalFloor', view.arrivalFloor, 'label'],
-        ['arrivalName', view.arrivalName, 'label'],
-        ['arrivalBody', view.arrivalBody, 'prose'],
-        ['arrivalNote', view.arrivalNote, 'reason'],
-      ];
-      for (const [name, text, role] of fields) {
-        if (text === '' || seen.has(`${name}:${text}`)) continue;
-        seen.add(`${name}:${text}`);
-        seeds.push({ field: `lobby.${arm}.${name}`, text, role });
+      push(`lobby.${arm}.kicker`, view.kicker, 'label');
+      push(`lobby.${arm}.title`, view.title, 'label');
+      push(`lobby.${arm}.body`, view.body, 'prose');
+      push(`lobby.${arm}.status`, view.status, 'prose');
+      if (view.offerWalkthrough) push(`lobby.${arm}.walkthrough`, LOBBY_COPY.walkthrough, 'label');
+      for (const landing of view.landings) {
+        push(`lobby.${arm}.landing.${landing.key}.name`, landing.name, 'label');
+        push(`lobby.${arm}.landing.${landing.key}.body`, landing.body, 'prose');
+        push(`lobby.${arm}.landing.${landing.key}.status`, landing.opens ? landing.status : LOBBY_COPY.here, 'prose');
+        for (const room of landing.rooms) {
+          push(`lobby.${arm}.landing.${landing.key}.room.${room.screen}`, room.label, 'label');
+        }
       }
-    };
-    const ride = (from: LobbyState, to: LobbyFloorKey): LobbyState => {
-      let state = from;
-      for (let guard = 0; guard < 12 && state.car !== to; guard += 1) state = lobbyStepToward(state, to);
-      return state;
     };
 
     for (const firstVisit of [true, false]) {
       const who = firstVisit ? 'first' : 'returning';
-      seed(`${who}.idle`, LOBBY_INITIAL, firstVisit);
-      seed(`${who}.idle.warned`, lobbyPick(LOBBY_INITIAL, '8').state, firstVisit);
-      seed(`${who}.idle.holdWarned`, lobbyHold(LOBBY_INITIAL).state, firstVisit);
-      const arriving = lobbyCall(LOBBY_INITIAL).state;
-      seed(`${who}.arriving`, lobbyStepToward(arriving, 'L'), firstVisit);
-      const open = lobbyArrived(ride(arriving, 'L'));
-      seed(`${who}.open`, open, firstVisit);
-      seed(`${who}.open.closeWarned`, lobbyClose(open).state, firstVisit);
-      for (const floor of LOBBY_FLOORS) {
-        const key = lobbyFloorOf(floor.key).key;
-        const picked = lobbyPick(open, key).state;
-        seed(`${who}.picked.${key}`, picked, firstVisit);
-        seed(`${who}.held.${key}`, lobbyHold(picked).state, firstVisit);
-        const closing = lobbyClose(picked).state;
-        seed(`${who}.closing.${key}`, closing, firstVisit);
-        const travel = lobbyDepart(closing).state;
-        seed(`${who}.travel.${key}`, lobbyStepToward(travel, key), firstVisit);
-        const arrived = lobbyArrived(ride(travel, key));
-        seed(`${who}.arrived.${key}`, arrived, firstVisit);
-        const keyed = lobbyArrived(ride(lobbyDepart(lobbyClose(lobbyPick(lobbyTurnKey(open).state, key).state).state).state, key));
-        seed(`${who}.arrived.${key}.engineer`, keyed, firstVisit);
-        const back = lobbyDepart(lobbyRideBack(arrived).state).state;
-        seed(`${who}.back.${key}`, lobbyStepToward(back, 'L'), firstVisit);
-      }
-      seed(`${who}.open.engineerKey`, lobbyTurnKey(open).state, firstVisit);
-      /* The auto-close counting down to its own departure, one second at a time. */
-      let counting = lobbyPick(open, '8').state;
-      for (let second = 0; second < 8 && counting.phase === 'open'; second += 1) {
-        counting = lobbyTick(counting).state;
-        seed(`${who}.countdown.${String(second)}`, counting, firstVisit);
-      }
+      seed(`${who}.welcome`, LOBBY_INITIAL, firstVisit);
+      for (const floor of GAME_FLOORS) seed(`${who}.pointed.${floor.key}`, lobbyPoint(LOBBY_INITIAL, floor.key), firstVisit);
     }
 
-    /* The two tables the view reads, claimed by name above and touched here, as `EVERYDAY_LANDING` does. */
-    void [LOBBY_COPY, LOBBY_WARNINGS, SCENARIO_ENTRIES].length;
+    /* What the design floor calls its run: the bar's primary there, and the tray's word for its stage. */
+    seeds.push({ field: 'lobby.design.testSimulation', text: TEST_SIMULATION_LABEL, role: 'label' });
+
+    /* The two tables claimed by name above and touched here, as `EVERYDAY_LANDING` does. */
+    void [LOBBY_COPY, SCENARIO_ENTRIES].length;
     for (const entry of SCENARIO_ENTRIES) {
       seeds.push({ field: `lobby.scenarioEntry.${entry.id}.title`, text: entry.title, role: 'label' });
       seeds.push({ field: `lobby.scenarioEntry.${entry.id}.blurb`, text: entry.blurb, role: 'prose' });

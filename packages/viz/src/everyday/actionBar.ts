@@ -41,7 +41,7 @@ import type {
   RunContext,
 } from './types.js';
 import { REPLAY_COPY } from './replay.js';
-import { MODE_PICKS } from './types.js';
+import { MODE_PICKS, TEST_SIMULATION_LABEL } from './types.js';
 
 /** The two flows that have a § 3.3 timeline. A rush has none, and a watched run has none. */
 export type TimelineFlow = 'daily' | 'campaign';
@@ -180,7 +180,14 @@ const LEAVE_TOWER = "⤺ Leave today's tower";
 const LEAVE_CAREER = '⤺ Leave the career';
 const LEAVE_RUSH = '⤺ Leave the rush';
 const STOP_WATCHING = '⤺ Stop watching';
-const MODES = '⌂ Modes';
+/**
+ * The left button on every screen that is not inside a mode. The guide's cell reads `⌂ Modes`; the
+ * screen it goes to is the lobby since [§ D1628](../../../../DECISIONS.md), so the button says so.
+ */
+export const LOBBY_LEAVE = '⌂ Lobby';
+/** The inverted rows' way out, for the same reason: the guide's `⌂ Return to Main Menu`. */
+export const LOBBY_WAY_OUT = '⌂ Return to the lobby';
+const MODES = LOBBY_LEAVE;
 
 /**
  * § 3.3's `stage · watching` note **as the guide wrote it**, kept so the deviation below can be
@@ -280,21 +287,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     screen: 'menu',
     leave: { label: MODES, inert: true },
     primary: primary(MODE_PICKS.map((pick) => MENU_PRIMARY[pick])),
-    note: 'Pick a mode above, then play it.',
-    inverted: false,
-  }),
-  /*
-   * § D1445's lobby, `guide: false` — no § 3.3 row exists for it, and the shell steps the bar aside
-   * while the lobby has the viewport (`shell.ts#applyChrome`), so this row is never drawn. It is here
-   * because every screen answers this table, and it says what is true if it ever were drawn: the
-   * modes list is the way past the ride, and the lobby's own panel is its primary.
-   */
-  row({
-    screen: 'lobby',
-    guide: false,
-    leave: leave(MODES),
-    primary: primary(['Call the car']),
-    note: 'Press CALL, choose a floor on the panel, then close the doors.',
+    note: 'Pick a floor above, then play it.',
     inverted: false,
   }),
   /*
@@ -354,7 +347,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     back: { label: 'How this works', screen: 'tutorial' },
     primary: primary(['Start playing']),
     /* § D993: this read *"Files the day and opens the main menu."* Nothing is filed now. */
-    note: 'Opens the main menu. Nothing is filed; your week starts when you play a day.',
+    note: 'Opens the lobby. Nothing is filed; your week starts when you play a day.',
     /*
      * **Not inverted, although it is the last step of a sequence.** § 3.3 inverts the *report* and
      * nothing else, and `actionBar.test.ts` holds that as a rule over the data rather than a taste
@@ -470,7 +463,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     primary: primary(['Front door']),
     note: 'Your week is where you left it.',
     inverted: true,
-    wayOut: '⌂ Return to Main Menu',
+    wayOut: LOBBY_WAY_OUT,
   }),
   row({
     screen: 'stage',
@@ -490,7 +483,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     primary: primary(['Your week']),
     note: 'Seven days, and where the world landed.',
     inverted: true,
-    wayOut: '⌂ Return to Main Menu',
+    wayOut: LOBBY_WAY_OUT,
   }),
   row({
     screen: 'report',
@@ -586,12 +579,13 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
      * Solvedness is the fix screen's state, so the row ships uninverted and carries the way out
      * for the refinement that flips it — see {@link ActionBarModel.inverted}.
      */
-    wayOut: '⌂ Return to Main Menu',
+    wayOut: LOBBY_WAY_OUT,
   }),
   row({
     screen: 'workshop',
     leave: leave(MODES),
-    primary: primary(['Run a day with this']),
+    /* § D1627: the design floor tries things, and a building is played on the floors above the lobby. */
+    primary: primary([TEST_SIMULATION_LABEL]),
     noteVariants: ['Unsaved changes travel with the run.', 'Nothing changed yet.'],
     inverted: false,
   }),
@@ -605,7 +599,8 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
   row({
     screen: 'tuner',
     leave: leave(MODES),
-    primary: primary(['Run it and watch']),
+    /* § D1629: *Tune the tower* only ever runs a sandbox day (§ D1451), so it carries the one label for that. */
+    primary: primary([TEST_SIMULATION_LABEL]),
     noteVariants: [
       'Sandbox — this run will not be scored.',
       'Scored day — three things are fixed.',
@@ -615,7 +610,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
   row({
     screen: 'designer',
     leave: leave(MODES),
-    primary: primary(['Run a day in it']),
+    primary: primary([TEST_SIMULATION_LABEL]),
     note: 'Nothing here is scored. It is a drawing board.',
     inverted: false,
   }),
@@ -735,5 +730,50 @@ export function confirmStripFor(ctx: RunContext, attemptStanding = false): Confi
     consequence: "Today's run will not be scored, and the board keeps whatever you posted before.",
     leaveLabel: 'Leave it',
     stayLabel: 'Stay',
+  };
+}
+
+/* -------------------------------------------------------------------------- *
+ * A test simulation's bar — § D1627
+ * -------------------------------------------------------------------------- */
+
+/** The stage's primary on a test simulation, where a played day reads *Close the day*. */
+export const TEST_SIMULATION_PRIMARY = 'See the results';
+/** The note beside it. */
+export const TEST_SIMULATION_NOTE = 'Stops the clock and shows how the test went. Nothing is filed.';
+
+/** The left button on a test simulation's stage and report: where it came from, not a day it abandons. */
+export const TEST_SIMULATION_LEAVE = '⤺ Back to the design floor';
+
+/**
+ * **The stage's or the report's row, as a test simulation wears it** —
+ * [§ D1627](../../../../DECISIONS.md).
+ *
+ * A run started from the workshop or the drawing board plays on § 7's stage, whose row is the daily flow's: *Leave
+ * today's tower*, `‹ Brief`, and a timeline that starts at the front door. None of the three is
+ * true of a test. It did not come through a door or a brief, and there is no day of the player's to
+ * abandon, so the left button goes back to the bench it was started from, without the leave strip,
+ * and the back cell and the timeline are not drawn. Everything else on the row is the screen's own.
+ *
+ * *Tune the tower* is the third door onto a sandbox day and is left alone: it is opened from a day's
+ * brief, so the day's own row, with its `‹ Brief`, is the true one there.
+ *
+ * Its one non-test caller is `shell.ts#drawBar`, while the host says a sandbox day is standing and
+ * the stage was entered from one of the two benches.
+ */
+export function testSimulationBarOf(model: ActionBarModel, origin: 'workshop' | 'designer'): ActionBarModel {
+  /*
+   * On the stage the primary stops the clock and opens the report, which on a played day is *Close
+   * the day*. A test has no day to close, so the same press is named for what it shows (§ D1629).
+   */
+  const onStage = model.screen === 'stage';
+  return {
+    screen: model.screen,
+    leave: { label: TEST_SIMULATION_LEAVE, inert: false, screen: origin },
+    primary: onStage ? { ...model.primary, label: TEST_SIMULATION_PRIMARY } : model.primary,
+    note: onStage ? TEST_SIMULATION_NOTE : model.note,
+    noteVariants: model.noteVariants,
+    inverted: model.inverted,
+    wayOut: model.wayOut,
   };
 }

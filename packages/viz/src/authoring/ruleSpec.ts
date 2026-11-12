@@ -35,10 +35,12 @@
  */
 
 import {
+  MAX_RULE_AND,
   RULE_ACTIONS,
   RULE_ACTION_WORDS,
   RULE_CONDITIONS,
   RULE_CONDITION_WORDS,
+  ruleRowOf,
   type DispatcherProfile,
   type RuleActionId,
   type RuleActionWords,
@@ -61,8 +63,16 @@ import {
 export interface RuleRow {
   readonly when: RuleConditionId;
   readonly whenValue?: number | string | undefined;
+  /** Further conditions the row requires as well — `core`'s `RuleRowConfig.and`, at most {@link MAX_RULE_AND}. */
+  readonly and?: readonly RuleAnd[] | undefined;
   readonly then: RuleActionId;
   readonly thenValue?: number | string | undefined;
+}
+
+/** One further condition on a row. `core`'s `RuleAndConfig`, held here under the editor's name. */
+export interface RuleAnd {
+  readonly when: RuleConditionId;
+  readonly whenValue?: number | string | undefined;
 }
 
 /** A fresh row: the first condition and first action, each with its first declared value. */
@@ -73,23 +83,23 @@ export function defaultRuleRow(): RuleRow {
 /** The row with its condition replaced and the value snapped to that condition's list. */
 export function rowWithWhen(row: RuleRow, when: RuleConditionId): RuleRow {
   const values = RULE_CONDITION_WORDS[when].values;
-  return Object.freeze({
+  return ruleRowOf({
+    ...row,
     when,
-    ...(values === undefined ? {} : { whenValue: firstValueOf(values, row.whenValue) }),
-    then: row.then,
-    ...(row.thenValue === undefined ? {} : { thenValue: row.thenValue }),
-  });
+    whenValue: values === undefined ? undefined : firstValueOf(values, row.whenValue),
+  }) as RuleRow;
 }
 
 /** The row with its action replaced and the value snapped to that action's list. */
 export function rowWithThen(row: RuleRow, then: RuleActionId): RuleRow {
   const values = RULE_ACTION_WORDS[then].values;
-  return Object.freeze({
-    when: row.when,
-    ...(row.whenValue === undefined ? {} : { whenValue: row.whenValue }),
+  return ruleRowOf({
+    ...row,
+    // "stop giving it new pickups" is one ceiling for the whole run and can carry no further test.
+    and: then === 'no-new-pickups' ? undefined : row.and,
     then,
-    ...(values === undefined ? {} : { thenValue: firstValueOf(values, row.thenValue) }),
-  });
+    thenValue: values === undefined ? undefined : firstValueOf(values, row.thenValue),
+  }) as RuleRow;
 }
 
 /** The current value when the list still offers it, else the list's first — never an invention. */
@@ -120,14 +130,7 @@ export function profileWithRules(
   rows: readonly RuleRow[],
 ): DispatcherProfile {
   if (rows.length === 0) return profile;
-  const authored: RuleRowConfig[] = rows.map((row) =>
-    Object.freeze({
-      when: row.when,
-      ...(row.whenValue === undefined ? {} : { whenValue: row.whenValue }),
-      then: row.then,
-      ...(row.thenValue === undefined ? {} : { thenValue: row.thenValue }),
-    }),
-  );
+  const authored = rows.map((row) => ruleRowOf(row) as RuleRowConfig);
   return {
     ...profile,
     rules: { rows: authored },
@@ -137,14 +140,7 @@ export function profileWithRules(
 
 /** The rows a profile carries, or `[]`. Exact — the profile's own shape is the editor's. */
 export function rulesFromProfile(profile: DispatcherProfile): readonly RuleRow[] {
-  return (profile.rules?.rows ?? []).map((row) =>
-    Object.freeze({
-      when: row.when,
-      ...(row.whenValue === undefined ? {} : { whenValue: row.whenValue }),
-      then: row.then,
-      ...(row.thenValue === undefined ? {} : { thenValue: row.thenValue }),
-    }),
-  );
+  return (profile.rules?.rows ?? []).map((row) => ruleRowOf(row) as RuleRow);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -169,11 +165,60 @@ export function substituted(
   return words.template.replace('{v}', label);
 }
 
-/** The §11.5 readback: *when the lobby queue passes 12 people, hold a car at the lobby.* */
+/**
+ * The §11.5 readback: *when the lobby queue passes 12 people, hold a car at the lobby.* A row with
+ * further conditions reads them in order, each from the same table: *when the lobby queue passes
+ * 12 people and a call has waited 60 s, …*.
+ */
 export function readbackOf(row: RuleRow): string {
-  const when = substituted(RULE_CONDITION_WORDS[row.when], row.whenValue);
+  const when = [row, ...(row.and ?? [])]
+    .map((condition) => substituted(RULE_CONDITION_WORDS[condition.when], condition.whenValue))
+    .join(' and ');
   const then = substituted(RULE_ACTION_WORDS[row.then], row.thenValue);
   return `when ${when}, ${then}.`;
+}
+
+/** Whether a row may take another condition: under the bound, and not the whole-run ceiling. */
+export function canAddCondition(row: RuleRow): boolean {
+  return row.then !== 'no-new-pickups' && (row.and ?? []).length < MAX_RULE_AND;
+}
+
+/**
+ * The row with one more condition: the first the vocabulary lists that the row does not already
+ * test, at its first value. Not simply the first — *when a call has waited 30 s and a call has
+ * waited 30 s* is a row that asks one thing twice, and a control whose first press writes a
+ * condition that changes nothing is the inert default this repository keeps refusing.
+ */
+export function rowWithAnotherCondition(row: RuleRow): RuleRow {
+  if (!canAddCondition(row)) return row;
+  const held = new Set([row.when, ...(row.and ?? []).map((extra) => extra.when)]);
+  const when = RULE_CONDITIONS.find((candidate) => !held.has(candidate)) ?? RULE_CONDITIONS[0];
+  const values = RULE_CONDITION_WORDS[when].values;
+  const extra: RuleAnd = { when, ...(values === undefined ? {} : { whenValue: values[0]!.value }) };
+  return ruleRowOf({ ...row, and: [...(row.and ?? []), extra] }) as RuleRow;
+}
+
+/** The row with its `at`-th further condition replaced, the value snapped to that condition's list. */
+export function rowWithAndAt(
+  row: RuleRow,
+  at: number,
+  when: RuleConditionId,
+  whenValue: number | string | undefined,
+): RuleRow {
+  const values = RULE_CONDITION_WORDS[when].values;
+  const next: RuleAnd = {
+    when,
+    ...(values === undefined ? {} : { whenValue: firstValueOf(values, whenValue) }),
+  };
+  return ruleRowOf({
+    ...row,
+    and: (row.and ?? []).map((extra, index) => (index === at ? next : extra)),
+  }) as RuleRow;
+}
+
+/** The row without its `at`-th further condition. */
+export function rowWithoutAndAt(row: RuleRow, at: number): RuleRow {
+  return ruleRowOf({ ...row, and: (row.and ?? []).filter((_, index) => index !== at) }) as RuleRow;
 }
 
 /**
@@ -209,17 +254,24 @@ export const RULES_EXCLUSIVITY_NOTE =
  * header and the row can never disagree about what a rule says.
  */
 export function ruleProvenanceName(patternId: string): string | undefined {
-  const match = /^rule-(\d+):([a-z-]+)(?::(.+))?$/.exec(patternId);
+  const match = /^rule-(\d+):(.+)$/.exec(patternId);
   if (match === null) return undefined;
-  const conditionId = match[2] as RuleConditionId;
-  if (!Object.hasOwn(RULE_CONDITION_WORDS, conditionId)) return undefined;
-  const words = RULE_CONDITION_WORDS[conditionId];
-  const raw = match[3];
-  const value =
-    raw === undefined
-      ? undefined
-      : (words.values?.find((option) => String(option.value) === raw)?.value ?? raw);
-  return `rule ${match[1]!} — ${substituted(words, value)}`;
+  // `resolveRuleArms` joins a row's conditions with `+`; no id and no declared value contains one.
+  const phrases: string[] = [];
+  for (const part of match[2]!.split('+')) {
+    const condition = /^([a-z-]+)(?::(.+))?$/.exec(part);
+    if (condition === null) return undefined;
+    const conditionId = condition[1] as RuleConditionId;
+    if (!Object.hasOwn(RULE_CONDITION_WORDS, conditionId)) return undefined;
+    const words = RULE_CONDITION_WORDS[conditionId];
+    const raw = condition[2];
+    const value =
+      raw === undefined
+        ? undefined
+        : (words.values?.find((option) => String(option.value) === raw)?.value ?? raw);
+    phrases.push(substituted(words, value));
+  }
+  return `rule ${match[1]!} — ${phrases.join(' and ')}`;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -278,6 +330,37 @@ export function ruleIssues(
       issues.push({
         field: `rows.${String(index)}.then`,
         message: `"${substituted(action, undefined)}" needs one of its listed values — the run is refused by name otherwise.`,
+      });
+    }
+    (row.and ?? []).forEach((extra, at) => {
+      const words = RULE_CONDITION_WORDS[extra.when];
+      if (words.values !== undefined && !words.values.some((o) => o.value === extra.whenValue)) {
+        issues.push({
+          field: `rows.${String(index)}.and.${String(at)}`,
+          message: `"${substituted(words, undefined)}" needs one of its listed values — the run is refused by name otherwise.`,
+        });
+      }
+      if (isTimeCondition(extra.when) && !context.hasClock) {
+        issues.push({
+          field: `rows.${String(index)}.and.${String(at)}`,
+          message:
+            'This crowd has no clock, so this time test reads as never — and because every ' +
+            'condition on a row must hold, the whole row does nothing.',
+        });
+      }
+    });
+    if ((row.and ?? []).length > MAX_RULE_AND) {
+      issues.push({
+        field: `rows.${String(index)}.when`,
+        message: `A row carries at most ${String(MAX_RULE_AND)} further conditions — the run is refused by name past that.`,
+      });
+    }
+    if (row.then === 'no-new-pickups' && (row.and ?? []).length > 0) {
+      issues.push({
+        field: `rows.${String(index)}.then`,
+        message:
+          '"stop giving it new pickups" is one ceiling for the whole run, so it cannot wait on a ' +
+          'further condition — the run is refused by name.',
       });
     }
     if (isTimeCondition(row.when) && !context.hasClock) {

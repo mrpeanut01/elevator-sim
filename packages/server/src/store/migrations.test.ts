@@ -143,6 +143,10 @@ class InterceptingSql implements Sql {
   readonly #onExec: (text: string) => Promise<string>;
   readonly execs: string[] = [];
 
+  get dialect(): Sql['dialect'] {
+    return this.#inner.dialect;
+  }
+
   constructor(inner: Sql, onExec: (text: string) => Promise<string>) {
     this.#inner = inner;
     this.#onExec = onExec;

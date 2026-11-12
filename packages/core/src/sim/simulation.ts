@@ -189,6 +189,7 @@ import {
   protectedFloorM,
   reachableHeightRangeM,
   requiredGapM,
+  sectorHeightRangeM,
   respectsClearance,
   respectsOrder,
   separationMarginM,
@@ -347,6 +348,11 @@ interface TwinShaftState {
   readonly upper: Car;
   /** The hoistway's vertical extent, for the static admissible envelope. */
   readonly span: ShaftSpanM;
+  /**
+   * Height of the declared sector boundary, metres — `docs/11` § 3.2's regime R1. `undefined` is
+   * the free regime (R2). Read through `Simulation#standingRangeM` and nowhere else.
+   */
+  readonly sectorBoundaryHeightM: number | undefined;
   /**
    * Cars that declined to depart and are waiting for this shaft to change — `docs/11` § 2.4
    * requirement 2's wake list. Drained by the arrival handler, never by a poll.
@@ -3390,7 +3396,7 @@ export class Simulation {
             // Restricted to the promised car when this call's remaining passengers already have
             // one. See `#candidateCars`: this is where D29's write-once promise is enforced, and
             // it is here rather than in `#reofferCall` because three paths reach a re-offer.
-            this.#candidateCars(active, snapshots),
+            this.#withoutShaftStrangers(active, bank, this.#candidateCars(active, snapshots)),
             at,
             withLandingCounts(group, waiting.count, waiting.massKg),
           );
@@ -4839,6 +4845,10 @@ export class Simulation {
             lowestHeightM: floors[0]?.heightM ?? 0,
             highestHeightM: floors[floors.length - 1]?.heightM ?? 0,
           },
+          sectorBoundaryHeightM:
+            shaft.sectorBoundaryFloorId === undefined
+              ? undefined
+              : shaft.floorsById.get(shaft.sectorBoundaryFloorId)?.heightM,
           wake: new Set<string>(),
           deferredSince: new Map<string, SimTime>(),
           clearing: false,
@@ -4882,6 +4892,16 @@ export class Simulation {
     this.#disclaimers.push(
       `building "${resolved.id}" declares ${shafts.length} TWIN shaft(s) (${shafts.map((shaft) => `"${shaft.id}"`).join(', ')}), each carrying two independently driven cars on one set of guide rails. The closed-form round-trip-time expression this project validates against assumes one car per shaft, free to travel the whole rise, and a TWIN car's rise is restricted by its mate and its round trip includes waiting the expression has no term for — so a simulated round trip for such a bank is deliberately not comparable with it, and an oracle residual measured on one is not evidence about this simulator. No closed-form round trip for a two-car shaft was located in the sources consulted (docs/11 OQ-7).`,
     );
+    // **A free-regime pair says it is not live.** `docs/11` § 3.2's R2 prevents a deadlock at
+    // commitment only where the destination is disclosed and only against the static envelope,
+    // and `sim/twinShaftSector.test.ts` pins a run on it that ends with riders aboard. A reader of
+    // such a run is owed the reason beside the count, and the remedy is one field.
+    const free = shafts.filter((shaft) => shaft.sectorBoundaryHeightM === undefined);
+    if (free.length > 0) {
+      this.#disclaimers.push(
+        `TWIN shaft(s) ${free.map((shaft) => `"${shaft.id}"`).join(', ')} of building "${resolved.id}" declare no sectorBoundaryFloorId and run in the free regime (docs/11 § 3.2, R2), in which the two cars can take riders across each other and stand loaded for the rest of the run. Riders left aboard or waiting on such a bank are that regime's known defect and not evidence about the dispatcher. Declaring a sector boundary on the shaft gives each car floors of its own and removes it.`,
+      );
+    }
   }
 
   /**
@@ -5300,6 +5320,17 @@ export class Simulation {
       override === undefined ? base : { ...base, idleOverride: override },
     );
     if (!decision.move || decision.targetFloorId === undefined) return;
+    // A sectored TWIN car is not parked outside its sector (`docs/11` § 3.2 regime R1). A parking
+    // strategy places a fleet it believes can stand anywhere, and `lobby` would send the upper car
+    // to a landing its mate's sector owns; the move would be deferred by the gate and the pair's
+    // static reach — the whole of R1's liveness argument — would stop being static.
+    const twin = this.#twinShaftByCarId.get(car.id);
+    const role = this.#twinRoleOf(car);
+    if (twin?.sectorBoundaryHeightM !== undefined && role !== undefined) {
+      const target = car.shaft.floorsById.get(car.stopFloorFor(decision.targetFloorId));
+      const [lowM, highM] = this.#standingRangeM(twin, role);
+      if (target === undefined || target.heightM < lowM || target.heightM > highM) return;
+    }
     this.#depart(car, decision.targetFloorId, at);
   }
 
@@ -5572,8 +5603,15 @@ export class Simulation {
     this.#separationChecks += 1;
 
     const gap = requiredGapM(twin.separation);
-    const reachableM = reachableHeightRangeM(role, mateState, twin.separation, twin.span);
-    const admissibleM = admissibleHeightRangeM(role, twin.separation, twin.span);
+    const admissibleM = this.#standingRangeM(twin, role);
+    const free = reachableHeightRangeM(role, mateState, twin.separation, twin.span);
+    // Sectored, a pickup outside the sector is as unreachable as one behind the mate, so the
+    // range a hall call is asked against is clipped to it. In the free regime the reachable
+    // range already lies inside the admissible one and this is the pair it always was.
+    const reachableM: readonly [number, number] =
+      twin.sectorBoundaryHeightM === undefined
+        ? free
+        : [Math.max(free[0], admissibleM[0]), Math.min(free[1], admissibleM[1])];
 
     return Object.freeze({
       carId: mate.id,
@@ -5583,6 +5621,84 @@ export class Simulation {
       clearanceM: gap,
       reachableIndexRange: indexRangeWithin(car.shaft, reachableM),
       admissibleIndexRange: indexRangeWithin(car.shaft, admissibleM),
+    });
+  }
+
+  /**
+   * **Where a TWIN car may ever stand** — the one authority on the question, read by the mate
+   * snapshot (dispatch), {@link #shaftAllows} (the doorway and the candidate filter) and
+   * {@link #park}.
+   *
+   * Two regimes, `docs/11` § 3.2. **Sectored (R1)**, when the shaft declares a boundary: the
+   * car's own sector, disjoint from its mate's by at least the required gap, so any two
+   * commitments the pair can hold are dischargeable at once and the movement gate has nothing to
+   * defer. **Free (R2)** otherwise: everything short of the one gap its mate needs at the far
+   * end, which is the range this class used before sectors existed.
+   */
+  #standingRangeM(twin: TwinShaftState, role: ShaftRole): readonly [number, number] {
+    return twin.sectorBoundaryHeightM === undefined
+      ? admissibleHeightRangeM(role, twin.separation, twin.span)
+      : sectorHeightRangeM(role, twin.sectorBoundaryHeightM, twin.separation, twin.span);
+  }
+
+  /**
+   * **The shaft binds the passenger**: a car of a two-car hoistway boards nobody for a floor it
+   * may never stand at — `docs/11` INV-TWIN-2, at the doorway.
+   *
+   * `Car.estimateCost` step 3' asks this of a destination *"where the call type discloses one"*,
+   * and under up/down buttons none is disclosed until the rider is aboard. Without this clause the
+   * lower car boarded riders for the top landing and the upper car riders for the bottom, and
+   * neither could ever be delivered: a commitment that was a deadlock at the instant it was made.
+   * It is {@link #deckAllows} with a shaft in place of a deck, and for the same reason — the
+   * alternative is simulating a journey the hardware cannot make.
+   *
+   * `true` for every car of every single-car shaft, which is every car of every shipped building.
+   */
+  #shaftAllows(car: Car, passenger: Passenger): boolean {
+    const twin = this.#twinShaftByCarId.get(car.id);
+    const role = this.#twinRoleOf(car);
+    if (twin === undefined || role === undefined) return true;
+    const destination = car.shaft.floorsById.get(car.stopFloorFor(passenger.destinationFloorId));
+    if (destination === undefined) return false;
+    const [lowM, highM] = this.#standingRangeM(twin, role);
+    return destination.heightM >= lowM && destination.heightM <= highM;
+  }
+
+  /**
+   * Drop from a call's candidates every TWIN car that could board **nobody** waiting for it.
+   *
+   * The doorway refusal above leaves a rider on the landing, the call is surrendered and
+   * re-offered, and under up/down buttons the group cannot see why — so it offered the call
+   * straight back to the car that had just refused it. Measured before this filter existed:
+   * `nearest-car` assigned one landing to the same paired car **3 363 times** in an 1 800 s run
+   * while the rider stood there. A car is asked what the bank is already asked
+   * ({@link #bankMayServe}): is anybody here somebody you can carry?
+   *
+   * What it models is a sectored group's own landing fixtures. A bank whose cars answer
+   * different floors gives each sector its own riser, so the button a rider presses says which
+   * sector they are bound for without saying which floor. The destination is still undisclosed to
+   * every cost term; only this static membership is used, and it is the membership
+   * {@link #shaftAllows} enforces at the doorway a moment later.
+   *
+   * Returns its argument, the same array, on every building without a two-car shaft.
+   */
+  #withoutShaftStrangers(
+    active: ActiveCall,
+    bank: Bank<Car>,
+    candidates: readonly CarSnapshot[],
+  ): readonly CarSnapshot[] {
+    if (this.#twinShafts.size === 0) return candidates;
+    if (!candidates.some((snapshot) => this.#twinShaftByCarId.has(snapshot.carId))) return candidates;
+    const floor = this.#building.requireFloor(active.floorId);
+    const waiting = this.#waitingForCall(floor, active).filter((passenger) =>
+      this.#bankMayServe(bank, passenger),
+    );
+    return candidates.filter((snapshot) => {
+      if (!this.#twinShaftByCarId.has(snapshot.carId)) return true;
+      const car = this.#carsById.get(snapshot.carId);
+      /* c8 ignore next -- a snapshot is taken of a car this run built. */
+      if (car === undefined) return true;
+      return waiting.some((passenger) => this.#shaftAllows(car, passenger));
     });
   }
 
@@ -5828,6 +5944,7 @@ export class Simulation {
       (this.#building.bankById(car.bankId)?.servesFloor(passenger.destinationFloorId) ?? true) &&
       isAccessPermitted(car.shaft, passenger.credentialGroup, passenger.destinationFloorId) &&
       this.#deckAllows(car, passenger) &&
+      this.#shaftAllows(car, passenger) &&
       this.#kioskAllows(passenger)
     );
   }
@@ -7029,14 +7146,31 @@ function terminalCarTimings(
 function twinAwareHomeFloorId(shaft: CarShaft, carSpecId: string, bankHomeFloorId: string): string {
   const separation = shaft.separation;
   if (separation === undefined || shaft.carIds.length !== 2) return bankHomeFloorId;
-  // The lower car keeps the bank's home; only the upper one is displaced.
-  if (shaft.carIds[0] === carSpecId) return bankHomeFloorId;
-
   const home = shaft.floorsById.get(bankHomeFloorId);
   /* c8 ignore next -- the bank's home is one of the floors its shaft serves. */
   if (home === undefined) return bankHomeFloorId;
 
-  const needM = home.heightM + requiredGapM(separation);
+  // **Sectored (`docs/11` § 3.2 regime R1): each car starts inside its own sector**, the lower at
+  // the bank's home when its sector holds it and at the boundary otherwise, the upper at the
+  // bank's home when *its* sector holds it and at its sector's lowest floor otherwise. A car that
+  // started outside its sector would have to be moved into it by the free regime's machinery,
+  // which is the machinery a sector exists to make unnecessary.
+  const boundary =
+    shaft.sectorBoundaryFloorId === undefined
+      ? undefined
+      : shaft.floorsById.get(shaft.sectorBoundaryFloorId);
+  const isLower = shaft.carIds[0] === carSpecId;
+  if (boundary !== undefined && isLower) {
+    return home.heightM <= boundary.heightM ? bankHomeFloorId : boundary.id;
+  }
+
+  // The lower car keeps the bank's home; only the upper one is displaced.
+  if (isLower) return bankHomeFloorId;
+
+  const needM =
+    boundary === undefined
+      ? home.heightM + requiredGapM(separation)
+      : Math.max(home.heightM, boundary.heightM + requiredGapM(separation));
   let best: ServedFloor | undefined;
   for (const floor of shaft.floors) {
     if (floor.heightM < needM) continue;

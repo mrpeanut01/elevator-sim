@@ -41393,6 +41393,8 @@ said to be unmeasured, and [§ D256](DECISIONS.md)'s refusal.
 
 ## D844 — the front door is not offered before the shell can answer who is arriving, and the landing page's run does not rebuild the page it lands on
 
+> **Status 2026-11-11: SUPERSEDED IN PART by [§ D1628](#d1628)** (the product owner). The waiting front door is gone with the first-arrival offer it waited for: the lobby is the front door for everybody and draws at once. The landing page's half stands. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Status 2026-10-10: AMENDED by [§ D1273](#d1273)** (an agent ruling). The waiting front door stands; the sentence it reuses now reads *The game has not finished loading. This screen fills in the moment it has.* See [`docs/39`](docs/39-decisions-in-force.md).
 
 **Date: 2026-09-22 · Owner: LANE-AE-FIX (wave AE integration) · Rules on:** nothing recorded is
@@ -52708,6 +52710,10 @@ line, raises no call, never stops on the card again, and reaches the day's end w
 
 ## D1445 — the lobby opens every cold launch, its panel follows § D525, and the tutorial is the basement
 
+> **Status 2026-11-11: AMENDED again by [§ D1628](#d1628)** (the product owner): the lobby and the main menu are one screen, so *Skip the lobby* is retired and nothing is offered in front of the lobby.
+>
+> **Status 2026-11-11: AMENDED by [§ D1627](#d1627)** (the product owner). The lobby still opens every cold launch and *Skip the lobby* restored the old front door until § D1628. The ride is replaced: a landing is one press, the floors are the six of `everyday/floors.ts` with Scenario still on top, and the walkthrough is a room on the lobby's floor rather than the basement. See [`docs/39`](docs/39-decisions-in-force.md).
+
 > **Taken 2026-10-13 by the product owner**, answering two questions put to them while the lobby
 > handoff (`docs/design/design_handoff_lobby_intro/`) was being built. **Amends
 > [§ D525](#d525)'s front door** (a screen now comes before the menu on every visit) and **moves
@@ -55619,3 +55625,301 @@ and an edit takes it away); and the honesty corpus.
 under the pass R11 amendment 5 wrote.
 
 **Numbers spent.** Lane AW-1 holds **D1626 to D1633** and spends **D1626**.
+
+## D1627 — every way to play is a floor: the tray is a shaft, a floor is one press, and motion never gates a selection
+
+> **Status 2026-11-11: AMENDED by [§ D1629](#d1629)** (the product owner). What this entry named as owed, a drawn building entered from a mode's floor, is built as the Scenario floor's *Your buildings*. *Tune the tower* now carries the *Test simulation* label, the bar's way home reads *Lobby*, and the Engineer swap is a stop on the shaft.
+>
+> **Status 2026-11-11: AMENDED by [§ D1628](#d1628)** (the product owner). The floors, the shaft, the motion rule and the test simulation stand. The lobby and the main menu, which this entry kept as two screens, are one; the *Elevator hall* row, the Engineer key and *Skip the lobby* are gone. See [`docs/39`](docs/39-decisions-in-force.md).
+
+> **Taken 2026-11-11 by the product owner**, as a direction to redesign the Everyday navigation, and
+> built the same day by one agent session (wave AX, a single lane). **Amends [§ D1445](#d1445)**: the lobby
+> still opens every cold launch and *Skip the lobby* still restores the old front door, and the ride
+> that § D1445 built to `docs/design/design_handoff_lobby_intro/` is replaced. **Owner-reversible**:
+> one revert restores the § D1445 lobby, the `DESIGN` and `WORLD` rail groups and the two bar labels.
+
+**Why an entry.** It binds the shell, the rail, the lobby, the action bar's table and the honesty
+register, which no one module owns; it moves a screen a design handoff specifies, so `docs/12` § 4
+gains a row; and it amends § D1445, so that entry gains a status line and `docs/39` § 2 a row.
+
+**The direction, in the owner's words.** Focus on the lobby and the flow to the other floors, and
+from each play floor to another; carry the theme of selecting floors into the left tray, as a shaft
+that shows the car at whichever floor the player is on; make changing floors intuitive and quick,
+with animation supporting the selection rather than controlling it and no countdown or travel time;
+and decouple *play a day in this building* flows to at most a test simulation, because to be played
+a building has to exist and be played as part of a mode.
+
+**What is ruled.**
+
+1. **One floor directory, `everyday/floors.ts`, and every surface that draws the building reads
+   it.** Six floors, top first: **3 Scenario, 2 Career, 1 Rush** (§ D525's modes in § D1445's
+   order, each reading its menu tile), **M Records** (your week, the boards), **L Lobby** (the main
+   menu, the elevator hall, the walkthrough, what this is) and **B Design** (the dispatcher
+   workshop, the test bench, the drawing board). `floorOfScreen` puts every screen on one floor in
+   every context; the four screens a day is played through take the floor of their flow.
+2. **The left tray is the shaft.** `rail.ts#railShaft` replaces the `DESIGN` and `WORLD` groups: a
+   hoistway, the six floors, each floor's rooms as rows under it, and a car standing at the floor
+   the player is on with the subline beside it. Every row the groups carried is still one press from
+   anywhere. A play floor's press is *leave to the lobby, then press the tile* in one act
+   (`shell.ts#rideToMode`); the lobby's floor is the old *Main menu* row and still asks about a day
+   in flight.
+3. **Motion is laid over a press and never in front of it.** The tray's car glides to its new
+   floor, and two door leaves part over the screen with the floor's plate between them, in about a
+   third of a second. Both are drawn after the screen has mounted, take no pointer events, are
+   hidden from assistive technology and are not drawn with reduced motion. No handler waits on a
+   timer before it navigates.
+4. **The lobby is the building in section, and a landing is one press.** § D1445's machine (CALL,
+   the ride down, the panel, a six-second auto-close, the ride up, *Step out*) is replaced by a
+   hall that shows the shaft and six landings: pointing at one glides the car to it and describes
+   the floor, pressing one steps out. Read off § D1445's own timings table, its shortest route from
+   a cold launch to Scenario was four presses and about ten seconds of motion; it is now one press.
+   The walkthrough moves from floor B to a room on L, because B is the design floor. The Engineer
+   key, *Continue* and *What this is* stay.
+5. **The design floor tries things, and a building is played on the floors above the lobby.** The
+   workshop's and the drawing board's primary both read *Test simulation*
+   (`types.ts#TEST_SIMULATION_LABEL`), where the handoff's § 3.3 reads *Run a day with this* and
+   *Run a day in it*. The stage that follows keeps the tray's car on B and reads
+   `TEST SIMULATION` where a played day reads `MID-DAY`. **One run changes, so that the label is
+   true.** The drawing board's press was already a sandbox day (`EverydayHost.runSandbox`,
+   § D1368). The workshop's was `startRun`, a sandbox day only while the day's attempt had not begun
+   on a crowd that counts (§ D1362) and the day's own run otherwise, which could be closed into the
+   week. It is `runSandbox` now, in every state, so no run started from the design floor can file.
+   It is still refused while a scored attempt stands (§ D1360), and the workshop's four fields still
+   travel with it, because they are written to the standing configuration by the workshop's own
+   controls and a sandbox puts back only what its own press wrote.
+6. **A test simulation started from a bench does not wear a day's bar.** While the host says a
+   sandbox day is standing and the stage was entered from the workshop or the drawing board, the
+   stage's and the report's row lose `‹ Brief` and the daily timeline, and the left button reads
+   *⤺ Back to the design floor* and returns to that bench with no leave strip, because there is no
+   day of the player's to abandon (`actionBar.ts#testSimulationBarOf`, called from
+   `shell.ts#drawBar`). *Tune the tower*'s sandbox day keeps the day's row: it is opened from a
+   brief, and `‹ Brief` is its true way back.
+
+**What it does not change.** The three modes, their tiles, the menu screen, the action bar's other
+rows, the leave strip, the tutorial, the first-arrival offer for a player who skips the lobby, and
+every figure a run produces. *Tune the tower* keeps its own primary, because it is opened from a
+day's brief and its note already says which kind of run it starts.
+
+**What is not built, and is named rather than implied.** A drawn building still cannot be entered
+from a mode's floor: `docs/38` § 2.1's *Build your own* (a scenario file with the player's own
+building, a goal and a budget) is not in Everyday. So clause 5 is true as *a bench run is only ever
+a test*, and the other half of the owner's sentence, *the building needs to exist and then be
+played as part of a mode*, is owed. The design floor's sentence says a building is played on the
+floors above the lobby and does not say this build can put the player's own there.
+
+**Held by** `everyday/floors.test.ts` (every screen on a floor in every context, a test simulation
+on B and its bar, the label on both benches and nowhere above the lobby), `everyday/rail.test.ts` (the shaft in
+every state, the play floors against the tiles), `everyday/lobbyModel.test.ts` (no state a press is
+refused in, the motion budget), `everyday/actionBar.test.ts` (the two cells as a deviation, read
+against the vendored guide both ways) and `everyday/lobby.browser.test.ts`, which measures on the
+built bundle, with motion on, that the hall is gone in the same task as the press and that the
+doors over the screen take no pointer events; and `everyday/workshopScreen.browser.test.ts`, which
+presses *Test simulation* on a day that was not a rehearsal and finds the car on B, the subline
+naming the run, and the week as it was.
+
+**Numbers spent.** Wave AX is one lane with no block reserved; it took the charter row's **D1627**
+and moved the row to D1628, so nothing is holed.
+
+## D1628 — the lobby and the main menu are one screen, and nothing stands in front of it
+
+> **Taken 2026-11-11 by the product owner** ("merge the lobby and the main menu into one screen"),
+> after [§ D1627](#d1627) had been built with the two kept apart, and built the same day by the same
+> session (wave AX). **Amends [§ D1627](#d1627)**, whose *What it does not change* kept the menu
+> screen and the first-arrival offer; **amends [§ D1445](#d1445)**, whose *Skip the lobby* is
+> retired; and **supersedes [§ D844](#d844)'s waiting front door**. **Owner-reversible**: one revert
+> restores the full-viewport lobby, the three-tile menu behind it and the setting between them.
+
+**Why an entry.** It retires a screen key, a setting, a store and a navigation the shell made on the
+host's arrival, and it moves what a first visit meets, which three earlier entries each ruled.
+
+**The reason in one sentence.** Once § D1627 made a landing one press, the lobby picked a mode and
+the menu behind it picked a mode, and a player who went *home* met a different screen from the one
+they had started on.
+
+**What is ruled.**
+
+1. **One screen, and it is the root.** `EverydayScreen` loses `lobby`. The `menu` key draws the
+   lobby (`shell.ts#drawLobby`, `lobbyScreen.ts`): the building in section, inside the shell, with
+   the tray, the bar and Settings where they are on every other screen. The key keeps its name,
+   because it is also a route, a rail class and a word in a dozen strings. A cold launch opens on
+   it, *Main menu* comes back to it, and the tray's car stands on L while it shows.
+2. **The three mode tiles are the three top landings.** They keep the tiles' class and
+   `data-screen`, and a press commits `ctx` and `modePick` exactly as a tile's did. *Continue your
+   week* is the shell's one tile, handed to the lobby whole. The lobby's own landing is where the
+   player stands and is not a press.
+3. **Every room is a press of its own**, as a chip under its landing: your week, the boards, the
+   walkthrough, what this is, the workshop, the bench and the drawing board. The separate *Elevator
+   hall* row is gone from the tray, because the hall is the screen the Lobby floor opens.
+4. **Nothing stands in front of it, and the host's arrival moves nobody.** § D1445 ruled that the
+   lobby replaces the first-arrival offer, and kept the offer alive behind *Skip the lobby*. With
+   one screen there is nothing to skip to, so the setting, its store (`lobbyStore.ts`) and its
+   Settings row are deleted, and so is `shell.ts#offerTutorial`, which sent a first visit from the
+   menu to the landing page when the host published. A first visit reads one sentence on the lobby
+   and is handed a button, *Start with the walkthrough*; the landing page is one press away as
+   *What this is*. The first-visit gate (`firstVisitOf`, § D476 as § D993 and § D1077 left it) is
+   unchanged and has one reader.
+5. **The front door has no waiting state.** § D844 held the menu's tiles back until the host
+   published, because the offer replaced the front door at that moment and a press in the window
+   landed on a removed node. With no offer there is no such window. The lobby draws at once from
+   nothing the host holds and repaints its two host answers in place. A landing pressed before the
+   host arrives opens its screen's own waiting sentence, which § D1273's wording still serves.
+6. **The Engineer key is not carried over.** The tray's *Switch to Engineer* is beside the lobby
+   now, so a second control for the same swap would be two answers to one question.
+
+**What it does not change.** § D1627's floors, the shaft, the motion rule and the test simulation.
+The landing page and the two-screen walkthrough themselves. The menu row of the action bar, whose
+primary still follows the selected mode.
+
+**What it costs, said plainly.** A newcomer no longer lands on the explainer page with its playing
+canvas; they land on the lobby and are offered the walkthrough by name. § D529's *tutorial before
+Scenario* is now an offer on the front door and not a sequence the product enforces. No retention
+figure exists for either arrangement, so nothing here claims one is better.
+
+**Held by** `everyday/lobbyModel.test.ts` (every landing but the lobby's opens, the three on top
+are the modes, the walkthrough is offered on a first visit only), `everyday/screens.test.ts` and
+`everyday/modes.test.ts` (one shell-owned key, no `lobby` route), `everyday/tutorialModel.test.ts`
+(the gate has one reader and nothing navigates on its answer), `everyday/settingsView.test.ts` (no
+row skips a lobby) and `everyday/lobby.browser.test.ts`, with
+`everyday/landingScreen.browser.test.ts` recording from before navigation commits that a first
+visit sees the front door and nothing else until it presses.
+
+**Numbers spent.** Wave AX took the charter row's **D1628** and moved the row to D1629; nothing is
+holed.
+
+## D1629 — a building you drew is played from the Scenario floor, saving only saves, and the building's loose ends are closed
+
+> **Taken 2026-11-11 by the product owner** ("continue with all of it, starting with playing your own
+> building"), against the list of outstanding work this session reported after [§ D1628](#d1628)
+> merged, and built the same day by the same session (wave AZ, a single lane). The owner added that
+> the gameplay is to be revamped later, so this entry builds the function and leaves its rules
+> plain. **Amends [§ D1627](#d1627)**, which named *a drawn building entered from a mode's floor* as
+> owed. **Owner-reversible**, clause by clause.
+
+**Why an entry.** It moves what *Save* does to a player's week, changes what a sandbox day leaves on
+the shelf, renames cells of the handoff's § 3.3 table, and moves the Engineer swap, none of which
+one module owns.
+
+**What is ruled.**
+
+1. **Your buildings.** The Scenario floor lists the buildings the player saved on the Design floor
+   (`scenarioModel.ts#ownBuildingsViewOf`), newest first, each with one press, *Play a day*. The
+   press is `EverydayHost.playOwnBuilding`, which stands the week on the building through
+   `withBuilding` and opens its brief; the day is then the daily flow's own, brief to report.
+2. **A day there is the player's own.** A drawn tower belongs to no authored scenario, so its week
+   carries `SANDBOX_CONTRACT_ID`, as § D1368's history already had it: the week the player left is
+   parked and not ended, the day is judged on the tower's rung and filed to that week's history, and
+   **nothing is banked**: no board, no streak, no chimes (`host.ts#fileScenarioDay` returns before
+   any award where `contractById` answers nothing). The list says so in one sentence, and
+   `scenarioModel.test.ts` holds the sentence.
+3. **Saving only saves.** The designer's *Save as a new building* was `applyBuildingSpec`, which
+   also moved the player's week onto the drawn tower. It is `saveBuilding` now and writes the shelf
+   alone; `applyBuildingSpec` is deleted. The saved line says where the building is played.
+4. **A test leaves no building on the shelf.** `sandbox.ts#SandboxBefore` keeps `savedBuildings`,
+   so the copy a test simulation or *Tune the tower* ran in goes when the sandbox ends. It used to
+   stay, which was harmless while nothing listed the shelf. A building is on the list because the
+   player pressed *Save*.
+5. **Every sandbox press carries one label.** *Tune the tower*'s primary reads *Test simulation*
+   too, since it has only ever run a sandbox day since § D1451. A test started from a bench names
+   its stage's primary *See the results* where a played day reads *Close the day*.
+6. **The way home says Lobby.** The bar's left button reads *⌂ Lobby* and the inverted way out
+   *⌂ Return to the lobby*, where the guide's cells read *⌂ Modes* and *⌂ Return to Main Menu*;
+   `SCREEN_NAMES.menu`, the report's secondary and the walkthrough's last note follow.
+7. **One shaft on the lobby.** On a wide screen the lobby no longer draws a hoistway of its own:
+   pointing at a landing glides the tray's car (`shell.ts#previewRailCar`), which changes nothing
+   about where the player is. On a narrow screen the tray is in the drawer, so the lobby keeps its
+   own, and the narrow header carries the floor the player is on beside the drawer's toggle.
+8. **A floor's plate is its key.** `3`, `2`, `1`, `M`, `L` and `B` ride to their floors on a bare
+   key press (`floors.ts#floorKeyOf`), never while typing into a control and never on the stage.
+9. **The Engineer surface is a stop on the shaft.** *Switch to Engineer* moves from the tray's foot
+   to the top of the building, with its note still drawn. The car never stands there, because the
+   page it opens is the other shell's. The Engineer shell's own menu is unchanged.
+
+**What is not built, named.** *Your buildings* is not `docs/38` § 2.1's whole *Build your own*: a
+saved building carries no goal of its own, no budget and no survivor count, it cannot be shared, and
+all of a player's buildings share one week. Those wait on the gameplay revamp the owner announced.
+A saved building cannot be renamed or removed from Everyday. And the first-visit question § D1628
+recorded is still the owner's to rule.
+
+**Held by** `everyday/ownBuilding.browser.test.ts` (save does not move the week, the brief names the
+building, a test alone lists nothing), `everyday/scenarioModel.test.ts`,
+`everyday/attemptDoors.test.ts` (both new doors refuse while a scored attempt stands and write when
+free), `shift/reportWindow.test.ts` (the id movers, with *Save* no longer among them),
+`everyday/floors.test.ts` (the keys, the test bar) and `everyday/actionBar.test.ts` (each renamed
+cell as a deviation, read against the vendored guide both ways).
+
+**Numbers spent.** Wave AZ took the charter row's **D1629** and moved the row to D1630; nothing is
+holed.
+
+## D1630 — the store runs on SQLite or PostgreSQL behind one seam, and the URL picks the engine
+
+> **Taken 2026-11-11 by the product owner** ("plan it and build the PR … move it to a connection
+> handler so that a change back later will not be as difficult"), after the Azure invoice for October
+> showed the PostgreSQL flexible server as the deployment's whole fixed cost. Built the same day by one
+> agent session working directly for the owner, outside any wave. **Amends [§ D361](#d361)** only in
+> that `SqliteSql` wraps `Sql.exec` in a transaction, which is not a seam `Store` can reach.
+> **Owner-reversible**: `databaseEngine=postgres` in `infra/azure/main.bicep` runs the store on
+> PostgreSQL exactly as before, and it is the template's default.
+
+**Why an entry.** It binds the store, the server's boot, the container image, the Azure template and
+the runbook, which no one module owns, and it reverses the reason `store.ts` gave for leaving
+`node:sqlite`.
+
+**The reason in one sentence.** The server cost a fixed ≈ $16 a month (`infra/README.md` § 5) for a
+leaderboard that is idle most of the day, and a SQLite file replicated to Blob Storage by Litestream
+answers the one objection that moved the store to PostgreSQL, a container filesystem that does not
+outlive the container.
+
+**What is ruled.**
+
+1. **Both engines ship, behind the existing `Sql` seam.** `SqliteSql` (`store/sqlite.ts`) joins
+   `PgSql`. `store/connect.ts#sqlFor` picks one from `ELEVATOR_SIM_DB`: `file:` is SQLite,
+   `postgres://` is PostgreSQL, anything else is refused. `main.ts` and `telemetry/dashboardMain.ts`
+   are the non-test callers.
+2. **One query text for both.** The store's SQL is written in the subset both engines parse. The five
+   best-row-per-player board queries move from `DISTINCT ON` to `ROW_NUMBER()`, with `id` as a final
+   tie-break that makes an exact tie determinate where `DISTINCT ON` picked arbitrarily;
+   `starts_with` becomes `SUBSTR`/`LENGTH`; `::` casts become `CAST`. The driver normalises only
+   transport: `$n` bound as SQLite's named parameters, booleans as `0`/`1`, `rowCount`, constraint
+   errors carrying PostgreSQL's SQLSTATE, `exec` as one transaction, and `LOWER` replaced by a Unicode
+   fold so display names collide on SQLite as they do on PostgreSQL.
+3. **The migration runner is the one reader of `Sql.dialect`.** Migrations 1, 2, 5 and 6
+   (`ADD COLUMN IF NOT EXISTS`, which SQLite cannot parse) carry an empty SQLite form, because every
+   SQLite database starts at migration 0 with those columns already in it; the version is still
+   recorded. A future column is a plain `ADD COLUMN` both engines run, and not added to `SCHEMA` too.
+4. **Both engines run the store's tests.** `store.sqlite.test.ts` and `chimes/ledger.sqlite.test.ts`
+   import the existing suites with `useTestEngine('sqlite')`, inside the `server` project that
+   `ci.yml` already runs, because a new vitest project would be named by no CI leg
+   (`ciWorkflowMatrix.test.ts`). `migrations.test.ts` stays PostgreSQL's, since it reads PostgreSQL's
+   catalogs; `sqlite.test.ts` covers the SQLite side.
+5. **The cutover copies inside the container, once.** The deployed server admits Azure services only,
+   so the copy cannot run from a laptop. `store/importer.ts` runs at boot when
+   `ELEVATOR_SIM_IMPORT_FROM` is set: only into SQLite, only into a store with no players, every table
+   in one transaction, with its table list held equal to the schema's by `importer.test.ts`.
+6. **SQLite pins one replica, and refuses to start empty by accident.** The template sets
+   `maxReplicas` to 1 on SQLite. `infra/entrypoint.sh` restores the newest replica, stops on a restore
+   error, and refuses a boot with no replica unless the cutover's import or `allowEmptyDatabase` says
+   an empty store is intended.
+7. **The replica is cheap by construction.** Locally redundant Hot storage with no blob versioning,
+   and 24 hours of Litestream retention, because crop-card measured a week of retention on
+   geo-redundant storage at about $65 a month in `ListBlobs` calls alone.
+
+**What it does not change.** The store's API, its schema, its no-transaction design for requests, the
+default engine of an existing deployment, and every other test that hands the store a `PgliteSql`.
+
+**What it costs, said plainly.** Point-in-time restore on SQLite is 24 hours, where PostgreSQL's floor
+was 7 days. One replica is the ceiling on SQLite. A cold start restores before it serves, which is
+unmeasured on Azure. Nothing copies SQLite back into PostgreSQL, so going back starts from an empty
+server, and `infra/README.md` § 8 says so. The SQLite storage bill is a forecast from another
+deployment's invoice until this one's first invoice replaces it.
+
+**Held by** `store/sqlite.test.ts` (the driver's transport promises and the migration register),
+`store/store.sqlite.test.ts` and `chimes/ledger.sqlite.test.ts` (every store and ledger case on
+SQLite, and that the engine really is SQLite), `store/importer.test.ts` (the copy, its three refusals,
+its rollback and its table list), and `store/connect.test.ts` (the URL picks the engine). Run by hand
+against the built server on 2026-11-11, with Litestream 0.3.13 against Azurite and the importer reading
+PGlite over the PostgreSQL wire protocol through `pg`: a refused empty boot, a first boot, a write
+replicated, a restore after the disk was wiped, and a cutover copy whose `BIGINT` strings landed as
+integers.
+
+**Numbers spent.** This session took the charter row's **D1630** and moved the row to D1631; nothing
+is holed.

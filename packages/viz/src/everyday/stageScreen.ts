@@ -4494,6 +4494,8 @@ function mountStage(
       day: week.day,
       /* The screen's own flow, never the recording's — GitHub issue #567. */
       contract: context.ctx === 'campaign',
+      /* A test simulation is standing: the strip says whose bars these are (§ D1627). */
+      test: host.sandboxDayLines().length > 0,
       /* § D1543: a career day leads with the contract's four, the tower's own, at its day. */
       contractGoals: careerTowerGoals(),
     });

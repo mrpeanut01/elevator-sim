@@ -52,7 +52,7 @@
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import { actionBarFor } from './actionBar.js';
-import { SCENARIO_COPY, scenarioHubViewOf } from './scenarioModel.js';
+import { SCENARIO_COPY, ownBuildingsViewOf, scenarioHubViewOf } from './scenarioModel.js';
 import { onScenarioLadderProvided, scenarioLadder } from './scenarioLadderPort.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
 import { fixSpentUnitsOf } from './profile.js';
@@ -78,6 +78,73 @@ function clearedStageIds(): ReadonlySet<string> {
       .turns.filter((turn) => turn.completion === 'scenario-cleared')
       .map((turn) => turn.key),
   );
+}
+
+/**
+ * **Your buildings** — [§ D1629](../../../../DECISIONS.md). The buildings the player saved on the
+ * Design floor, each with one press that stands their week on it and opens its brief. A refusal
+ * (a scored attempt standing elsewhere, § D1360) is drawn under the list in the host's own words.
+ */
+function ownBuildingsBlock(doc: Document, context: EverydayScreenShellContext): HTMLElement {
+  const view = ownBuildingsViewOf(context.host.ownBuildings(), (id) => context.host.buildingSpecLine(id));
+  const block = el(doc, 'section', 'everyday-scenario-own');
+  block.style.cssText = `margin:30px 0 0;padding:22px 0 0;border-top:1px solid ${C.rule};max-width:760px`;
+  const heading = el(doc, 'h2', 'everyday-scenario-own-title', view.heading);
+  heading.style.cssText = `font-family:${TYPE.heading};font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0`;
+  const lede = el(doc, 'p', 'everyday-scenario-own-lede', view.lede);
+  lede.style.cssText = `font-size:14.5px;line-height:1.55;color:${C.inkSoft};margin:8px 0 0;max-width:60ch;text-wrap:pretty`;
+  block.append(heading, lede);
+
+  const refusal = el(doc, 'p', 'everyday-scenario-own-refusal');
+  refusal.setAttribute('role', 'status');
+  refusal.style.cssText = `font-size:13px;line-height:1.5;color:${C.terracotta};margin:10px 0 0;max-width:60ch`;
+
+  if (view.empty !== undefined) {
+    const empty = el(doc, 'p', 'everyday-scenario-own-empty', view.empty);
+    empty.style.cssText = `font-size:14px;line-height:1.5;color:${C.inkSoft};margin:14px 0 0;max-width:60ch`;
+    block.append(empty);
+  } else {
+    const rows = el(doc, 'ul', 'everyday-scenario-own-rows');
+    rows.style.cssText = 'list-style:none;margin:16px 0 0;padding:0;display:grid;gap:10px';
+    for (const row of view.rows) {
+      const item = el(doc, 'li', 'everyday-scenario-own-row');
+      item.dataset['building'] = row.id;
+      item.style.cssText = `display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;border:1px solid ${C.rule};border-radius:${String(R.card)}px;background:${C.paper};min-width:0`;
+      const text = el(doc, 'div');
+      text.style.cssText = 'min-width:0;flex:1 1 220px';
+      const name = el(doc, 'div', 'everyday-scenario-own-name', row.name);
+      name.style.cssText = `font-family:${TYPE.heading};font-size:18px;font-weight:650;letter-spacing:-.01em;color:${C.ink}`;
+      text.append(name);
+      if (row.spec !== '') {
+        const spec = el(doc, 'div', 'everyday-scenario-own-spec', row.spec);
+        spec.style.cssText = `font:500 11px ${TYPE.mono};letter-spacing:.03em;color:${C.label};margin:5px 0 0`;
+        text.append(spec);
+      }
+      const play = el(doc, 'button', 'everyday-scenario-own-play', view.playLabel);
+      play.type = 'button';
+      play.style.cssText = `flex:none;padding:9px 16px;border:0;border-radius:${R.control}px;background:${C.sun};color:${C.ink};font:600 14px ${TYPE.heading};cursor:pointer`;
+      play.addEventListener('click', () => {
+        const refused = context.host.playOwnBuilding(row.id);
+        if (refused !== undefined) {
+          refusal.textContent = refused;
+          return;
+        }
+        context.go('brief');
+      });
+      item.append(text, play);
+      rows.append(item);
+    }
+    block.append(rows);
+  }
+
+  const design = el(doc, 'button', 'everyday-scenario-own-design', view.designLabel);
+  design.type = 'button';
+  design.style.cssText = `margin:14px 0 0;padding:8px 14px;border:1px solid ${C.rule};border-radius:${R.control}px;background:transparent;color:${C.ink};font:600 13px ${TYPE.heading};cursor:pointer`;
+  design.addEventListener('click', () => {
+    context.go('designer');
+  });
+  block.append(design, refusal);
+  return block;
 }
 
 function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedEverydayScreen {
@@ -135,6 +202,9 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       list.append(card);
     }
     next.append(list);
+
+    /* ------------------------------------------------------ your buildings */
+    next.append(ownBuildingsBlock(doc, context));
 
     /* ---------------------------------------------------------------- path */
     if (view.path !== undefined) next.append(pathBlock(doc, context, view.path, view.startHere));

@@ -27,6 +27,7 @@ import {
   PARKING_STRATEGIES,
   REASSIGNMENT_POLICIES,
   RULE_ACTIONS,
+  MAX_RULE_AND,
   RULE_CONDITIONS,
   SERVICE_MODES,
   WEIGHT_SET_POLICIES,
@@ -38,6 +39,7 @@ import {
   type CostTerm,
   type DispatcherProfile,
   type DispatcherProfiles,
+  type FormulaNodeConfig,
   type ElevatorSpec,
   type ElevatorSpecs,
   type FloorConfig,
@@ -179,6 +181,14 @@ export const ISSUE_CODES = {
    * whose safety check is exact only under an unstated premise is worse than one with no check.
    */
   twinSeparationUnstated: 'twin-separation-unstated',
+  /**
+   * **A two-car shaft's sector boundary cannot be honoured** — `docs/11` § 3.2 regime R1,
+   * {@link ShaftConfig.sectorBoundaryFloorId}. Three refusals under one code: a boundary on a
+   * shaft holding one car (there is nothing to partition), a boundary the bank does not serve,
+   * and a boundary so high that no served floor lies a full required gap above it, which would
+   * leave the upper car a sector with no floor in it. Raised on no shipped building.
+   */
+  twinSectorInvalid: 'twin-sector-invalid',
 } as const;
 
 /** Stable codes for non-fatal diagnostics. */
@@ -1154,6 +1164,17 @@ const ruleRowSchema = z.strictObject({
   $comment: comment,
   when: z.enum(RULE_CONDITIONS),
   whenValue: z.union([z.number(), z.string()]).optional(),
+  // Further conditions the row requires as well: non-empty when present, for `rows`' own reason.
+  and: z
+    .array(
+      z.strictObject({
+        when: z.enum(RULE_CONDITIONS),
+        whenValue: z.union([z.number(), z.string()]).optional(),
+      }),
+    )
+    .min(1, 'an authored empty "and" adds no condition')
+    .max(MAX_RULE_AND)
+    .optional(),
   then: z.enum(RULE_ACTIONS),
   thenValue: z.union([z.number(), z.string()]).optional(),
 });
@@ -1165,6 +1186,26 @@ const ruleRowSchema = z.strictObject({
 const rulesSchema = z.strictObject({
   $comment: comment,
   rows: z.array(ruleRowSchema).min(1, 'a rules section with no rows switches nothing').optional(),
+});
+
+/** One node of a formula tree. Recursive, so lazy; exactly one of the three shapes. */
+const formulaNodeSchema: z.ZodType<FormulaNodeConfig> = z.lazy(() =>
+  z.union([
+    z.strictObject({ term: identifier }),
+    z.strictObject({ value: nonNegative.max(100) }),
+    z.strictObject({
+      op: z.enum(['add', 'multiply', 'max', 'min']),
+      of: z.array(formulaNodeSchema).min(2, 'an operation combines two or more things'),
+    }),
+  ]),
+);
+
+const formulaTermSchema = z.strictObject({
+  $comment: comment,
+  id: identifier,
+  name: z.string().min(1).max(60),
+  weight: nonNegative.max(100),
+  expression: formulaNodeSchema,
 });
 
 export const dispatcherProfileSchema = z.strictObject({
@@ -1194,6 +1235,21 @@ export const dispatcherProfileSchema = z.strictObject({
   auction: auctionStageSchema.optional(),
   selection: selectionStageSchema.optional(),
   rules: rulesSchema.optional(),
+  /*
+   * This dispatcher's own pattern-to-priorities entries, over the file-level map. A record, so
+   * `DISPATCHER_PROFILE_OBJECT_SECTIONS` rightly does not find it: it is not a section of
+   * tunables. Whether a key is a declared pattern and a value an authored profile is
+   * `resolveWeightSets`' refusal, for the reason the file-level map's is — one profile cannot see
+   * the library it is read against.
+   */
+  patternWeightSets: z.record(identifier, identifier).optional(),
+  /*
+   * The profile's own formulas. The schema holds the shape; which term a leaf may read, how deep
+   * a tree may nest and how many nodes it may hold are `dispatch/formula.ts#resolveFormulas`'
+   * refusals, because `config/` is a closed module graph and the term library lives in
+   * `dispatch/` — the same split `ruleRowSchema` makes for a rule's value lists.
+   */
+  formulas: z.array(formulaTermSchema).min(1, 'an authored empty formulas list adds nothing').max(4).optional(),
 });
 
 /**
@@ -1654,6 +1710,7 @@ export const shaftConfigSchema = z.strictObject({
   standingClearanceM: z.number().gt(0).optional(),
   bufferM: z.number().min(BANK_SHAFT_TUNABLES.bufferM.min).optional(),
   emergencyDecelerationMps2: z.number().gt(0).optional(),
+  sectorBoundaryFloorId: identifier.optional(),
 });
 
 export const bankConfigSchema = z.strictObject({

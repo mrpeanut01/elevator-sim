@@ -32,6 +32,10 @@ export class RacingSql implements Sql {
   /** One-shot, because the raced statement is itself a `DELETE` that comes back through here. */
   #spent = false;
 
+  get dialect(): Sql['dialect'] {
+    return this.#inner.dialect;
+  }
+
   constructor(inner: Sql, fires: (text: string) => boolean, race: () => Promise<void>) {
     this.#inner = inner;
     this.#fires = fires;

@@ -18,6 +18,41 @@ the experiment runner.
 Mixed-use is where a smart dispatcher earns its keep: office down-peak and residential
 up-peak overlap around 18:00 and compete for the same shuttle capacity.
 
+### Retail has no profile, and why
+
+`data/traffic-profiles.json` ships no shopping-centre profile, so the designer's *Wide podium*
+template (`authoring/towerPlan.ts#podiumPlan`) runs an office crowd and says so. A search on
+2026-11-11 for a citable basis found **one figure and none of the four a profile needs**. Nothing
+was added to `data/`, because a reference value is cited or it is not added.
+
+| Source | What it states | What it does not |
+|---|---|---|
+| Siikonen, *Overview of the Book "People Flow in Buildings"*, 13th Symposium on Lift & Escalator Technologies, Table 1 (p. 24-3) | Mean batch size **1.2** for *Commercial*, two-way traffic | An arrival rate, a directional split or a service target. *Commercial* is not defined there as retail |
+| Same paper, abstract | ISO 8100-32:2020 is titled for *office, hotel, and residential buildings* | So the standard's design criteria do not cover retail |
+| Peters, Mehta & Haddon, *Lift Passenger Traffic Patterns: Applications, Current Knowledge and Measurement*, Table 1 | CIBSE Guide D arrival rates for offices, hotels, hospitals, flats and schools | Retail has no row, and no retail survey is reported |
+| KONE, *Planning retail People Flow* (2014) | Qualitative planning advice for department stores and malls | Any number: no rate, share, density or waiting time |
+| Hui, lecture *Vertical Transportation (I)*, IBTM6010H (2021) | In shopping centres travel is a few floors, escalators carry many times the lift traffic, and lifts serve access and goods | Any number |
+
+**Not read, so not cited.** CIBSE Guide D has *Department stores* and *Shopping centres* sections
+under *Selection with respect to building function* (the outline in the CIBSE Lifts Group 2023
+seminar deck names them). Search listings, not the books, place a § 4.7.3 on daily elevator
+traffic in shopping centres in Siikonen's book and a section on circulation in shopping centres
+in Barney & Al-Sharif's *Elevator Traffic Handbook*. All three are behind a paywall and none was
+opened. Strakosch was not opened either.
+
+**What is missing**, in the order a profile would need it:
+
+1. `arrivalRatePctPop5min`. Every shipped rate is a share of an occupant population, and a shop
+   has visitors, not occupants. A retail profile needs a stated footfall basis (a density and a
+   dwell time, or visitors per hour) before a percentage means anything.
+2. The share of visitors who take a lift at all, where escalators carry the main flow.
+3. `directionalSplit`, above all the inter-floor share.
+4. `targetIntervalS` and `targetAvgWaitS`.
+
+The shape of the day (no morning up-peak, a long two-way plateau, a weekend peak) is common
+knowledge and is stated numerically by nothing read here. Whoever holds Guide D 2020 or the
+Siikonen book can close this from the sections named above.
+
 ### Arrival process
 
 Passengers arrive as a **Poisson batch arrival process** — not one at a time. Groups
@@ -585,4 +620,9 @@ literature. Re-measure before carrying any of these numbers to another building 
 - [Using Common Random Numbers in Health Care Cost-Effectiveness Simulation Modeling — PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC3725537/)
 - [Automating Discrete Event Simulation Output Analysis — Hoad & Robinson, Warwick](https://warwick.ac.uk/fac/soc/wbs/projects/autosimoa/overall_framework/overallframework_websitewriteup_5.doc)
 - [Improving Elevator Performance Using Reinforcement Learning — Crites & Barto, NeurIPS](http://papers.neurips.cc/paper/1073-improving-elevator-performance-using-reinforcement-learning.pdf)
+- [Overview of the Book "People Flow in Buildings" — Siikonen, 13th Symposium on Lift & Escalator Technologies](https://liftescalatorlibrary.org/paper_indexing/papers/00000511.pdf)
+- [Lift Passenger Traffic Patterns: Applications, Current Knowledge and Measurement — Peters, Mehta & Haddon](https://wordpress.peters-research.com/index.php/papers/lift-passenger-traffic-patterns-applications-current-knowledge-and-measurement/)
+- [Planning retail People Flow — KONE (2014)](https://www.kone.se/Images/handbook-planning-retail-people-flow_tcm27-19032.pdf)
+- [Vertical Transportation (I), IBTM6010H — Hui (2021)](http://ibse.hk/IBTM6010H/IBTM6010H_2021-09.pdf)
+- [CIBSE Lifts Group Annual Seminar 2023: Guide D outline](https://www.cibse.org/media/5a4lpbwp/chapter-3-4-9-a2.pdf)
 - [Confidence Intervals for the Mean of a Log-Normal Distribution — Olsson, Journal of Statistics Education](https://jse.amstat.org/v13n1/olsson.html)

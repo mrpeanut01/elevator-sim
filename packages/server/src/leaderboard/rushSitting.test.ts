@@ -143,6 +143,17 @@ describe('the cheap gate — everything refused before a simulation starts', () 
     expect(rushSittingIssues({ buildingId: BUILDING, rounds: [round, round] }, purse)).toEqual([]);
   });
 
+  it('carries a rule row’s further conditions, and refuses a key beside them that nothing reads', () => {
+    const ruled = (and: unknown): unknown => ({
+      buildingId: BUILDING,
+      rounds: [{ ...round, ruleRows: [{ when: 'call-waited', whenValue: 30, and, then: 'jump-queue' }] }],
+    });
+    expect(rushSittingIssues(ruled([{ when: 'lobby-queue-passes', whenValue: 12 }]) as never, purse)).toEqual([]);
+    expect(
+      rushSittingIssues(ruled([{ when: 'shaft-out', weight: 3 }]) as never, purse).join(' '),
+    ).toContain('ruleRows[0].and[0] carries "weight"');
+  });
+
   it('refuses a purse or an amount the client names, by name, on the sitting and on a round', () => {
     for (const key of ['purse', 'purseUnits', 'paidUnits', 'purseBeforeUnits', 'purseAfterUnits', 'spentUnits', 'wavesOutlasted', 'budgetUnits', 'units']) {
       const onSitting = rushSittingIssues({ buildingId: BUILDING, rounds: [round], [key]: 999 }, purse);

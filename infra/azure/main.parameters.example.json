@@ -48,6 +48,16 @@
     "maxReplicas": {
       "value": 2
     },
+    "_comment_databaseEngine": [
+      "postgres (the default) or sqlite. Switching an existing deployment is infra/README.md § 8:",
+      "set importFromPostgres to true for the deployment that switches, then back to false."
+    ],
+    "databaseEngine": {
+      "value": "postgres"
+    },
+    "importFromPostgres": {
+      "value": false
+    },
     "databaseSku": {
       "value": "Standard_B1ms"
     },

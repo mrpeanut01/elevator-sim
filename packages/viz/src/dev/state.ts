@@ -402,6 +402,14 @@ export function runSubmissionOf(resources: BrowserResources, state: ViewerState)
 export interface SavedDispatcher {
   readonly id: string;
   readonly profile: DispatcherProfile;
+  /**
+   * The id of the industry design this was first saved from, when the workshop knows it.
+   *
+   * Written by `everyday/host.ts#saveWorkingDispatcher` and carried through a copy. Absent on a
+   * dispatcher saved before the field existed and on one saved from the Engineer editor, and an
+   * absent line is drawn as no line: the workshop does not guess a lineage.
+   */
+  readonly basedOn?: string | undefined;
 }
 
 /** An arrival pattern the reader saved. */

@@ -266,3 +266,23 @@ describe('§ D1543 — the career stage leads with the four that file the day', 
     expect(strip.rows.every((row) => row.state === 'pending')).toBe(true);
   });
 });
+
+/* ---- § D1627: a test simulation's strip does not claim a day ---- */
+describe('§ D1627 — a test simulation heads its bars as a played day’s, not today’s', () => {
+  const base = { readings: [], observations: NO_RUN, simTimeS: 0, endedAt: 600, history: [], day: 1 } as const;
+
+  it('swaps the eyebrow and says a test files nothing', () => {
+    const strip = stageGoalsOf({ ...base, test: true });
+    expect(strip.heading).toBe(STAGE_GOALS_COPY.testHeading);
+    expect(strip.heading).not.toBe(TODAY_ASKS_HEADING);
+    expect(strip.contract).toBe(STAGE_GOALS_COPY.testNote);
+    expect(strip.contract).toMatch(/files nothing/u);
+  });
+
+  it('leaves a played day and a career day exactly as they were', () => {
+    expect(stageGoalsOf(base).heading).toBe(TODAY_ASKS_HEADING);
+    expect(stageGoalsOf(base).contract).toBe('');
+    expect(stageGoalsOf({ ...base, contract: true, test: true }).contract).toBe(STAGE_GOALS_COPY.contract);
+    expect(stageGoalsOf({ ...base, contract: true, test: true }).heading).toBe(TODAY_ASKS_HEADING);
+  });
+});
