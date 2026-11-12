@@ -56001,7 +56001,8 @@ abandonment's treatment and its place in the precedence.
 configuration, so adding a block to it moves every digest taken over a run's inputs, whether or
 not any run reads the block. Two shipped files are pinned that way and both were regenerated, as
 their guards instruct: `data/fixit-as-built-mornings.json` (all 18 input hashes moved and **no
-reading did**) and `data/scenario-survivors.json`. A stored run still replays to the same legs; a
+reading did**) and `data/scenario-survivors.json` (the whole sweep re-run; **every count and name
+reproduced**, and only the hash and the provenance stamp moved). A stored run still replays to the same legs; a
 digest of its *inputs* taken before this entry no longer matches one taken after. `airPressure`,
 `ropeClasses` and `shaftFootprint` paid the same cost for the same reason.
 
