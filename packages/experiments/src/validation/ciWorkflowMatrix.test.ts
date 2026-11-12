@@ -136,7 +136,7 @@ const ARCH_STEP_HEADER = `      - name: ${ARCH_STEP}\n`;
 const CONDITIONAL_ARCH_STEP_HEADER = `${ARCH_STEP_HEADER}        if: \${{ matrix.platform == 'linux' }}\n`;
 
 /** The last leg in the shipped `include:`, which the macOS mutations below insert ahead of. */
-const LAST_LEG = '          - leg: browser\n            projects: --project viz-browser\n';
+const LAST_LEG = '          - leg: browser\n            projects: --project viz-browser --shard=1/3\n';
 
 const macosLeg = (runner: string): string =>
   `          - leg: cli-macos\n            projects: --project cli\n            platform: macos\n            runner: ${runner}\n`;

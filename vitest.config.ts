@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import DurationSequencer from './infra/checks/testSequencer.mjs';
 
 /**
  * Workspace-aware test config.
@@ -200,6 +201,16 @@ export default defineConfig({
   resolve: { alias },
   test: {
     passWithNoTests: true,
+    /*
+     * Shards by measured duration rather than by file count, and starts the slowest file first.
+     * `ci.yml` splits `viz` and `viz-browser` into three legs each; with vitest's own sequencer the
+     * two `viz` shards carried 32 and 43 minutes of test time in run 43157297755. The weights are
+     * `infra/checks/test-durations.json`, refreshed by `scripts/test-durations.mjs`; a file missing
+     * from them is weighed at its project's median, so the table going stale costs balance, never
+     * coverage. `infra/checks/testSequencer.mjs` says how, and `validation/testSequencer.test.ts`
+     * holds it to every file landing in exactly one shard.
+     */
+    sequence: { sequencer: DurationSequencer },
     projects: [
       /*
        * `core` and `server` take the same constant as `viz` — GitHub issue #149, § D394.
