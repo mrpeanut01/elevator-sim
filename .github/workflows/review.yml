@@ -35,6 +35,10 @@
 # pull request's manifests with its base through the dependency graph and fails on a new dependency
 # with a known vulnerability of high severity or worse. It is free on a public repository and needs
 # no checkout. It is not a required check (2-1 in § D1084's swarm); the owner can make it one.
+# **A draft runs none of it.** Each job skips while `github.event.pull_request.draft` is true, as
+# `ci.yml`'s jobs do, and `ready_for_review` (already listed) starts the first run. For `claude
+# review` that moves its one run per pull request from opening to readiness, so a pull request
+# opened as a draft is reviewed in the form it asks to be merged in.
 name: Review
 
 on:
@@ -53,6 +57,7 @@ concurrency:
 jobs:
   gates:
     name: invariant gates
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -76,6 +81,7 @@ jobs:
     if: >-
       vars.CLAUDE_REVIEW == 'true' &&
       github.event_name == 'pull_request' &&
+      github.event.pull_request.draft != true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (github.event.action == 'opened' ||
        github.event.action == 'reopened' ||
@@ -168,7 +174,7 @@ jobs:
   # diff from the API. Only on `pull_request`, because it has no base to compare on a dispatch.
   dependency-review:
     name: dependency review
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     permissions:
       contents: read
