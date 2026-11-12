@@ -355,6 +355,17 @@ cite why.
   [`docs/44`](docs/44-honesty-corpus-log.md) are each at most about 120 words of prose, tables
   excluded; the reasoning belongs in a decision entry or a docstring, and `documentation.test.ts`
   holds both caps.
+- **Seed the boards on demand, never on a schedule you set up.** `.github/workflows/seed-boards.yml`
+  posts the house's runs to one day's daily board ([§ D521](DECISIONS.md), [§ D522](DECISIONS.md));
+  [`infra/README.md`](infra/README.md) § 4.1 says how the token reaches the deployment. Run it
+  (`gh workflow run seed-boards.yml`, with `-f date=YYYY-MM-DD` for another day) when the owner asks,
+  or on your own judgement when the work in front of you needs a populated board and that day's is
+  empty: checking a board screen against the live API, a playtest, confirming a deploy. Say that you
+  ran it. It is idempotent, so a second run on a date updates the same rows. **Do not set
+  `SEED_BOARDS_ENABLED`**: the nightly schedule is the owner's switch. Locally, start the server with
+  an `ELEVATOR_SIM_SEED_TOKEN` of 32 characters or more and `POST /api/boards/seed` with it as the
+  bearer. Synthetic *players* belong on a local server only, where the outbox mailer hands over the
+  sign-in link; never create accounts on the deployed site to fill a board.
 - **One push per wave, not one per commit.** Commit as often as you like; push when the wave is
   ready. Every push to a **pull request branch** cancels the CI run in flight (`ci.yml:127` sets
   `cancel-in-progress: ${{ github.event_name == 'pull_request' }}`) and starts a fresh suite
