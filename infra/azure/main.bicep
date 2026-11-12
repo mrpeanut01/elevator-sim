@@ -53,6 +53,17 @@ Generate one with: openssl rand -base64 48
 param appSecret string
 
 @description('''
+The bearer token `POST /api/boards/seed` requires (GitHub issue #328, DECISIONS.md § D522). Empty,
+the default, leaves seeding unconfigured: the app gets no `ELEVATOR_SIM_SEED_TOKEN` and the route
+answers 503 to everyone. Set, it must be the same value as the repository secret
+`ELEVATOR_SIM_SEED_TOKEN`, which is what `.github/workflows/seed-boards.yml` sends. The server
+refuses to boot on one shorter than 32 characters.
+Generate one with: openssl rand -hex 32
+''')
+@secure()
+param seedToken string = ''
+
+@description('''
 Which store the app runs on — DECISIONS.md § D1630. `postgres` (the default, and what every existing
 deployment runs) is a PostgreSQL flexible server. `sqlite` is a file replicated to Blob Storage by
 Litestream, at pennies a month, and pins the app to one replica, because SQLite has one writer.
@@ -421,7 +432,8 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           { name: 'database-url', value: databaseUrl }
         ],
         useSqlite ? [{ name: 'storage-key', value: storage!.listKeys().keys[0].value }] : [],
-        useSqlite && importFromPostgres ? [{ name: 'import-from', value: postgresUrl }] : []
+        useSqlite && importFromPostgres ? [{ name: 'import-from', value: postgresUrl }] : [],
+        empty(seedToken) ? [] : [{ name: 'seed-token', value: seedToken }]
       )
       registries: empty(containerRegistryServer) ? [] : [
         {
@@ -509,7 +521,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'ELEVATOR_SIM_IMPORT_FROM', secretRef: 'import-from' }
           ] : [], useSqlite && allowEmptyDatabase ? [
             { name: 'ELEVATOR_SIM_ALLOW_EMPTY_DB', value: '1' }
-          ] : [])
+          ] : [], empty(seedToken) ? [] : [
+            // What the scheduled seed-boards workflow presents; absent, the route answers 503.
+            { name: 'ELEVATOR_SIM_SEED_TOKEN', secretRef: 'seed-token' }
+          ])
           probes: [
             {
               type: 'Readiness'
