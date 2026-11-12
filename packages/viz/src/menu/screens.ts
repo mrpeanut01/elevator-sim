@@ -1298,9 +1298,10 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
           'one question. Play the day through and the sheet fills in. The surface that reads a ' +
           'shift while it runs is the left rail.',
         'Average wait is withheld rather than printed whenever the run cannot support one, on ' +
-          'five grounds: an empty measurement window, a queue still growing when the run ends, ' +
-          'too many arrivals never served, a wait past the 15-minute abandonment horizon, and ' +
-          'more than 2 % of riders giving up. The reason is printed where the figure would have ' +
+          'six grounds: an empty measurement window, a queue still growing when the run ends, ' +
+          'too many arrivals never served, a wait past the 15-minute abandonment horizon, ' +
+          'more than 2 % of riders giving up, and an escalator with a declared capacity that ' +
+          'could not carry its crowd. The reason is printed where the figure would have ' +
           'been. A withheld mean is the run declining to be summarised by one number — not a ' +
           'fault, and not a low score.',
         'Energy sits beside the wait figures and is never folded into them. A dispatcher that ' +

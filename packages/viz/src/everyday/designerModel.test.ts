@@ -37,6 +37,8 @@ import {
   supertallPlan,
   withCars,
   withDecks,
+  withEscalatorCapacity,
+  withEscalatorToggled,
   withFloors,
   withPopulation,
   withShaftAdded,
@@ -51,6 +53,8 @@ import { DATA_DIR } from '../fixtures.test-helper.js';
 import {
   automaticClassFor,
   classOfMachine,
+  designerCapacityChoices,
+  designerEscalatorIdleNote,
   designerCapacityLine,
   designerFigures,
   designerFloorFacts,
@@ -366,6 +370,32 @@ describe('what the side panel says about a floor and about a shaft’s doors', (
     expect(designerFloorFacts(withPopulation(SIZED, [5], 200), [5, 5]).peopleNote).toBe('set by hand');
     expect(designerFloorFacts(SIZED, [0, 0]).title).toBe('The lobby');
     expect(designerFloorFacts(SIZED, [0, 0]).canBeSkyLobby).toBe(false);
+  });
+
+  it('offers an escalator the reference table’s capacities and nothing it cannot cite', () => {
+    const drawn = withEscalatorToggled(SIZED, 5);
+    expect(designerFloorFacts(drawn, [5, 5]).escalatorCapacity).toBeUndefined();
+    expect(designerCapacityChoices(SPECS, undefined)).toEqual([
+      { value: 0, label: 'No limit' },
+      { value: 3600, label: '0.6 m steps · 3,600 an hour' },
+      { value: 4800, label: '0.8 m steps · 4,800 an hour' },
+      { value: 6000, label: '1.0 m steps · 6,000 an hour' },
+    ]);
+    const capped = withEscalatorCapacity(drawn, 5, 4800);
+    expect(designerFloorFacts(capped, [5, 5]).escalatorCapacity).toBe(4800);
+    // A range has no single escalator, so it reports none.
+    expect(designerFloorFacts(capped, [4, 6]).escalatorCapacity).toBeUndefined();
+    // A figure that came in on an opened building is shown as what it is, not hidden.
+    expect(designerCapacityChoices(SPECS, 2500).at(-1)).toEqual({ value: 2500, label: '2,500 an hour, as opened' });
+    expect(designerCapacityChoices(SPECS, 4800)).toHaveLength(4);
+    // On this plan the same lifts join floors 5 and 6, so the board says a limit changes nothing…
+    expect(designerEscalatorIdleNote(drawn, planAnalysisOf(drawn, SPECS), 5)).toBe(DESIGNER_COPY.escalatorCapacityIdle);
+    // …and says nothing where riders really are routed over one — a two-level lobby whose lifts
+    // start at the upper level — or where there is no escalator at all.
+    const closed = SIZED.shafts.reduce((plan, shaft) => withStopToggled(plan, shaft.key, 0), SIZED);
+    const mezzanine = withEscalatorToggled(withSkyLobbyToggled(closed, [1]), 0);
+    expect(designerEscalatorIdleNote(mezzanine, planAnalysisOf(mezzanine, SPECS), 0)).toBe('');
+    expect(designerEscalatorIdleNote(SIZED, planAnalysisOf(SIZED, SPECS), 5)).toBe('');
   });
 
   it('takes a range of floors as one thing', () => {
