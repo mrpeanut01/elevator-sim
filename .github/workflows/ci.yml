@@ -62,7 +62,13 @@ name: CI
 # a pull request against, and the next pull request's own run is what catches a defect sooner.
 # Restoring the per-push run is one line: put `push: branches: [main]` back above `pull_request:`.
 on:
+  # `ready_for_review` is listed because the default types leave it out, and a draft runs nothing:
+  # `legs`, `guards` and `suite` each skip while `github.event.pull_request.draft` is true, and
+  # marking the pull request ready is what starts its first run. A draft cannot merge, so the
+  # skipped checks it shows let nothing through; what it saves is eleven jobs per push against the
+  # twenty the account may run at once. Every other event has no `pull_request`, so it runs as before.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   # A merge queue batches several approved pull requests and tests the tree they WOULD produce
   # together. **It is not available to this repository as it stands**: GitHub offers merge queues
   # only to organisation-owned repositories and `mrpeanut01/elevator-sim` is owned by a user
@@ -166,6 +172,7 @@ jobs:
   # written where the jobs are.
   legs:
     name: ${{ matrix.leg }}
+    if: github.event.pull_request.draft != true
     runs-on: ${{ matrix.runner }}
     # Stated rather than inherited. The suite reads the tree and writes nothing, so the token this
     # job hands to whatever a pull request contains is the smallest one that still checks out.
@@ -409,6 +416,7 @@ jobs:
   # failed three of the twenty-five most recent red runs from inside a fifteen-minute viz shard.
   guards:
     name: guards
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -430,8 +438,8 @@ jobs:
         run: npx vitest run --passWithNoTests=false --project viz --project experiments packages/viz/src/testCost.test.ts packages/viz/src/boundaries.test.ts packages/viz/src/deadCode.test.ts packages/viz/src/honesty/derive.test.ts packages/viz/src/deepTiers.test.ts packages/viz/src/ciLegs.test.ts packages/viz/src/ciNodeVersion.test.ts packages/viz/src/persist/persist.test.ts packages/viz/src/dev/data.test.ts packages/viz/src/dev/bundleSize.test.ts packages/viz/src/pricing/pricesAreMultipliedOnlyHere.test.ts packages/viz/src/everyday/viewportGateClaims.test.ts packages/experiments/src/validation/documentation.test.ts packages/experiments/src/validation/citations.test.ts packages/experiments/src/validation/documentRouting.test.ts packages/experiments/src/validation/ciWorkflowMatrix.test.ts packages/experiments/src/validation/deepTierBuild.test.ts packages/experiments/src/validation/deepTierReport.test.ts packages/experiments/src/validation/blockedBy.test.ts
 
   # The single check a branch protection rule can point at, and the reason the leg names above are
-  # free to change. `suite (linux)` was one job, then five legs, and since § D1084 it is six legs
-  # (the `viz` leg is two shards) plus `guards`; a required status check naming it would have gone
+  # free to change. `suite (linux)` was one job, then five legs, and it is nine legs
+  # (`viz` and `browser` are three shards each) plus `guards`; a required status check naming it would have gone
   # looking for a job that no longer exists. This job keeps that name, depends on every leg and on
   # `guards`, and fails unless all of them succeeded.
   #
@@ -446,7 +454,7 @@ jobs:
   suite:
     name: suite (linux)
     needs: [legs, guards]
-    if: always()
+    if: always() && github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     permissions:
       contents: read
