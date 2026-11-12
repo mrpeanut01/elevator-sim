@@ -139,6 +139,12 @@ Communication Service is a DNS-verified manual step a template cannot perform.
 
 ## 3. Deploy
 
+> **Since [§ D1634](../DECISIONS.md) this is automated.** `.github/workflows/deploy-server.yml` builds
+> the image in the registry and redeploys this template on every push to `main` that touches the
+> server, carrying the last deployment's parameters forward. It is armed once, by
+> `infra/azure/provision-server-deployer.sh`. The steps below are what it does, and what to run by
+> hand if it is disarmed.
+
 ```sh
 az group create --name elevator-sim --location eastus
 ```
@@ -383,6 +389,11 @@ is not repeated here.
 ---
 
 ## 8. Switching the store to SQLite, and back
+
+> **With the deploy workflow armed (§ 3), steps 1 to 4 are two manual runs:**
+> `gh workflow run deploy-server.yml -f databaseEngine=sqlite -f importFromPostgres=true`, check the
+> run's log for the `[import]` line, then `gh workflow run deploy-server.yml -f importFromPostgres=false`.
+> Deleting the PostgreSQL server stays a manual step.
 
 [§ D1630](../DECISIONS.md) is the decision. Each step below is a deployment of this template, so
 `what-if` works for each one, and **every deployment must carry every parameter your last one did**
