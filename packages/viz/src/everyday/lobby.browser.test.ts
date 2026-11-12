@@ -388,6 +388,18 @@ describe.skipIf(!HAS_BROWSER)('§ D1628 — the lobby is the main menu', () => {
       await page.goto(origin, { waitUntil: 'load' });
       await page.waitForSelector('.everyday-lobby', { timeout: 30_000 });
       expect(await page.locator('.everyday-consent-no').count(), 'the ask stands on a first visit').toBe(1);
+      /*
+       * § D1631: the bar is one row here and the lobby keeps a landing's worth of room. Measured
+       * before the fix at 92 px of bar and 18 px of lobby; the floors are a whole row and 48 px.
+       */
+      const room = await page.evaluate(() => ({
+        bar: document.querySelector('.everyday-bar')?.getBoundingClientRect().height ?? 0,
+        lobby: document.querySelector('.everyday-screen')?.getBoundingClientRect().height ?? 0,
+        leaveShown: (document.querySelector<HTMLElement>('.everyday-bar-leave')?.offsetWidth ?? 0) > 0,
+      }));
+      expect(room.bar, 'the lobby bar wrapped to a second row').toBeLessThanOrEqual(56);
+      expect(room.lobby, 'the lobby has less than a landing of room').toBeGreaterThanOrEqual(48);
+      expect(room.leaveShown, 'a narrow lobby drew the leave that leads nowhere').toBe(false);
       const top = '.everyday-lobby-floor-button[data-floor="3"]';
       /* Centred, because the shell's header and bar share this window with the ask (§ D1628). */
       await page.locator(top).evaluate((node) => {

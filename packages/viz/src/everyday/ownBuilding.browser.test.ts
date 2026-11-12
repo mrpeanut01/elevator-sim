@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { CHROMIUM, HAS_BROWSER, openPage, startShippedSite, type ShippedSite } from '../dev/browserTier.test-helper.js';
 import { DESIGNER_COPY } from './designerModel.js';
+import { OWN_BUILDING_NAMELESS, OWN_BUILDING_STANDING } from './host.js';
 import { OWN_BUILDINGS_COPY } from './scenarioModel.js';
 
 let site: ShippedSite;
@@ -103,6 +104,62 @@ describe.skipIf(!HAS_BROWSER)('§ D1629 — a building you drew is played from t
       await page.locator('.everyday-bar-leave').click();
       await page.waitForSelector('.everyday-designer-save', { timeout: 30_000 });
       await toScenario(page);
+      expect(await page.locator('.everyday-scenario-own-row').count()).toBe(0);
+      expect(await page.textContent('.everyday-scenario-own-empty')).toBe(OWN_BUILDINGS_COPY.empty);
+    } finally {
+      await page.close();
+    }
+  });
+
+  /* § D1631: the shelf can be kept, and a building the week stands on is left alone. */
+  it('goes from a save to the list in one press, renames a building, and removes one only when asked twice', async () => {
+    const page = await openDesigner();
+    try {
+      await page.locator('.everyday-designer input').first().fill(NAME);
+      expect(await page.locator('.everyday-designer-goplay').isVisible()).toBe(false);
+      await page.locator('.everyday-designer-save').click();
+      await page.locator('.everyday-designer-goplay').click();
+      await page.waitForSelector('.everyday-scenario-own-row', { timeout: 30_000 });
+
+      /* Rename: the name is edited in place and the row reads the new one. */
+      await page.locator('.everyday-scenario-own-rename').click();
+      await page.locator('.everyday-scenario-own-name-input').fill('   ');
+      await page.locator('.everyday-scenario-own-rename-save').click();
+      expect(await page.textContent('.everyday-scenario-own-refusal')).toBe(OWN_BUILDING_NAMELESS);
+      await page.locator('.everyday-scenario-own-name-input').fill('  Harbour   House ');
+      await page.locator('.everyday-scenario-own-rename-save').click();
+      expect(await page.textContent('.everyday-scenario-own-name')).toBe('Harbour House');
+      expect(await page.textContent('.everyday-scenario-own-refusal')).toBe('');
+
+      /* Remove asks first, and the keeping answer keeps. */
+      await page.locator('.everyday-scenario-own-remove').click();
+      expect(await page.textContent('.everyday-scenario-own-remove-ask')).toBe(OWN_BUILDINGS_COPY.removeAsk);
+      await page.locator('.everyday-scenario-own-remove-no').click();
+      expect(await page.locator('.everyday-scenario-own-row').count()).toBe(1);
+
+      /* With the week standing on it, neither control writes: the row says why. */
+      await page.locator('.everyday-scenario-own-play').click();
+      await page.waitForSelector('.everyday-brief', { timeout: 30_000 });
+      expect(await page.textContent('.everyday-brief')).toContain('Harbour House');
+      await toScenario(page);
+      await page.locator('.everyday-scenario-own-remove').click();
+      await page.locator('.everyday-scenario-own-remove-yes').click();
+      expect(await page.textContent('.everyday-scenario-own-refusal')).toBe(OWN_BUILDING_STANDING);
+      expect(await page.locator('.everyday-scenario-own-row').count()).toBe(1);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('removes a building the week is not standing on, and the list says it is empty again', async () => {
+    const page = await openDesigner();
+    try {
+      await page.locator('.everyday-designer input').first().fill(NAME);
+      await page.locator('.everyday-designer-save').click();
+      await page.locator('.everyday-designer-goplay').click();
+      await page.waitForSelector('.everyday-scenario-own-row', { timeout: 30_000 });
+      await page.locator('.everyday-scenario-own-remove').click();
+      await page.locator('.everyday-scenario-own-remove-yes').click();
       expect(await page.locator('.everyday-scenario-own-row').count()).toBe(0);
       expect(await page.textContent('.everyday-scenario-own-empty')).toBe(OWN_BUILDINGS_COPY.empty);
     } finally {

@@ -150,7 +150,9 @@ glide and the doors over the screen are drawn after the press. A run started fro
 is a *test simulation* and must stay a sandbox day; a building is played on a mode's floor. A
 building the player drew is played from the Scenario floor's *Your buildings*
 ([§ D1629](DECISIONS.md)), on a week of its own that banks nothing: `saveBuilding` writes the shelf
-and must not move the player's week, and a sandbox must leave no building on the shelf.
+and must not move the player's week, and a sandbox must leave no building on the shelf. The shelf
+is kept from the same list ([§ D1631](DECISIONS.md)): a rename or a remove is refused while the week
+stands on the building, so no id is left naming nothing.
 
 **The viewer is built to a design handoff**, vendored at [`docs/design/`](docs/design/) and
 extracted in [`docs/12-design-handoff.md`](docs/12-design-handoff.md)

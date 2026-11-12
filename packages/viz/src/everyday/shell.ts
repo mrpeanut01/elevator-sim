@@ -855,6 +855,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     narrowHeader.style.display = isNarrow ? 'flex' : 'none';
     paintRegion();
     bar.style.cssText = isNarrow ? BAR_NARROW : BAR_SKIN;
+    fitLobbyBar();
     railClose.style.display = isNarrow ? 'flex' : 'none';
     if (isNarrow) {
       rail.style.cssText = RAIL_DRAWER;
@@ -2466,6 +2467,33 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     return dataHost.runState().dayClosed && dataHost.lastReport() !== undefined;
   }
 
+  /**
+   * **The lobby's bar is one row on a narrow screen** — [§ D1631](../../../../DECISIONS.md).
+   *
+   * Measured at 320 × 320 with the consent ask standing: the bar wrapped to two rows (92 px) and the
+   * lobby was left 18 px. Two of its three cells were the cause. The inert leave names the screen
+   * the player is on and takes them nowhere, so on a narrow lobby it is not drawn; and the note
+   * wraps inside its own cell where it used to push the primary onto a second row. The wide bar and
+   * every other screen's bar are untouched, and § 3.3's row is the same row.
+   */
+  function fitLobbyBar(): void {
+    const leaveCell = bar.querySelector<HTMLElement>('.everyday-bar-leave');
+    if (leaveCell === null) return;
+    const fit = narrow === true && state.screen === EVERYDAY_ROOT;
+    leaveCell.hidden = fit && leaveCell.hasAttribute('disabled');
+    bar.style.flexWrap = fit ? 'nowrap' : narrow === true ? 'wrap' : '';
+    /* The bar's spacer is the one cell with no class; the note takes its room on a narrow lobby. */
+    for (const cell of bar.children) {
+      if (cell instanceof HTMLElement && cell.className === '') cell.style.display = fit ? 'none' : '';
+    }
+    const note = bar.querySelector<HTMLElement>('.everyday-bar-note');
+    if (note !== null) {
+      note.style.flex = fit ? '1 1 0' : '';
+      note.style.minWidth = fit ? '0' : '';
+      note.style.textAlign = fit ? 'left' : 'right';
+    }
+  }
+
   function drawBar(): void {
     confirmShowing = false;
     bar.replaceChildren();
@@ -2676,6 +2704,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       primaryBtn.addEventListener('click', requestLeave);
     }
     bar.append(primaryBtn);
+    fitLobbyBar();
   }
 
   /**
