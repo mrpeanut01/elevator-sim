@@ -299,6 +299,7 @@ Floors not covered by any access zone are unrestricted.
 | `name` | mode | Optional human name. |
 | `connects` | mode | Exactly two floor ids, which must differ and must both exist. Order carries no meaning — the edge is traversed either way at the same cost. |
 | `traversalTimeS` | mode | Landing-to-landing seconds, **including** stepping on and stepping off. Deterministic. |
+| `capacityPersonsPerHour` | escalator | Optional. Persons per hour **in each direction**. Absent means no limit, which is every shipped building. Present, riders queue first come, first served at each boarding landing and step on `3600 / capacity` seconds apart. Refused on `kind: "stairs"`. No default. |
 
 A transport mode is an **edge of the routing graph beside the banks**, and where a floor is
 reachable in the same number of segments by both a mode and a lift, the mode wins — that is the
@@ -327,8 +328,35 @@ was the single largest modelling limit the repository had recorded
 ([`DECISIONS.md` § D147](../../DECISIONS.md) § 6); the four together bring the same 1,956 journeys
 down to **3,245** lift legs.
 
-Three things a mode deliberately cannot express, because nothing would read them: what kind of
-machine it is, a direction (so a one-way escalator is not expressible), and a capacity or headway.
+One thing a mode deliberately cannot express, because nothing would read it: a direction, so a
+one-way escalator is not expressible. *(This sentence listed three. `kind` has shipped since the
+stairs work, and a capacity since [`DECISIONS.md` § D1632](../../DECISIONS.md).)*
+
+### An escalator's carrying capacity
+
+`capacityPersonsPerHour` gives an escalator a queue ([§ D1632](../../DECISIONS.md)). What that
+means, and what it does not:
+
+- **A mode is a pair.** One belt up and one down, each at the declared figure, each with its own
+  queue at its own boarding landing. A single reversible belt is not modelled.
+- **The wait is a wait, and it is not lift waiting time.** It is on the journey's
+  time-to-destination and is published per queue in `RunSummary.transportQueues` (entries, peak
+  queue, longest wait, and a mean that is withheld when the queue did not keep up). A queue that
+  did not keep up also withholds the lift AWT's interval, on the `transport-saturated` ground,
+  because an escalator holding riders back lowers lift waiting time by construction.
+- **The route does not change.** Riders are not diverted to a lift that serves both landings, and
+  they do not give up in the queue. Past saturation the queue is therefore longer than a real
+  crowd would let it get.
+- **Only lift journeys load it.** A journey that is the escalator and nothing else is not lift
+  demand and is never generated, so it never stands in this queue.
+- **Check the escalator is ridden at all before you declare one.** The census paragraph below
+  applies unchanged: a capacity on a mode that carries no hop moves nothing.
+
+The figure is reference data and must be cited in the mode's `$comment`.
+`elevator-specs.json`'s `escalatorCapacity` block carries the EN 115-1 planning table, and a
+declared figure above its largest row is warned about (`escalator-capacity-above-reference`).
+See [docs/02 § Escalator carrying capacity](../../docs/02-elevator-reference.md). **No shipped
+building declares one**, and `config/transportModes.test.ts` holds that.
 
 **Declaring a mode is not the same as its being used, and the difference is worth measuring.** Two
 of `vertical-city`'s four — `51 ↔ 52` and `76 ↔ 77` — carry **0 hops**, because the local bank at

@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { load } from '../sim/fixtures.test-helper.js';
 
 import { parseBuilding, resolveBuilding } from './parse.js';
-import { ISSUE_CODES } from './schema.js';
+import { ISSUE_CODES, WARNING_CODES } from './schema.js';
 import type { BuildingConfig } from './types.js';
 
 /** A minimal valid one-bank building, plus whatever `transportModes` the case is testing. */
@@ -132,5 +132,82 @@ describe('a mode naming a floor the building does not declare is fatal, and loca
     const issues = (thrown as { issues?: readonly { path: string; code?: string }[] }).issues ?? [];
     expect(issues.some((issue) => issue.code === ISSUE_CODES.unknownFloor)).toBe(true);
     expect(issues.some((issue) => issue.path === 'transportModes[0].connects[1]')).toBe(true);
+  });
+});
+
+/**
+ * `capacityPersonsPerHour` — `DECISIONS.md` § D1632. What the loader accepts, what it refuses, and
+ * the one thing it only warns about.
+ */
+describe('an escalator may declare a carrying capacity, and a stair may not', () => {
+  const escalator = (capacity: unknown): unknown[] => [
+    { id: 'esc', connects: ['G', 'M'], traversalTimeS: 21.2, capacityPersonsPerHour: capacity },
+  ];
+
+  it('parses a declared capacity and leaves an undeclared one absent rather than defaulted', () => {
+    const declared = parseBuilding(withModes(escalator(6000)), 'ok.test.json');
+    expect(declared.transportModes?.[0]?.capacityPersonsPerHour).toBe(6000);
+    const none = parseBuilding(
+      withModes([{ id: 'esc', connects: ['G', 'M'], traversalTimeS: 21.2 }]),
+      'ok.test.json',
+    );
+    expect(none.transportModes?.[0]).not.toHaveProperty('capacityPersonsPerHour');
+  });
+
+  for (const [label, capacity] of [
+    ['zero', 0],
+    ['a negative figure', -6000],
+    ['a string', '6000'],
+  ] as const) {
+    it(`refuses ${label}`, () => {
+      expect(() => parseBuilding(withModes(escalator(capacity)), 'bad.test.json')).toThrow(
+        /capacityPersonsPerHour/,
+      );
+    });
+  }
+
+  it('refuses the field on a stairs mode, and says no stair figure has been cited', () => {
+    const stairs = [
+      {
+        id: 'stair',
+        kind: 'stairs',
+        connects: ['G', 'M'],
+        traversalTimeS: { upS: 17, downS: 11 },
+        use: { up: 0.2, down: 0.4 },
+        capacityPersonsPerHour: 3000,
+      },
+    ];
+    expect(() => parseBuilding(withModes(stairs), 'bad.test.json')).toThrow(
+      /capacityPersonsPerHour is an escalator field\. No stair flow capacity has been consulted or cited/,
+    );
+  });
+
+  it('warns, and does not refuse, when the figure is above every row of the reference table', async () => {
+    const config = await load();
+    const rows = config.elevatorSpecs.escalatorCapacity?.rows ?? [];
+    // The table is the shipped one and it is the nine EN 115-1 planning figures.
+    expect(rows).toHaveLength(9);
+    const largest = Math.max(...rows.map((row) => row.personsPerHour));
+    expect(largest).toBe(8200);
+    const at = resolveBuilding(parseBuilding(withModes(escalator(largest)), 'at.test.json'), config.elevatorSpecs);
+    expect(at.warnings.map((warning) => warning.code)).not.toContain(WARNING_CODES.escalatorCapacityAboveReference);
+    const above = resolveBuilding(
+      parseBuilding(withModes(escalator(largest + 1)), 'above.test.json'),
+      config.elevatorSpecs,
+    );
+    const warning = above.warnings.find((entry) => entry.code === WARNING_CODES.escalatorCapacityAboveReference);
+    expect(warning?.path).toBe('transportModes[0].capacityPersonsPerHour');
+    expect(warning?.message).toContain('8201 persons per hour');
+    // Run as declared: the resolved mode carries the author's figure, not the table's.
+    expect(above.transportModes[0]?.capacityPersonsPerHour).toBe(largest + 1);
+  });
+
+  it('no shipped building declares one, so no shipped run has a queue', async () => {
+    const config = await load();
+    for (const building of config.buildings) {
+      for (const mode of building.transportModes) {
+        expect(mode, `${building.id}/${mode.id}`).not.toHaveProperty('capacityPersonsPerHour');
+      }
+    }
   });
 });

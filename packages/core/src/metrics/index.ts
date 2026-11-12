@@ -149,6 +149,19 @@ export { AWT_INVALID_GROUNDS, diagnoseAwtValidity } from './awtValidity.js';
 export type { AwtInvalidGround, AwtInvalidity, AwtValidityEvidence } from './awtValidity.js';
 
 export {
+  TRANSPORT_SATURATION_GROUNDS,
+  describeTransportSaturation,
+  summarizeTransportQueues,
+} from './transportQueue.js';
+
+export type {
+  TransportBoardingRecord,
+  TransportQueueRecord,
+  TransportQueueStatistics,
+  TransportSaturationGround,
+} from './transportQueue.js';
+
+export {
   countAbove,
   fractionAbove,
   histogram,

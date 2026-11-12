@@ -66,6 +66,7 @@ import type {
   ServiceLevelDiagnosis,
   WaitStatistics,
 } from './types.js';
+import { describeTransportSaturation, type TransportQueueStatistics } from './transportQueue.js';
 
 /* -------------------------------------------------------------------------- *
  * The evidence a ground is decided on
@@ -102,6 +103,14 @@ export interface AwtValidityEvidence {
   readonly abandonmentFraction: number;
   /** The abandonment limit applied. `DEFAULT_MAX_ABANDONMENT_FRACTION` unless overridden. */
   readonly maxAbandonmentFraction: number;
+  /**
+   * Every escalator queue over the window (§ D1632, `metrics/transportQueue.ts`).
+   *
+   * `[]` on every run of every building that declares no `capacityPersonsPerHour`, which is every
+   * run this repository has published — so the sixth ground below cannot fire on one. Optional
+   * so that evidence assembled by hand before the ground existed is still evidence.
+   */
+  readonly transportQueues?: readonly TransportQueueStatistics[] | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -151,6 +160,39 @@ const AWT_INVALID_GROUND_SPECS = [
     fires: (evidence: AwtValidityEvidence): boolean => evidence.waiting.count === 0,
     reason: (): string =>
       'No passenger was served within the reporting window, so there is no waiting time to average.',
+  },
+  {
+    /*
+     * **The sixth ground: an escalator that could not carry its demand** (§ D1632).
+     *
+     * Placed with `abandoned`, and ahead of it, for `abandoned`'s own reason — precedence is by
+     * cause. A saturated escalator *meters* the lifts behind it: the riders it is holding have
+     * not reached a lift landing, so they are in no lift queue, light no button and are not
+     * unserved legs. Lift waiting time therefore **falls by construction** as the escalator gets
+     * worse, exactly as it does when riders walk out, and `censored` cannot see it because a
+     * rider who never reached the landing never became a leg to count as unserved.
+     *
+     * Below `saturated` and `empty-window`: a lift queue that diverged on its own is the lifts'
+     * fact and stays reported as one, and with nobody served there is no mean to qualify. It
+     * cannot fire on a run that declares no escalator capacity, so no existing message moves.
+     *
+     * The sentence is the queue's own, from `transportQueue.ts`, with the consequence for AWT
+     * appended — one description of the queue, used in both places.
+     */
+    ground: 'transport-saturated',
+    fires: (evidence: AwtValidityEvidence): boolean =>
+      (evidence.transportQueues ?? []).some((queue) => queue.saturated),
+    reason: (evidence: AwtValidityEvidence): string => {
+      const saturated = (evidence.transportQueues ?? []).filter((queue) => queue.saturated);
+      const first = saturated[0];
+      /* c8 ignore next -- `fires` guarantees at least one. */
+      if (first === undefined) return 'An escalator queue did not clear.';
+      const others =
+        saturated.length === 1
+          ? ''
+          : ` ${saturated.length - 1} other escalator queue${saturated.length === 2 ? '' : 's'} did not keep up either.`;
+      return `${describeTransportSaturation(first, evidence.windowSeconds)}${others} Riders held at an escalator have not reached a lift landing, so they are in no lift queue and count as no unserved leg: the lifts behind it are being metered, lift waiting time is lowered by construction, and the reported mean of ${evidence.waiting.meanS.toFixed(1)} s describes the crowd that got through rather than the service the building offers. Its confidence interval must be suppressed.`;
+    },
   },
   {
     /*

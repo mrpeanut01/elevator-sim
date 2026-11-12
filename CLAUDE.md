@@ -59,15 +59,15 @@ verdict:
   to be corrected ([§ D186](DECISIONS.md)); and mode parity is **derived from the code**, proved
   against a fail state the product deliberately does not ship.
 
-  **The honesty corpus: the always-on row is wave BA's, measured 2026-11-11 on that wave's head;
+  **The honesty corpus: the always-on row is wave BC's, measured 2026-11-12 on that wave's head;
   the deep row is the nightly job's on `c181913`, the first after waves AU and AV merged, and the first
-  nightly after wave BA merges republishes it.**
+  nightly after wave BC merges republishes it.**
   Every earlier wave's move, its decomposition and what it taught are in
   [`docs/44`](docs/44-honesty-corpus-log.md), newest first:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **1 162 750** | **606** | **80** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **1 166 964** | **606** | **80** | **0** | **green**, and the register is empty |
   | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 314 338** | **4 710** | **81** | **0** | **green**, and the register is empty |
 
   **How this row is kept.** Each rule below was learned the hard way at least once, and the log says
@@ -150,7 +150,9 @@ glide and the doors over the screen are drawn after the press. A run started fro
 is a *test simulation* and must stay a sandbox day; a building is played on a mode's floor. A
 building the player drew is played from the Scenario floor's *Your buildings*
 ([§ D1629](DECISIONS.md)), on a week of its own that banks nothing: `saveBuilding` writes the shelf
-and must not move the player's week, and a sandbox must leave no building on the shelf.
+and must not move the player's week, and a sandbox must leave no building on the shelf. The shelf
+is kept from the same list ([§ D1631](DECISIONS.md)): a rename or a remove is refused while the week
+stands on the building, so no id is left naming nothing.
 
 **The viewer is built to a design handoff**, vendored at [`docs/design/`](docs/design/) and
 extracted in [`docs/12-design-handoff.md`](docs/12-design-handoff.md)

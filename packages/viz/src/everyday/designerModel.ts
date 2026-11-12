@@ -53,6 +53,7 @@ import type { CallType, ElevatorSpecs } from '@elevator-sim/core/browser';
 
 import {
   RATED_LOADS,
+  escalatorCapacityChoices,
   personsOf,
   type BuildingSpec,
   type SpecBankAnalysis,
@@ -67,6 +68,7 @@ import {
   TWO_CAR_FIGURES_WITHHELD,
   escalatorAbove,
   stairsAbove,
+  escalatorCarriesLiftJourneys,
   groupsOf,
   layoutOf,
   orphanFloorsOf,
@@ -110,6 +112,8 @@ export const DESIGNER_COPY = Object.freeze({
   saveLabel: 'Save as a new building',
   /** What a save did, and where the building is played — § D1629. */
   savedLine: 'Saved. Play a day in it from the Scenario floor, under Your buildings.',
+  /** The press under that line: the Scenario floor, where the building is listed — § D1631. */
+  goPlay: 'Go to Your buildings',
   nameLabel: 'What it is called',
   templatesEyebrow: 'START FROM',
   groupsEyebrow: 'LIFT GROUPS — SHAFTS THAT ANSWER THE SAME BUTTONS',
@@ -211,6 +215,12 @@ export const DESIGNER_COPY = Object.freeze({
   accessAdd: 'Keep these floors for them',
   accessOpen: 'Anybody may travel here.',
   accessLift: 'Lift it',
+  escalatorCapacityLabel: 'How many it carries, each way',
+  escalatorCapacityNone: 'No limit',
+  escalatorCapacityIdle:
+    'Nobody is routed over this escalator on the way to or from a lift: the lifts already join its two floors, or neither floor is a sky lobby. A limit here changes nothing in a run.',
+  escalatorCapacityHint:
+    'With no limit any number of riders step on at once. With one they step on one at a time and the rest queue at the foot of it, so they reach the lifts later; that wait is counted in their journey and never in the wait for a lift. Each figure is EN 115-1’s planning figure for that step width on a full escalator: a smaller crowd is only spaced a step apart, and a larger one queues for as long as it keeps coming. Riders do not leave a full escalator for a lift.',
   zoneLabel: 'First floor of its zone',
   autoZoneLabel: 'Zone the tallest shafts for me',
   autoZoneHint:
@@ -1021,6 +1031,11 @@ export interface DesignerFloorFacts {
   readonly panel: CallType | 'controller' | undefined;
   /** Every access zone that covers a picked floor: its id, and who it is kept for and where. */
   readonly zones: readonly { readonly id: string; readonly line: string }[];
+  /**
+   * Riders an hour the escalator above the picked floor carries each way, or `undefined` where
+   * it has no limit or there is no escalator — § D1632.
+   */
+  readonly escalatorCapacity: number | undefined;
   /** The crowd every picked floor shares, as a profile id, or `undefined` where they differ. */
   readonly use: string | undefined;
 }
@@ -1046,6 +1061,51 @@ export const DESIGNER_PANEL_COPY: Readonly<Record<CallType | 'controller', strin
   'destination-entry': 'A destination panel',
   'mobile-credential': 'A phone credential',
 });
+/**
+ * What the board says under the capacity control when a limit there would change no run, or `''`
+ * where it would — `towerPlan.ts#escalatorCarriesLiftJourneys` is the question, § D1632.
+ *
+ * `''` as well where the loader refused the building: there is no resolved building to ask, and
+ * the refusal is already on the board in its own words.
+ */
+export function designerEscalatorIdleNote(plan: TowerPlan, analysis: PlanAnalysis, floor: number): string {
+  const escalator = escalatorAbove(plan, floor);
+  if (escalator === undefined || analysis.resolved === undefined) return '';
+  return escalatorCarriesLiftJourneys(analysis.resolved, escalator.id) ? '' : DESIGNER_COPY.escalatorCapacityIdle;
+}
+
+/** One choice of the escalator capacity control: `0` is *no limit*, anything else a table row. */
+export interface DesignerCapacityChoice {
+  readonly value: number;
+  readonly label: string;
+}
+
+/**
+ * The escalator capacity control's choices — *no limit* first, then one per step width.
+ *
+ * Read from `elevator-specs.json`'s `escalatorCapacity` table through
+ * `buildingSpec.ts#escalatorCapacityChoices`, so the board offers cited figures and no others
+ * and a row added to the data appears here without an edit (invariant 7). `current` is offered
+ * as well when it is none of them — a figure that came in on an opened building — so the control
+ * can show what the plan really holds rather than appearing to have nothing selected.
+ */
+export function designerCapacityChoices(
+  specs: ElevatorSpecs,
+  current: number | undefined,
+): readonly DesignerCapacityChoice[] {
+  const rows = escalatorCapacityChoices(specs.escalatorCapacity);
+  const choices: DesignerCapacityChoice[] = [{ value: 0, label: DESIGNER_COPY.escalatorCapacityNone }];
+  for (const row of rows) {
+    const width = row.stepWidthM.toFixed(1);
+    const riders = row.personsPerHour.toLocaleString('en-US');
+    choices.push({ value: row.personsPerHour, label: `${width} m steps · ${riders} an hour` });
+  }
+  if (current !== undefined && !rows.some((row) => row.personsPerHour === current)) {
+    const riders = current.toLocaleString('en-US');
+    choices.push({ value: current, label: `${riders} an hour, as opened` });
+  }
+  return choices;
+}
 
 export function designerFloorFacts(plan: TowerPlan, range: readonly [number, number]): DesignerFloorFacts {
   const low = Math.min(range[0], range[1]);
@@ -1090,6 +1150,7 @@ export function designerFloorFacts(plan: TowerPlan, range: readonly [number, num
         id: zone.id,
         line: `${zone.credentialGroups.join(', ')} only · ${stopsSummary(plan, zone.floors)}`,
       })),
+    escalatorCapacity: single ? escalatorAbove(plan, low)?.capacityPersonsPerHour : undefined,
     use: uses.size === 1 ? ([...uses][0] as string) : undefined,
   };
 }

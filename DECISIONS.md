@@ -55788,6 +55788,8 @@ holed.
 
 ## D1629 — a building you drew is played from the Scenario floor, saving only saves, and the building's loose ends are closed
 
+> **Status 2026-11-12: AMENDED by [§ D1631](#d1631)** (on the owner's delegation). Clause 3, *saving only saves*, is confirmed. A saved building can now be renamed and removed, which this entry named as not built, and the first-visit question is closed: a first visit meets the lobby.
+
 > **Taken 2026-11-11 by the product owner** ("continue with all of it, starting with playing your own
 > building"), against the list of outstanding work this session reported after [§ D1628](#d1628)
 > merged, and built the same day by the same session (wave AZ, a single lane). The owner added that
@@ -55923,6 +55925,187 @@ integers.
 
 **Numbers spent.** This session took the charter row's **D1630** and moved the row to D1631; nothing
 is holed.
+
+## D1631 — the four questions the navigation left open are settled: save only saves, the lobby comes first, the shelf can be kept, and a narrow lobby's bar is one row
+
+> **Taken 2026-11-12 by this session on the product owner's instruction** ("continue with the four
+> open decisions, using your best judgement"), against the four questions reported after
+> [§ D1629](#d1629) merged. Built the same day (wave BB, a single lane). **Amends § D1629**, which
+> named a saved building as not renamable or removable and left the first-visit question open.
+> **Owner-reversible**, clause by clause: each is a judgement the owner delegated and may retake.
+
+**Why an entry.** It settles a question two earlier entries left to the owner, adds two writes to
+the Everyday host, and changes how the shell draws one row of the handoff's § 3.3 table.
+
+**What is ruled.**
+
+1. **Save only saves, and the next press is offered.** § D1629's clause 3 stands: the drawing
+   board's *Save* writes the shelf and does not move the week, where #655 had it do both. A building
+   is played on a mode's floor (§ D1627), and a save that also moved the week would start a day the
+   player had not asked for. What was missing was the way on, so the saved line is followed by one
+   press, *Go to Your buildings*, drawn only while that line stands.
+2. **A first visit meets the lobby.** § D1628's arrangement is kept: the lobby is the first screen,
+   it offers the walkthrough by name, and *What this is* is one press away. Nobody is sent to a page
+   they did not choose. The question § D1628 recorded as open is closed on that answer.
+3. **The shelf can be kept.** A row under *Your buildings* carries *Rename* and *Remove*
+   (`EverydayHost.renameOwnBuilding`, `removeOwnBuilding`). A name is one line: runs of space
+   collapsed, the ends trimmed, cut at `OWN_BUILDING_NAME_MAX`. *Remove* asks first, with the keeping
+   answer drawn first. **Neither writes while the week stands on the building**, or while the
+   Engineer editor has it open: a brief, a report and a run in memory read the building by id, so
+   the row is left alone until the week has moved, and the row says so. Both ask the attempt hold
+   (§ D1360) as a save does.
+4. **A narrow lobby's bar is one row.** Measured at 320 × 320 with the consent ask standing, the bar
+   wrapped to 92 px and left the lobby 18 px. On a narrow lobby the shell does not draw the inert
+   leave, which names the screen the player is on, and the note wraps inside its own cell. The bar
+   is 52 px there and the lobby has 58 px, which scrolls. § 3.3's row is unchanged as data; the wide
+   bar and every other screen's bar are untouched.
+
+**What is not built, named.** A goal, a budget, a survivor count and sharing for a player's
+building still wait on the gameplay revamp, and all of a player's buildings still share one week.
+At 320 × 320 the lobby is usable and still small while the ask stands; the ask's own height is
+[issue #630](https://github.com/mrpeanut01/elevator-sim/issues/630)'s and is not moved here.
+
+**Held by** `everyday/ownBuilding.browser.test.ts` (the press after a save, a rename, a remove asked
+twice, and the refusal while the week stands on the building), `everyday/scenarioModel.test.ts`
+(the words and the name rule), `everyday/attemptDoors.test.ts` (both writes refuse while a scored
+attempt stands) and `everyday/lobby.browser.test.ts` (the bar's height, the lobby's room and the
+undrawn leave at 320 × 320).
+
+**Numbers spent.** Wave BB took the charter row's **D1631** and moved the row to D1632; nothing is
+holed.
+
+## D1632 — an escalator may declare a carrying capacity, and one that does has a queue
+
+> **Taken 2026-11-11** on the product owner's request for escalator handling as an engine feature,
+> comprehensive and correct. **Moves a recorded refusal**: `config/types.ts` and `docs/02` both said
+> a mode deliberately has *no capacity or headway*, because "modelling it would put a queue on the
+> one edge that exists to remove a queue". That sentence is kept where it stood, struck, with what
+> moved it.
+
+**Why an entry.** It adds a field to the building schema, a block to `data/elevator-specs.json`, a
+table and two leg fields to the run record, a sixth `awtIsValid` ground and a fourth undelivered
+reason. Each of those binds code its own module does not own.
+
+**What is ruled.**
+
+1. **The field.** `transportModes[].capacityPersonsPerHour`, optional, strictly positive, persons
+   per hour **in each direction**. **No default.** Absent is *no limit*, which is the model before
+   this entry and what every shipped building declares.
+2. **Declared, not derived.** A mode declares neither a step width nor a speed; `traversalTimeS` is
+   a lumped figure, and a second declared speed beside it would be two statements of one quantity.
+   Per hour, because every source consulted states it so and five of the nine planning figures do
+   not divide by sixty.
+3. **The table is data.** `elevator-specs.json`'s `escalatorCapacity` block carries the nine
+   EN 115-1 traffic-flow-planning figures. It is reference data and never a default. It has two
+   non-test readers: `resolveBuilding` warns above its largest row
+   (`escalator-capacity-above-reference`), and the building designer offers its 0.5 m/s rows.
+4. **The queue.** Each direction of a capacity-bearing mode has a first-come, first-served queue at
+   its boarding landing. Riders step on `3600 / capacity` seconds apart, then ride `traversalTimeS`.
+   The server is deterministic and nobody leaves the queue, so a rider's turn is fixed when they
+   join: the implementation is one `max` per rider and no boarding event (`sim/escalatorQueue.ts`).
+   **No random stream was added** (invariant 2), nothing reads a clock, and riders join in the
+   kernel's `(time, sequence)` order, in trace order within a batch.
+5. **A mode is a pair.** One belt up, one down, each at the declared rate, with independent queues.
+   The shipped modes are named *escalator pair* and `traversalTimeS` is symmetric. A single
+   reversible belt would need a declared direction or schedule and is **not modelled**.
+6. **Stairs are refused the field.** No stair flow capacity was consulted, and a stairs rider never
+   enters the lift system, so the figure would be uncited and unread.
+7. **The route stays fixed.** `traffic/route.ts` plans structurally, before the run. A saturated
+   escalator diverts nobody to a lift that serves both landings; the queue grows and is reported.
+8. **Reporting.** The wait is on time-to-destination and is **not** lift waiting time.
+   `RunRecord.transportQueues` carries every rider's turn; `RunSummary.transportQueues` carries the
+   per-window statistics. A closing hop's wait is on the leg as `egressQueueSeconds`.
+9. **Saturation.** A queue is saturated when more riders joined in the window than the window can
+   board (exact, no threshold), when a rider was cut by the drain deadline, or when a rider waited
+   past the 900 s horizon `serviceLevel` already uses. A saturated queue withholds its own mean and
+   fires `transport-saturated`, which withholds the lift AWT's interval.
+10. **A rider held at the deadline is undelivered**, reason `on-transport`, and the run is
+    `timed-out`. `ConservationAudit.transportQueue` checks `entered === cleared + cut`.
+
+**Why the lift mean is withheld too.** A saturated escalator meters the lifts behind it. The riders
+it holds have reached no lift landing, so they are in no lift queue and are no unserved leg. Lift
+waiting time therefore falls as the escalator gets worse. That is abandonment's shape, and it gets
+abandonment's treatment and its place in the precedence.
+
+**What was sourced, and from where.**
+
+| claim | source | status |
+|---|---|---|
+| the nine planning figures | KONE, *Planning Guide for KONE escalators and autowalks* (GB/IR), § 4.2 Table 4.1 and § 10.2 | **read**; the two tables agree |
+| they are an average practical capacity at full load | same guide, § 4.2 | **read** |
+| EN 115-1's own text, annex and table number | — | **not opened**, not asserted |
+| CIBSE Guide D handling capacities | — | **not opened**, in any edition |
+| a published practical-to-theoretical ratio | — | **none found** |
+| 80 %, 71 %, 67 % of the per-step theoretical figure at 0.5 m/s | arithmetic over the table and Chereau & Chalaux's per-step assumption (read as an excerpt) | **derived here**, stated by neither source |
+
+**The limits, each chosen and each tested** (`sim/escalatorCapacity.test.ts`).
+
+- No diversion and no reneging, so past saturation the queue over-states a real one.
+- A journey that is the escalator alone is refused by the generator as `no-lift-leg` and never
+  loads the queue, so below saturation the queue under-states a real one.
+- Evenly spaced slots; two riders abreast are two slots.
+- The trolley derating the guide records (about 80 %) is not applied.
+- The leg `arrivedAt` after a capacity-bearing hop is no longer dispatcher-independent where the
+  belt is shared with riders coming off a lift. It already was not for any transfer leg.
+
+**What the data block cost, said plainly.** `elevator-specs.json` is part of every run's
+configuration, so adding a block to it moves every digest taken over a run's inputs, whether or
+not any run reads the block. Two shipped files are pinned that way and both were regenerated, as
+their guards instruct: `data/fixit-as-built-mornings.json` (all 18 input hashes moved and **no
+reading did**) and `data/scenario-survivors.json` (the whole sweep re-run; **every count and name
+reproduced**, and only the hash and the provenance stamp moved). A stored run still replays to the same legs; a
+digest of its *inputs* taken before this entry no longer matches one taken after. `airPressure`,
+`ropeClasses` and `shaftFootprint` paid the same cost for the same reason.
+
+**What was left out, and said.**
+
+- **No shipped building declares a capacity.** None of them cites one, and the planning figures are
+  far above the hop counts `data/buildings/README.md` records. What a cited capacity would do on a
+  shipped tower is **unmeasured**.
+- **The viewer draws no queue and prints no queue statistic.** `VizSummary` is not extended. The
+  suppression lead for the new ground is worded (`mode/disclosure.ts`); nothing else is shown.
+- **The drawing board offers only the table's 0.5 m/s rows**, the speed its seconds are derived at.
+  Where no lift journey is routed over an escalator the board says a limit changes nothing, and
+  `towerPlan.test.ts` pins that by a run. On every shipped template that is the case.
+- **No replication metric.** `REPLICATION_METRICS` is unchanged, so the experiment runner cannot
+  pair two arms on an escalator's queue wait. The figures are on each run's summary and nowhere
+  aggregated.
+- **`Passenger.timeToDestinationS`** does not include a closing hop's queue wait; the record and
+  `buildJourneys` do. Nothing outside tests reads the getter.
+
+**Held by** `sim/escalatorCapacity.test.ts` (absent is identical; the closed form above and below
+capacity; the control moves the legs at all three hop positions; conservation; the two limits),
+`config/transportModes.test.ts`, `metrics/awtValidity.test.ts`, `traffic/transportIdentity.test.ts`
+(the pinned digests, unchanged), and in the viewer `authoring/authoring.test.ts`,
+`authoring/towerPlan.test.ts`, `everyday/designerModel.test.ts` and `mode/disclosure.test.ts`.
+
+**Numbers spent.** One, **D1632**. The charter row moves to D1633.
+
+## D1633 — Charter S9 B2's bundle budget raised to 2 000 kB by the product owner
+
+**Date: 2026-11-12 · Owner: product owner, answering the integrator during the merge of GitHub PR
+#668 · Rules on: `packages/viz/src/everyday/builtBundle.browser.test.ts#BUNDLE_BUDGET_KB`,
+`docs/41-launch-checklist.md` § 4.1.**
+
+**Why an entry.** [§ D405](#d405)'s first ground, as for [§ D622](#d622): this moves a figure a
+document outside the deciding test file must agree with.
+
+**What happened.** CI on #668 (escalator carrying capacity, [§ D1632](#d1632)) measured the built
+bundle at **1 628.741 kB gzip**, past the 1 620 kB line that 90 % of the 1 800 kB budget sets. A
+local build of the base and of #668's head differed by **≈ 13.2 kB**, almost all of it `core`'s new
+escalator-queue code, which ships in the page bundle and in the `batch`, `morning` and `shift`
+workers alike. So the base already stood at **≈ 1 615.5 kB**, within 5 kB of the line before #668.
+Not an accidental dependency.
+
+**MEASURED: 1 628.741 kB on #668's head in CI, ≈ 1 615.5 kB base by difference.** **CHOSEN:
+2 000 kB, by the product owner**, offered beside the shared-`core` trim and holding #668. The 90 %
+line is now 1 800 kB.
+
+**The trim is still the follow-up.** `core` is bundled once per entry point, so every byte it gains
+is paid four times. Sharing it in one chunk would very likely buy back real headroom; it changes how
+four entry points load, and it was not taken here.
+
+**Numbers spent.** One, **D1633**. The charter row moves to D1634.
 
 ## D1634 — the server deploys itself on a push to `main`, with the last deployment's parameters carried forward
 

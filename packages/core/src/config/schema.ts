@@ -256,6 +256,13 @@ export const WARNING_CODES = {
    */
   floorAreaBuysNothing: 'floor-area-buys-nothing',
   /**
+   * An escalator declares a `capacityPersonsPerHour` above the largest row of
+   * `elevator-specs.json`'s `escalatorCapacity` table — `DECISIONS.md` § D1632. Legal, and run as
+   * declared; the warning exists because the likely causes are a both-directions total or a
+   * slipped digit, and either makes the queue the field models never form.
+   */
+  escalatorCapacityAboveReference: 'escalator-capacity-above-reference',
+  /**
    * Some floors of this building resolve a gross area and some do not — `DECISIONS.md` § D601.
    *
    * The per-floor figures still resolve for the floors that have one; the **building-level**
@@ -632,6 +639,32 @@ const shaftFootprintSchema = z.strictObject({
   source: z.string().min(1),
 });
 
+/**
+ * `elevator-specs.json`'s `escalatorCapacity` block — § D1632.
+ *
+ * Every figure strictly positive, and no two rows may describe the same step width and speed:
+ * the designer looks a row up by that pair, and two answers would make the lookup depend on
+ * array order.
+ */
+const escalatorCapacitySchema = z.strictObject({
+  $comment: comment,
+  rows: z
+    .array(
+      z.strictObject({
+        stepWidthM: positive,
+        nominalSpeedMps: positive,
+        personsPerHour: positive,
+      }),
+    )
+    .min(1, 'an escalatorCapacity block must declare at least one row')
+    .refine(
+      (rows) =>
+        new Set(rows.map((row) => `${row.stepWidthM}@${row.nominalSpeedMps}`)).size === rows.length,
+      { message: 'escalatorCapacity rows must be distinct in (stepWidthM, nominalSpeedMps)' },
+    ),
+  source: z.string().min(1),
+});
+
 export const elevatorSpecsSchema = z
   .strictObject({
     $comment: comment,
@@ -643,6 +676,7 @@ export const elevatorSpecsSchema = z
     regenerativeDrive: regenerativeDriveSchema.optional(),
     ropeClasses: ropeClassesSchema.optional(),
     shaftFootprint: shaftFootprintSchema.optional(),
+    escalatorCapacity: escalatorCapacitySchema.optional(),
     codeMinimumSpeedByRise: z.array(
       z.strictObject({
         riseFtRange: z
@@ -1813,6 +1847,10 @@ export const transportModeSchema = z
     // array indexed by flight count would be dead in every entry but its last — measured, and
     // recorded on {@link StairsUseConfig}.
     use: z.strictObject({ up: fraction, down: fraction }).optional(),
+    // Persons per hour, one direction. Strictly positive and finite: zero would be a machine
+    // nobody can ever board, which is a mode that should not be declared. No default — absent
+    // is "no limit", the model before § D1632. Active only on an escalator; see the refinement.
+    capacityPersonsPerHour: positive.optional(),
   })
   .refine((mode) => mode.connects[0] !== mode.connects[1], {
     message:
@@ -1861,6 +1899,14 @@ export const transportModeSchema = z
         path: ['use'],
         message:
           'an escalator is structural — the router sends journeys over it because the geometry connects those floors — so there is no choice to model and "use" would never be read.',
+      });
+    }
+    if (kind === 'stairs' && mode.capacityPersonsPerHour !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['capacityPersonsPerHour'],
+        message:
+          'capacityPersonsPerHour is an escalator field. No stair flow capacity has been consulted or cited for this project, and a rider who takes the stairs never enters the lift system, so the figure would be uncited and unread. See docs/02 § Escalator carrying capacity.',
       });
     }
     if (typeof mode.traversalTimeS !== 'number' && mode.traversalTimeS.upS < mode.traversalTimeS.downS) {

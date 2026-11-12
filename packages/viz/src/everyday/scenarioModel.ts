@@ -350,6 +350,15 @@ export const OWN_BUILDINGS_COPY = Object.freeze({
   play: 'Play a day',
   empty: 'You have not saved a building yet. Draw one on the Design floor and it is listed here.',
   design: 'Design a building',
+  /* § D1631: the shelf can be kept. */
+  rename: 'Rename',
+  nameLabel: 'Building name',
+  saveName: 'Save name',
+  cancel: 'Cancel',
+  remove: 'Remove',
+  removeAsk: 'Remove this building from this device? It cannot be brought back.',
+  removeYes: 'Remove it',
+  removeNo: 'Keep it',
 });
 
 /** One saved building, as the hub lists it. */
@@ -368,6 +377,17 @@ export interface OwnBuildingsView {
   readonly empty: string | undefined;
   readonly playLabel: string;
   readonly designLabel: string;
+  /** The words of a row's two keeping controls and their confirmations — § D1631. */
+  readonly keep: {
+    readonly rename: string;
+    readonly nameLabel: string;
+    readonly saveName: string;
+    readonly cancel: string;
+    readonly remove: string;
+    readonly removeAsk: string;
+    readonly removeYes: string;
+    readonly removeNo: string;
+  };
 }
 
 /**
@@ -392,6 +412,16 @@ export function ownBuildingsViewOf(
     empty: rows.length === 0 ? OWN_BUILDINGS_COPY.empty : undefined,
     playLabel: OWN_BUILDINGS_COPY.play,
     designLabel: OWN_BUILDINGS_COPY.design,
+    keep: Object.freeze({
+      rename: OWN_BUILDINGS_COPY.rename,
+      nameLabel: OWN_BUILDINGS_COPY.nameLabel,
+      saveName: OWN_BUILDINGS_COPY.saveName,
+      cancel: OWN_BUILDINGS_COPY.cancel,
+      remove: OWN_BUILDINGS_COPY.remove,
+      removeAsk: OWN_BUILDINGS_COPY.removeAsk,
+      removeYes: OWN_BUILDINGS_COPY.removeYes,
+      removeNo: OWN_BUILDINGS_COPY.removeNo,
+    }),
   });
 }
 

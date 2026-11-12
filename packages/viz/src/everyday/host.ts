@@ -986,6 +986,29 @@ export interface OwnBuilding {
 /** {@link EverydayHost.playOwnBuilding}'s refusal for an id the shelf no longer holds. */
 export const OWN_BUILDING_GONE = 'That building is no longer saved on this device, so there is nothing to play.';
 
+/**
+ * Why a saved building cannot be renamed or removed right now — [§ D1631](../../../../DECISIONS.md).
+ * The week is standing on it: its brief, its report and a run in memory all read it by id, so the
+ * shelf row is left alone until the week has moved to another building.
+ */
+export const OWN_BUILDING_STANDING =
+  'Your week is standing on this building. Play a day somewhere else first, then rename or remove it here.';
+
+/** The same refusal for a building the Engineer editor has open with changes that are not saved. */
+export const OWN_BUILDING_OPEN =
+  'This building is open in the Engineer building editor. Finish with it there first.';
+
+/** A rename to nothing is refused: a building with no name is a blank row. */
+export const OWN_BUILDING_NAMELESS = 'A building needs a name.';
+
+/** The longest name a saved building keeps, in characters. A row is one line. */
+export const OWN_BUILDING_NAME_MAX = 40;
+
+/** A typed name as the shelf keeps it: runs of space made one, the ends trimmed, cut to the cap. */
+export function ownBuildingNameOf(typed: string): string {
+  return typed.replace(/\s+/gu, ' ').trim().slice(0, OWN_BUILDING_NAME_MAX).trim();
+}
+
 /** What *Tune the tower* opens on — {@link EverydayHost.sandboxStanding}, [§ D1368](../../../../DECISIONS.md). */
 export interface SandboxStanding {
   /** The tower its contract's rung hands over, as the authoring model's spec. */
@@ -2153,6 +2176,20 @@ export interface EverydayHost {
    * longer on the shelf. Nothing is written on a refusal.
    */
   playOwnBuilding(id: string): string | undefined;
+
+  /**
+   * Rename a saved building — [§ D1631](../../../../DECISIONS.md). The id stays, so everything that
+   * names the building by id follows. Answers `undefined` when the name was written, or the sentence
+   * that says why not: gone from the shelf, nameless, standing under the week, open in the Engineer
+   * editor, or {@link attemptHold}'s (§ D1360). Nothing is written on a refusal.
+   */
+  renameOwnBuilding(id: string, name: string): string | undefined;
+
+  /**
+   * Remove a saved building from the shelf — § D1631. Refused on the same grounds as a rename, so no
+   * id is ever left naming nothing: the week must have moved off the building first.
+   */
+  removeOwnBuilding(id: string): string | undefined;
 
   /**
    * **Run a sandbox day: the day with what moved, over the week and never on it** — wave AO, lane
@@ -4370,6 +4407,15 @@ export function createEverydayHost(
     return undefined;
   };
 
+  /** Why a saved building's shelf row may not be written now, or `undefined` — § D1631. */
+  const ownBuildingBusy = (id: string): string | undefined => {
+    const state = b.state();
+    if (!state.savedBuildings.some((entry) => entry.id === id)) return OWN_BUILDING_GONE;
+    if (state.buildingId === id) return OWN_BUILDING_STANDING;
+    if (state.editingBuildingId === id) return OWN_BUILDING_OPEN;
+    return undefined;
+  };
+
   const everydayHost: EverydayHost = {
     week: () => b.state().week,
     parkedWeeks: () => b.state().parkedWeeks,
@@ -5446,6 +5492,29 @@ export function createEverydayHost(
       }
       notifyCampaign();
       return undefined;
+    },
+    renameOwnBuilding: (id, typed) => {
+      const refused = ownBuildingBusy(id);
+      if (refused !== undefined) return refused;
+      const name = ownBuildingNameOf(typed);
+      if (name === '') return OWN_BUILDING_NAMELESS;
+      /*
+       * A shelf row the week is not standing on ({@link ownBuildingBusy} refused otherwise), so the
+       * write reaches no run and no screen says it does. Built as a patch and handed over, as
+       * `saveBuilding`'s is.
+       */
+      const patch = {
+        savedBuildings: b.state().savedBuildings.map((entry) =>
+          entry.id === id ? { id: entry.id, config: { ...entry.config, name } } : entry,
+        ),
+      };
+      return editorWrite(patch);
+    },
+    removeOwnBuilding: (id) => {
+      const refused = ownBuildingBusy(id);
+      if (refused !== undefined) return refused;
+      const patch = { savedBuildings: b.state().savedBuildings.filter((entry) => entry.id !== id) };
+      return editorWrite(patch);
     },
     runSandbox: (presses) => {
       /* § D1360: a sandbox day plays the attempt's crowd, so it is refused while an attempt stands. */

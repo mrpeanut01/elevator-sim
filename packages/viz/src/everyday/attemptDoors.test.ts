@@ -173,6 +173,9 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   saveBuilding: 'held',
   ownBuildings: 'reads',
   playOwnBuilding: 'held',
+  /* § D1631: keeping the shelf writes it, so both ask the hold as a save does. */
+  renameOwnBuilding: 'held',
+  removeOwnBuilding: 'held',
   /* § D1368's sandbox day plays the day's crowd, so it is held while an attempt stands (joined at integration). */
   sandboxStanding: 'reads',
   /* Lane AO-4's two reads, joined at integration: the attempt's left-at clock and the day before's driver. */
@@ -392,6 +395,16 @@ const HELD_PRESSES: Readonly<Record<string, (host: EverydayHost) => unknown>> = 
     if (reading === undefined) throw new Error('the standing building has no plan');
     return host.playOwnBuilding(host.saveBuilding(reading.plan));
   },
+  renameOwnBuilding: (host) => {
+    const reading = host.buildingPlan();
+    if (reading === undefined) throw new Error('the standing building has no plan');
+    return host.renameOwnBuilding(host.saveBuilding(reading.plan), 'Renamed');
+  },
+  removeOwnBuilding: (host) => {
+    const reading = host.buildingPlan();
+    if (reading === undefined) throw new Error('the standing building has no plan');
+    return host.removeOwnBuilding(host.saveBuilding(reading.plan));
+  },
   runSandbox: (host) => host.runSandbox({ building: undefined, pattern: undefined, dwell: { choice: 'patient' } }),
   takeCallAgain: (host) => host.takeCallAgain(),
   playThisCrowd: (host) =>
@@ -416,6 +429,8 @@ const BEFORE_THE_ATTEMPT: Readonly<Record<string, 'practice' | 'refused' | 'writ
   setPlainLever: 'writes',
   saveBuilding: 'writes',
   playOwnBuilding: 'writes',
+  renameOwnBuilding: 'writes',
+  removeOwnBuilding: 'writes',
   startRun: 'practice',
   runSandbox: 'practice',
   takeCallAgain: 'refused',

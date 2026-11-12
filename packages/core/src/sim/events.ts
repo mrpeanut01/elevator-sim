@@ -1,5 +1,5 @@
 /**
- * The ten things that can happen in a run, as kernel events.
+ * The eleven things that can happen in a run, as kernel events.
  *
  * The whole simulation is these and nothing else. There is no tick, no polling loop and no
  * "advance by dt": the clock jumps from one of these to the next, which is what makes a
@@ -11,6 +11,7 @@
  * | `sim.batchArrival` | a trace batch's time comes | materializes its passengers, lights the buttons, runs dispatch |
  * | `sim.transferArrival` | a sky-lobby walk completes | re-injects the journey's next leg as a fresh arrival |
  * | `sim.transportArrival` | a journey's *opening* escalator or stair hop completes | admits its first lift leg at the far landing |
+ * | `sim.transportCleared` | a rider steps off a *closing* escalator that declares a carrying capacity (§ D1632) | nothing to the building; it makes the run last until they are off, so a queue still draining is not mistaken for a finished run |
  * | `sim.dispatchTick` | a defer window closes, or a call is due to be re-offered | runs stages 2–5 for one bank |
  * | `sim.carArrived` | a car is levelled | completes the move and asks the car what to do next |
  * | `sim.carDoor` | the door's next automatic transition is due | runs the door forward; transfers passengers when it reaches open |
@@ -47,6 +48,7 @@ export const SIM_EVENT_TYPES = Object.freeze({
   batchArrival: 'sim.batchArrival',
   transferArrival: 'sim.transferArrival',
   transportArrival: 'sim.transportArrival',
+  transportCleared: 'sim.transportCleared',
   dispatchTick: 'sim.dispatchTick',
   carArrived: 'sim.carArrived',
   carDoor: 'sim.carDoor',
@@ -104,6 +106,21 @@ export interface TransferArrivalPayload {
 export interface TransportArrivalPayload {
   /** Index into `PassengerTrace.passengers`. */
   readonly passengerIndex: number;
+}
+
+/**
+ * A rider reaching the far landing of the escalator that **ends** their journey, on an escalator
+ * that declares a carrying capacity (§ D1632).
+ *
+ * {@link TransportArrivalPayload}'s docstring says a closing hop needs no event because it is a
+ * constant added to the completion instant, and on an escalator with no declared capacity that is
+ * still true and still what happens. With a capacity the hop is a queue wait plus a ride, the
+ * wait is settled when the rider steps off the lift, and this event marks the instant the journey
+ * is really over — so the run's own end is not earlier than a rider it reports as delivered.
+ */
+export interface TransportClearedPayload {
+  /** Id of the final leg whose journey the escalator finishes. */
+  readonly legId: string;
 }
 
 /** One bank's group controller is due to look at its live calls. */
@@ -193,6 +210,14 @@ export function transportArrivalEvent(
   handler: EventHandler<TransportArrivalPayload>,
 ): SimEvent<TransportArrivalPayload> {
   return createEvent(SIM_EVENT_TYPES.transportArrival, payload, handler);
+}
+
+/** A closing hop on a capacity-bearing escalator completing. See {@link TransportClearedPayload}. */
+export function transportClearedEvent(
+  payload: TransportClearedPayload,
+  handler: EventHandler<TransportClearedPayload>,
+): SimEvent<TransportClearedPayload> {
+  return createEvent(SIM_EVENT_TYPES.transportCleared, payload, handler);
 }
 
 /** A bank's group controller running stages 2 to 5 over its live calls. */
