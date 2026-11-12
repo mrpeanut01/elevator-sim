@@ -1122,6 +1122,11 @@ lobby in front of the existing Everyday menu and proposes *Skip the lobby*; the 
 inventory begins at a menu of mode cards. This build has one screen for both, inside the shell:
 the mode cards are the lobby's three top landings, and there is no setting between them.
 
+**And four smaller cells follow** ([§ D1629](../DECISIONS.md)). § 3.3's `⌂ Modes` and
+`⌂ Return to Main Menu` ship as *⌂ Lobby* and *⌂ Return to the lobby*; the tuner's *Run it and
+watch* ships as *Test simulation*; and § 3.2's *Switch to Engineer* is drawn as the top stop of the
+shaft, where the guide puts it at the rail's foot.
+
 **What it does not change.** The handoff's palette, type and door easing are kept where the new
 hall draws the same things. Every rail row the two groups carried is still on the tray, under its
 floor. The rest of § 3.3's table ships as transcribed, and `actionBar.test.ts` reads the vendored

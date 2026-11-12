@@ -383,7 +383,7 @@ describe('what this screen adds on top of the sheet', () => {
     expect(view.close?.tomorrow.wrinkle).toBe('Move-in day: A tenant is hauling boxes up.');
     expect(view.close?.call).toBe('No call decided today: the stage raised none.');
     expect(view.close?.arithmetic).toBeDefined();
-    expect(view.secondary).toEqual({ week: 'Your week', menu: 'Main menu' });
+    expect(view.secondary).toEqual({ week: 'Your week', menu: 'Lobby' });
     // No week handed in (every caller but the daily report), a career sheet, or a practice close: no lead.
     expect(viewOf({ report }).close).toBeUndefined();
     expect(

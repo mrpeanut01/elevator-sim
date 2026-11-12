@@ -214,7 +214,7 @@ import {
   type TowerChoiceView,
 } from './towerChoice.js';
 import type { VizRecording } from '../contract/types.js';
-import { savedBuildingFrom, savedBuildingFromPlan, stateRunningSaved } from '../dev/buildingEditor.js';
+import { savedBuildingFromPlan } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
 import {
   allBuildingIds,
@@ -230,6 +230,7 @@ import {
   shiftLengthForContract,
   shiftRunConfigOf,
   specsWithSaved,
+  withBuilding,
   withDispatcher,
   type PatternSelection,
   type PlannedDay,
@@ -975,6 +976,15 @@ export interface CampaignDayFacts {
   /** Whether the run's log already carries an answer. */
   readonly answered: boolean;
 }
+
+/** One building the player drew and saved — {@link EverydayHost.ownBuildings}, [§ D1629](../../../../DECISIONS.md). */
+export interface OwnBuilding {
+  readonly id: string;
+  readonly name: string;
+}
+
+/** {@link EverydayHost.playOwnBuilding}'s refusal for an id the shelf no longer holds. */
+export const OWN_BUILDING_GONE = 'That building is no longer saved on this device, so there is nothing to play.';
 
 /** What *Tune the tower* opens on — {@link EverydayHost.sandboxStanding}, [§ D1368](../../../../DECISIONS.md). */
 export interface SandboxStanding {
@@ -2108,36 +2118,41 @@ export interface EverydayHost {
   answerIncident(atS: number, optionId: string): string | undefined;
 
   /**
-   * Save a drawn building **and stand the next run on it**, answering the id it took.
+   * **Save a drawn building to the shelf**, answering the id it took —
+   * [§ D1629](../../../../DECISIONS.md).
    *
-   * The exact two presses the Engineer building editor's *Save* and *Run it* make, in one call:
-   * `savedBuildingFrom` allocates a fresh id and runs the document through the real loader (so a
-   * spec the parser refuses throws here rather than at run time), and `stateRunningSaved` selects
-   * it through `withBuilding` — which is the load-bearing half. A bare `buildingId` write would
-   * leave the week's `contractId` in place and bank a drawn tower against a real assignment; the
-   * sandbox contract is what says a drawn building belongs to no scenario.
-   *
-   * It does **not** run. GAMEPLAY § 13's *Run a day in it* and § 3.3's tuner primary are
-   * *apply, then run*, and the two are separate because the designer's *Save as a new building*
-   * is the same apply with no run after it. Composition beats a second method that differs by a
-   * boolean.
+   * `dev/buildingEditor.ts#savedBuildingFromPlan` allocates a fresh id and runs the drawing board's
+   * plan through the real loader, so a plan the parser refuses throws here rather than at run time. **It does not stand the week on
+   * the building, and that is the change.** This was `applyBuildingSpec`, and then `applyTowerPlan` for a plan, which also moved the
+   * player's week onto the drawn tower through `withBuilding`: pressing *Save* on the design floor
+   * quietly left the Scenario week the player was on and put a tower nobody had asked to play under
+   * the front door. Drawing is the design floor's and playing is a mode's, so saving saves, and
+   * {@link playOwnBuilding} is the press that plays.
    *
    * While a scored attempt stands on the week on screen it throws {@link attemptHold}'s sentence
-   * and writes nothing — § D1360, the loader's own refusal shape, which the designer already
-   * quotes; the tuner's primary is inert with the same words, so it never reaches this.
+   * where the write would reach that day, and writes nothing (§ D1360).
    */
-  applyBuildingSpec(spec: BuildingSpec): string;
+  saveBuilding(plan: TowerPlan): string;
 
   /**
-   * {@link applyBuildingSpec} for the drawing board's plan: save it under a fresh id **and stand
-   * the next run on it**, answering the id it took. *Design a building*'s *Save as a new building*.
-   *
-   * The same two halves and the same load-bearing one: `dev/buildingEditor.ts#savedBuildingFromPlan`
-   * puts the document through the real loader, so a plan it refuses throws here, and
-   * `stateRunningSaved` selects it through `withBuilding`. It does not run, and it throws
-   * {@link attemptHold}'s sentence and writes nothing while a scored attempt stands (§ D1360).
+   * The buildings this player has drawn and saved, in the order they were saved — § D1629. The
+   * Scenario floor lists them under *Your buildings*; the name is the one the designer wrote.
    */
-  applyTowerPlan(plan: TowerPlan): string;
+  ownBuildings(): readonly OwnBuilding[];
+
+  /**
+   * **Play a day in a building the player drew** — § D1629, `docs/38` § 2.1's *Build your own* as
+   * far as this build takes it. Stands the week on the saved building through `withBuilding`, which
+   * is the load-bearing part: a drawn tower belongs to no authored scenario, so its week carries
+   * `shift/week.ts#SANDBOX_CONTRACT_ID`, the week the player left is parked and not ended, and
+   * nothing a day there does can be banked against a real assignment. The day is then the daily
+   * flow's own (brief, stage, report), judged on the tower's rung, and filed to that week's history.
+   *
+   * Answers `undefined` when the week stands on the building, or the sentence that says why it does
+   * not: {@link attemptHold}'s while a scored attempt stands (§ D1360), or that the building is no
+   * longer on the shelf. Nothing is written on a refusal.
+   */
+  playOwnBuilding(id: string): string | undefined;
 
   /**
    * **Run a sandbox day: the day with what moved, over the week and never on it** — wave AO, lane
@@ -5385,33 +5400,52 @@ export function createEverydayHost(
       b.intervene(atS, composed.change);
       return undefined;
     },
-    applyBuildingSpec: (spec) => {
-      const state = b.state();
-      const saved = savedBuildingFrom(spec, state, b.resources);
-      const next = stateRunningSaved(state, b.resources, saved);
-      /*
-       * The whole derived state as the patch, rather than a hand-picked field list.
-       * `stateRunningSaved` goes through `withBuilding`, which touches the week, the parked weeks
-       * and both editor working copies under their own pristine guards — a list here would be a
-       * second opinion about which of those matter, and would go stale the next time that function
-       * learns to carry one more thing. It is a patch over the same `state` this call read, so
-       * nothing else can have moved underneath it.
-       */
-      /* § D1360: the loader's refusal shape, which the designer quotes; nothing is written. */
-      const held = attemptHoldOver({ ...next });
-      if (held !== undefined) throw new Error(held);
-      b.applyPatch({ ...next });
-      return saved.id;
-    },
-    applyTowerPlan: (plan) => {
+    saveBuilding: (plan) => {
       const state = b.state();
       const saved = savedBuildingFromPlan(plan, state, b.resources);
-      const next = stateRunningSaved(state, b.resources, saved);
-      /* § D1360, as `applyBuildingSpec` asks it: the loader's refusal shape, and nothing written. */
-      const held = attemptHoldOver({ ...next });
+      const patch = {
+        savedBuildings: [
+          ...state.savedBuildings.filter((entry) => entry.id !== saved.id),
+          { id: saved.id, config: saved.config },
+        ],
+      };
+      /* § D1360: the loader's refusal shape, which the designer quotes; nothing is written. */
+      const held = attemptHoldOver(patch);
       if (held !== undefined) throw new Error(held);
-      b.applyPatch({ ...next });
+      b.applyPatch(patch);
       return saved.id;
+    },
+    ownBuildings: () => b.state().savedBuildings.map((entry) => ({ id: entry.id, name: entry.config.name })),
+    playOwnBuilding: (id) => {
+      const state = b.state();
+      if (!state.savedBuildings.some((entry) => entry.id === id)) return OWN_BUILDING_GONE;
+      /*
+       * The whole derived state, as `withBuilding` makes it: the week moved to the sandbox contract
+       * with the week left behind parked, and both editor working copies under their own guards.
+       */
+      const next = withBuilding(state, b.resources, id);
+      const held = attemptHoldOver({ ...next });
+      if (held !== undefined) return held;
+      releaseCareer();
+      const standing = state.buildingId === id && state.week.contractId === next.week.contractId;
+      if (!standing) {
+        /* The day being left goes with the week being parked — {@link moveWeekTo}'s rule. */
+        if (b.dayClosed()) b.cancelRun?.();
+        else b.abandonDay?.();
+        b.applyPatch({
+          ...next,
+          windowStartS: null,
+          interventions: [],
+          recording: undefined,
+          report: undefined,
+          tomorrow: undefined,
+          withheld: [],
+        });
+        const dealt = dealPatchFor(b, b.state());
+        if (dealt.seed !== undefined) b.applyPatch(dealt);
+      }
+      notifyCampaign();
+      return undefined;
     },
     runSandbox: (presses) => {
       /* § D1360: a sandbox day plays the attempt's crowd, so it is refused while an attempt stands. */

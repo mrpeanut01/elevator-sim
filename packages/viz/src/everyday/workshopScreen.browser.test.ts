@@ -134,7 +134,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
   it('opens from the rail with § 3.3’s workshop row under it', async () => {
     const page = await openShelf();
     expect(await page.textContent('.everyday-workshop h1')).toBe('Your dispatchers, and the industry’s');
-    expect(await page.textContent('.everyday-bar-leave')).toBe('⌂ Modes');
+    expect(await page.textContent('.everyday-bar-leave')).toBe('⌂ Lobby');
     expect(await page.textContent('.everyday-bar-primary')).toBe('Test simulation');
     // Nothing is withheld: every shipped design is on the shelf, once, and exactly one is open.
     expect(await page.locator('.everyday-workshop-industry').count()).toBe(13);

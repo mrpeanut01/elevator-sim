@@ -350,10 +350,10 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
       }));
       // The left button is present and inert on the menu — there is no mode to abandon yet — and
       // the primary is named for its effect, never "Next".
-      expect(bar.leave).toEqual({ label: '⌂ Modes', disabled: true });
+      expect(bar.leave).toEqual({ label: '⌂ Lobby', disabled: true });
       // § D525: the menu row follows the selected card, and the first card is Scenario.
       expect(bar.primary).toEqual({ label: 'Pick a scenario', disabled: false });
-      expect(bar.note).toBe('Pick a mode above, then play it.');
+      expect(bar.note).toBe('Pick a floor above, then play it.');
     } finally {
       await page.close();
     }

@@ -549,7 +549,7 @@ export function tuneSandboxStrip(moved: readonly TuneKey[]): TuneSandboxStrip {
     return {
       state: 'Nothing changed yet — a sandbox day all the same',
       note:
-        'Run it and watch plays the day as it stands, as a sandbox day: it never counts, and your week ' +
+        'Test simulation plays the day as it stands, as a sandbox day: it never counts, and your week ' +
         'stays where it is. The day that counts starts from its brief.',
     };
   }

@@ -87,14 +87,16 @@ export interface SandboxPresses {
  *
  * Not the recording: the run standing is the sandbox's once it lands, and the host refuses it on the
  * way out (`abandonDay`) rather than swapping a recording under a playback it does not own, which is
- * the same split the replay keeps. The library is not put back either: a changed tower and a tuned
- * pattern are saved to it as the designer and the traffic editor save theirs, and that is where the
- * Engineer surface finds them.
+ * the same split the replay keeps. A tuned pattern stays in the library, as the traffic editor saves
+ * its own. **The building shelf is put back** ([§ D1629](../../../../DECISIONS.md)): it used to keep
+ * every tower a test ran in, which was harmless while nothing listed the shelf, and the Scenario
+ * floor's *Your buildings* now does. A building is on the shelf because the player pressed *Save*.
  */
 export type SandboxBefore = Pick<
   ViewerState,
   | 'week'
   | 'parkedWeeks'
+  | 'savedBuildings'
   | 'buildingId'
   | 'commissioning'
   | 'pattern'
@@ -111,6 +113,8 @@ export function sandboxBeforeOf(state: ViewerState): SandboxBefore {
   return {
     week: state.week,
     parkedWeeks: state.parkedWeeks,
+    /* § D1629: a test's copy of the tower leaves the shelf with the test, so the shelf is the player's saves. */
+    savedBuildings: state.savedBuildings,
     buildingId: state.buildingId,
     commissioning: state.commissioning,
     pattern: state.pattern,

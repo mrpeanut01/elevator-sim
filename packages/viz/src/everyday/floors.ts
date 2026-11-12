@@ -99,7 +99,7 @@ export const GAME_FLOORS: readonly GameFloor[] = Object.freeze([
     key: 'L' as const,
     name: 'Lobby',
     group: 'LOBBY' as const,
-    body: 'The front desk, and the main menu. Every floor starts here, with the walkthrough and what this game is.',
+    body: 'The front desk. Every floor starts here, with the walkthrough and what this game is.',
     status: '',
     screen: 'menu' as const,
     rooms: Object.freeze([
@@ -182,4 +182,14 @@ export function floorDirection(from: GameFloorKey, to: GameFloorKey): 'up' | 'do
   const b = GAME_FLOOR_ORDER.indexOf(to);
   if (a === b) return undefined;
   return b < a ? 'up' : 'down';
+}
+
+/**
+ * The floor a pressed key names, or `undefined`: the plate's own character, either case. The shell
+ * rides there on a bare key press ([§ D1629](../../../../DECISIONS.md)), so the tray's plates are
+ * also its shortcuts and there is no second list of them to keep.
+ */
+export function floorKeyOf(key: string): GameFloorKey | undefined {
+  const plate = key.toUpperCase();
+  return GAME_FLOOR_ORDER.find((candidate) => candidate === plate);
 }
