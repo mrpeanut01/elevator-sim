@@ -421,7 +421,7 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
   const children: Node[] = [];
   const heading = draw.retain('h1', 'title', { className: 'menu-title' });
   setText(heading, view.title);
-  /* § D1632: a screen reached from a landing says which floor it is, by the plate beside its title. */
+  /* § D1635: a screen reached from a landing says which floor it is, by the plate beside its title. */
   if (view.floor === undefined) heading.removeAttribute(FLOOR_ATTR);
   else heading.setAttribute(FLOOR_ATTR, view.floor);
   children.push(heading);
@@ -457,7 +457,7 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
   }
 
   /*
-   * § D1632: the root is drawn as a building. Its rows are landings on a shaft, each with its
+   * § D1635: the root is drawn as a building. Its rows are landings on a shaft, each with its
    * floor's plate, and a car stands at the one the player is pointing at. The car is drawn after
    * the pointer or the focus moves and nothing waits on it: a press is `dispatch`, as it was.
    */
@@ -711,7 +711,7 @@ function asModal(
       return;
     }
     /*
-     * § D1632: a landing's plate is its key. Never with a modifier and never while typing into a
+     * § D1635: a landing's plate is its key. Never with a modifier and never while typing into a
      * control, and only an enabled row answers, exactly as a click would.
      */
     if (!event.ctrlKey && !event.metaKey && !event.altKey && !isTyping(event.target)) {

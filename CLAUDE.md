@@ -59,9 +59,9 @@ verdict:
   to be corrected ([§ D186](DECISIONS.md)); and mode parity is **derived from the code**, proved
   against a fail state the product deliberately does not ship.
 
-  **The honesty corpus: the always-on row is wave BC's, measured 2026-11-12 on that wave's head;
+  **The honesty corpus: the always-on row is wave BD's, measured 2026-11-12 on that wave's head;
   the deep row is the nightly job's on `c181913`, the first after waves AU and AV merged, and the first
-  nightly after wave BC merges republishes it.**
+  nightly after wave BD merges republishes it.**
   Every earlier wave's move, its decomposition and what it taught are in
   [`docs/44`](docs/44-honesty-corpus-log.md), newest first:
 
@@ -153,7 +153,7 @@ building the player drew is played from the Scenario floor's *Your buildings*
 and must not move the player's week, and a sandbox must leave no building on the shelf. The shelf
 is kept from the same list ([§ D1631](DECISIONS.md)): a rename or a remove is refused while the week
 stands on the building, so no id is left naming nothing. The Engineer menu's root is drawn the same
-way ([§ D1632](DECISIONS.md)): `menu/screens.ts#MAIN_FLOORS` plates its rows, and a plate is its key
+way ([§ D1635](DECISIONS.md)): `menu/screens.ts#MAIN_FLOORS` plates its rows, and a plate is its key
 on the root only.
 
 **The viewer is built to a design handoff**, vendored at [`docs/design/`](docs/design/) and

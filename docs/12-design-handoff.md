@@ -1128,7 +1128,7 @@ watch* ships as *Test simulation*; and § 3.2's *Switch to Engineer* is drawn as
 shaft, where the guide puts it at the rail's foot.
 
 **And the Engineer menu, which the handoff does not draw (§ 4.8), is a shaft too**
-([§ D1632](../DECISIONS.md)): its root's rows are landings with plates, in the Engineer palette.
+([§ D1635](../DECISIONS.md)): its root's rows are landings with plates, in the Engineer palette.
 
 **And one cell is not drawn on a narrow lobby** ([§ D1631](../DECISIONS.md)). § 3.3's menu row
 carries an inert leave. On a narrow screen the lobby's bar omits it and lets the note wrap in its own

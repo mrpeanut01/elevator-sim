@@ -245,8 +245,8 @@ describe.skipIf(!HAS_BROWSER)('the transport keyboard moves the playhead', () =>
   }, 120_000);
 });
 
-/* ---- § D1632: the Engineer menu is a shaft of landings, and a landing's plate is its key ---- */
-describe.skipIf(!HAS_BROWSER)('§ D1632 — the Engineer menu’s floors', () => {
+/* ---- § D1635: the Engineer menu is a shaft of landings, and a landing's plate is its key ---- */
+describe.skipIf(!HAS_BROWSER)('§ D1635 — the Engineer menu’s floors', () => {
   async function openMenu(): Promise<Page> {
     const page = await openPage(browser, { viewport: { width: 1280, height: 900 } });
     await page.goto(origin, { waitUntil: 'load' });

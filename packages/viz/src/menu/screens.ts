@@ -427,7 +427,7 @@ export interface MenuAffordance {
   readonly primary?: boolean | undefined;
   /**
    * **The plate of the floor this row is a landing on**, on the root screen and `undefined` on every
-   * other — [§ D1632](../../../../DECISIONS.md), {@link MAIN_FLOORS}. The panel draws the root's rows
+   * other — [§ D1635](../../../../DECISIONS.md), {@link MAIN_FLOORS}. The panel draws the root's rows
    * as a shaft with a plate beside each, and a plate that is one letter or digit is also the row's
    * key ({@link floorRowFor}). Decoration and a shortcut, never the row's only name.
    */
@@ -436,7 +436,7 @@ export interface MenuAffordance {
 }
 
 /**
- * **The Engineer menu as a building** — [§ D1632](../../../../DECISIONS.md), the owner's direction
+ * **The Engineer menu as a building** — [§ D1635](../../../../DECISIONS.md), the owner's direction
  * of 2026-11-12, after Everyday was laid out as floors ([§ D1627](../../../../DECISIONS.md)).
  *
  * One plate per root row, top floor first, which is the order {@link mainRows} already had. The
@@ -1075,7 +1075,7 @@ function mainRows(
     to('main.settings', 'Settings', 'Presentation only — nothing here changes a run', 'settings'),
     resumeRow(hasRun, neverLeft),
   ];
-  /* § D1632: every root row is a landing, and carries its floor's plate. */
+  /* § D1635: every root row is a landing, and carries its floor's plate. */
   return Object.freeze(rows.map((row) => ({ ...row, floor: MAIN_FLOORS[row.id] })));
 }
 

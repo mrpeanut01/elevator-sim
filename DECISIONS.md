@@ -55788,7 +55788,7 @@ holed.
 
 ## D1629 — a building you drew is played from the Scenario floor, saving only saves, and the building's loose ends are closed
 
-> **Status 2026-11-12: AMENDED by [§ D1632](#d1632)** (the product owner). Clause 9's last sentence, *the Engineer shell's own menu is unchanged*, no longer holds: that menu's root is drawn as floors.
+> **Status 2026-11-12: AMENDED by [§ D1635](#d1635)** (the product owner). Clause 9's last sentence, *the Engineer shell's own menu is unchanged*, no longer holds: that menu's root is drawn as floors.
 >
 > **Status 2026-11-12: AMENDED by [§ D1631](#d1631)** (on the owner's delegation). Clause 3, *saving only saves*, is confirmed. A saved building can now be renamed and removed, which this entry named as not built, and the first-visit question is closed: a first visit meets the lobby.
 
@@ -55976,10 +55976,10 @@ undrawn leave at 320 × 320).
 **Numbers spent.** Wave BB took the charter row's **D1631** and moved the row to D1632; nothing is
 holed.
 
-## D1632 — the Engineer menu's root is drawn as a building: every row a landing with a plate, a car at the one pointed at, and a plate is its key
+## D1635 — the Engineer menu's root is drawn as a building: every row a landing with a plate, a car at the one pointed at, and a plate is its key
 
 > **Taken 2026-11-12 by the product owner** ("restyle the Engineer shell's menu as floors"), after
-> [§ D1629](#d1629) recorded that menu as unchanged, and built the same day by one session (wave BC,
+> [§ D1629](#d1629) recorded that menu as unchanged, and built the same day by one session (wave BD,
 > a single lane). **Amends § D1629's** clause 9 in that one sentence. **Owner-reversible**: the
 > change is how one screen is drawn and keyed.
 
@@ -56016,5 +56016,5 @@ click asks, a refused row and a mark press nothing) and `dev/keyboard.browser.te
 comes to the landing pointed at, the plate is drawn, a key rides to its floor and a letter is a
 letter again once there).
 
-**Numbers spent.** Wave BC took the charter row's **D1632** and moved the row to D1633; nothing is
+**Numbers spent.** Wave BD took the charter row's **D1635** and moved the row to D1636; nothing is
 holed.

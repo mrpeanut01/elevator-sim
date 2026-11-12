@@ -7259,7 +7259,7 @@ const MENU: SurfaceAdapter = {
           if (row.disabledWhy !== undefined) {
             seeds.push({ field: `${at}.${row.id}.why`, text: row.disabledWhy, role: 'reason' });
           }
-          /* § D1632: the landing's plate is drawn beside the row, so it is swept with it. */
+          /* § D1635: the landing's plate is drawn beside the row, so it is swept with it. */
           if (row.floor !== undefined) {
             seeds.push({ field: `${at}.${row.id}.floor`, text: row.floor, role: 'label' });
           }

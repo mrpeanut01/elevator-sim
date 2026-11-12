@@ -1856,8 +1856,8 @@ describe('the recorder records', () => {
   });
 });
 
-/* ---- § D1632: the root is drawn as a building, and a landing's plate is its key ---- */
-describe('§ D1632 — the Engineer menu’s root is a shaft of landings', () => {
+/* ---- § D1635: the root is drawn as a building, and a landing's plate is its key ---- */
+describe('§ D1635 — the Engineer menu’s root is a shaft of landings', () => {
   const platesOf = (root: Recorded): readonly string[] =>
     walk(root)
       .filter((node) => node.tag === 'button' && node.attrs.has('data-floor'))
