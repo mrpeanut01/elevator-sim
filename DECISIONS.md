@@ -55923,3 +55923,49 @@ integers.
 
 **Numbers spent.** This session took the charter row's **D1630** and moved the row to D1631; nothing
 is holed.
+
+## D1631 — the server deploys itself on a push to `main`, with the last deployment's parameters carried forward
+
+> **Taken 2026-11-12 by the product owner** ("set up the automatic deploy like CropCard"), during the
+> SQLite cutover of [§ D1630](#d1630), after the server image was found unbuilt since 2026-08-15 and
+> the cutover's first build failed on a Dockerfile gap (#665). Built the same day by one agent session
+> working directly for the owner, outside any wave. **Owner-reversible**: deleting the repository
+> variable `AZURE_SERVER_CLIENT_ID` skips the job and changes nothing else.
+
+**Why an entry.** It binds `.github/workflows/`, the Azure resource group's role assignments,
+`infra/README.md` and `docs/22-charter.md`'s S9 cell, which no one module owns.
+
+**What is ruled.**
+
+1. **`.github/workflows/deploy-server.yml` builds and deploys.** A push to `main` touching the
+   image's or the template's inputs, or a manual run, builds the image with `az acr build` (amd64,
+   in the registry) and redeploys `infra/azure/main.bicep` as the deployment named `app`.
+2. **Parameters are the last deployment's.** They are read from `app` and passed back unchanged,
+   with only the image and what a manual run names (`databaseEngine`, `importFromPostgres`)
+   replaced, because a deployment that forgets `viewerOrigin` breaks every signed-in surface
+   silently. The two secure parameters come from the Container App's own secrets; nothing is stored
+   in the repository or in GitHub.
+3. **Green means serving.** The run passes only when the active revision runs the new image and
+   `/api/boards` answers 200, because a revision that fails to start leaves the old one serving
+   under a successful template deployment.
+4. **The identity is scoped to one resource group.** `infra/azure/provision-server-deployer.sh`
+   creates a user-assigned identity trusted by the `server-production` environment through a
+   federated credential whose subject is read from GitHub (§ D308), with Contributor and User Access
+   Administrator on the `elevator-sim` group only; the second because the template writes two role
+   assignments. The environment deploys from `main` only.
+
+**What it does not change.** The viewer's deployment (`deploy-viz.yml`), the template, the image, and
+deleting a PostgreSQL server, which stays a manual step.
+
+**What it costs, said plainly.** User Access Administrator on the resource group lets the workflow's
+identity grant roles inside that group. A push to `main` touching `packages/**` now restarts the
+server as well as the page. `main` has no push CI run (§ D1084), so what deploys is what a pull
+request's CI passed before merge.
+
+**Held by** `documentation.test.ts` S9 (the workflow is named in the charter) and the workflow's own
+last step. No run has happened yet: the workflow is unarmed until the owner runs the provisioning
+script.
+
+**Numbers spent.** This session took the charter row's **D1631** and moved the row to D1632; nothing
+is holed.
+

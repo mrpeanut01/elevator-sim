@@ -1,0 +1,181 @@
+# Deploy the server: build the image in the registry and redeploy infra/azure/main.bicep — DECISIONS.md § D1631.
+#
+# Until this file the server had no automation: `infra/README.md` § 3 was `docker build` and
+# `az deployment group create` from a workstation, and the image went unbuilt from 2026-08-15 until a
+# Dockerfile gap was found on 2026-11-12 (#665). Every push to `main` that touches what the image or
+# the template is made of now builds and deploys, and a manual run can also switch the store's engine
+# (`infra/README.md` § 8).
+#
+# ## The parameters are the last deployment's, never a second copy of them
+#
+# A deployment that forgets one parameter silently reverts it, and `viewerOrigin` is the one whose
+# loss breaks every signed-in surface with no failing status code (`infra/README.md`'s header). So the
+# parameters are read from the deployment named `app` and passed back unchanged, with only the image
+# and anything a manual run names replaced. The two secure ones are not returned by Azure, so they are
+# read from the Container App's own secrets: `app-secret`, and the PostgreSQL password inside
+# `database-url` or `import-from` while a server is still deployed. Nothing is stored in this
+# repository or in GitHub.
+#
+# ## Armed by a variable
+#
+# `AZURE_SERVER_CLIENT_ID` is set by `infra/azure/provision-server-deployer.sh`, which also creates
+# the identity this job signs in as. Without it the job is skipped and nothing else changes.
+
+name: Deploy server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/**'
+      - 'data/**'
+      - 'scripts/**'
+      - 'infra/checks/**'
+      - 'infra/azure/main.bicep'
+      - 'infra/entrypoint.sh'
+      - 'infra/litestream.yml'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/deploy-server.yml'
+  workflow_dispatch:
+    inputs:
+      databaseEngine:
+        description: 'The store: keep what is deployed, or switch (infra/README.md § 8)'
+        type: choice
+        options: [keep, postgres, sqlite]
+        default: keep
+      importFromPostgres:
+        description: 'SQLite only: copy PostgreSQL into the new store on first boot'
+        type: choice
+        options: [keep, 'true', 'false']
+        default: keep
+
+# One deployment at a time, and never cancel one halfway: a cancelled run can leave a template
+# deployment in flight with nobody watching it.
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy server
+    if: vars.AZURE_SERVER_CLIENT_ID != '' && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      id-token: write
+      contents: read
+    environment:
+      name: server-production
+      url: ${{ steps.deploy.outputs.app_url }}
+    env:
+      RG: ${{ vars.AZURE_SERVER_RESOURCE_GROUP || 'elevator-sim' }}
+      DEPLOYMENT: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_SERVER_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Read the last deployment
+        id: last
+        run: |
+          az config set extension.use_dynamic_install=yes_without_prompt --only-show-errors
+          az deployment group show -g "$RG" -n "$DEPLOYMENT" --query properties.parameters -o json > "$RUNNER_TEMP/last.json"
+          server=$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/last.json'))['containerRegistryServer']['value'])")
+          test -n "$server" || { echo "::error::the last deployment names no containerRegistryServer"; exit 1; }
+          echo "registry=${server%%.*}" >> "$GITHUB_OUTPUT"
+          echo "server=$server" >> "$GITHUB_OUTPUT"
+          echo "tag=$(git rev-parse --short=8 HEAD)-amd64" >> "$GITHUB_OUTPUT"
+
+      # Built by the registry rather than on this runner: `az acr build` runs on Azure's own amd64
+      # hosts, which is the platform Container Apps runs, and pushes in the same step.
+      - name: Build and push the image
+        run: |
+          az acr build -r "${{ steps.last.outputs.registry }}" \
+            -t "elevator-sim:${{ steps.last.outputs.tag }}" --platform linux/amd64 .
+
+      - name: Write the parameters
+        env:
+          ENGINE_INPUT: ${{ inputs.databaseEngine || 'keep' }}
+          IMPORT_INPUT: ${{ inputs.importFromPostgres || 'keep' }}
+          IMAGE: ${{ steps.last.outputs.server }}/elevator-sim:${{ steps.last.outputs.tag }}
+        run: |
+          app=$(az resource list -g "$RG" --resource-type Microsoft.App/containerApps --query "[0].name" -o tsv)
+          secret() { az containerapp secret show -g "$RG" -n "$app" --secret-name "$1" --query value -o tsv 2>/dev/null || true; }
+          APP_SECRET=$(secret app-secret)
+          test -n "$APP_SECRET" || { echo "::error::the Container App has no app-secret to carry forward"; exit 1; }
+          echo "::add-mask::$APP_SECRET"
+          PG_URL=$(secret database-url)
+          case "$PG_URL" in postgres*) ;; *) PG_URL=$(secret import-from) ;; esac
+          DB_PASSWORD=""
+          if [ -n "$PG_URL" ]; then
+            echo "::add-mask::$PG_URL"
+            DB_PASSWORD=$(python3 -c 'import sys, urllib.parse as u; print(u.unquote(u.urlsplit(sys.argv[1]).password or ""))' "$PG_URL")
+            echo "::add-mask::$DB_PASSWORD"
+          fi
+          export APP_SECRET DB_PASSWORD
+          python3 - "$RUNNER_TEMP/last.json" "$RUNNER_TEMP/params.json" <<'PY'
+          import json, os, sys
+          last = json.load(open(sys.argv[1]))
+          params = {k: {"value": v["value"]} for k, v in last.items() if "value" in v}
+          params["containerImage"] = {"value": os.environ["IMAGE"]}
+          params["appSecret"] = {"value": os.environ["APP_SECRET"]}
+          params["databaseAdminPassword"] = {"value": os.environ["DB_PASSWORD"]}
+          engine = os.environ["ENGINE_INPUT"]
+          if engine != "keep":
+              params["databaseEngine"] = {"value": engine}
+          imp = os.environ["IMPORT_INPUT"]
+          if imp != "keep":
+              params["importFromPostgres"] = {"value": imp == "true"}
+          chosen = params.get("databaseEngine", {"value": "postgres"})["value"]
+          importing = params.get("importFromPostgres", {"value": False})["value"]
+          needs_pg = chosen == "postgres" or importing
+          if needs_pg and not os.environ["DB_PASSWORD"]:
+              sys.exit("::error::this deployment needs a PostgreSQL server, and no PostgreSQL password is "
+                       "recorded on the Container App to carry forward")
+          json.dump({"$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+                     "contentVersion": "1.0.0.0", "parameters": params}, open(sys.argv[2], "w"))
+          shown = {k: v["value"] for k, v in params.items() if k not in ("appSecret", "databaseAdminPassword")}
+          print(json.dumps(shown, indent=2))
+          PY
+
+      - name: Deploy the template
+        id: deploy
+        run: |
+          az deployment group create -g "$RG" -n "$DEPLOYMENT" \
+            --template-file infra/azure/main.bicep --parameters "@$RUNNER_TEMP/params.json" -o none
+          rm -f "$RUNNER_TEMP/params.json"
+          url=$(az deployment group show -g "$RG" -n "$DEPLOYMENT" --query properties.outputs.appUrl.value -o tsv)
+          echo "app_url=$url" >> "$GITHUB_OUTPUT"
+
+      # Green means the new image is the one serving and the API answers, not that a template
+      # deployment was accepted: a revision that fails to start leaves the old one serving and the
+      # deployment still reports success.
+      - name: The new image is serving
+        env:
+          IMAGE: ${{ steps.last.outputs.server }}/elevator-sim:${{ steps.last.outputs.tag }}
+          URL: ${{ steps.deploy.outputs.app_url }}
+        run: |
+          app=$(az resource list -g "$RG" --resource-type Microsoft.App/containerApps --query "[0].name" -o tsv)
+          for attempt in $(seq 1 40); do
+            image=$(az containerapp revision list -g "$RG" -n "$app" \
+              --query "[?properties.active && properties.trafficWeight > \`0\`] | [0].properties.template.containers[0].image" -o tsv)
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$URL/api/boards" || true)
+            echo "attempt $attempt: serving $image, /api/boards answered $code"
+            if [ "$image" = "$IMAGE" ] && [ "$code" = "200" ]; then
+              az containerapp logs show -g "$RG" -n "$app" --tail 200 2>/dev/null | grep -E '\[import\]|\[entrypoint\]' || true
+              echo "LIVE: $IMAGE at $URL"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::the new revision did not start serving within ten minutes. Its last log lines:"
+          az containerapp logs show -g "$RG" -n "$app" --tail 100 2>/dev/null || true
+          exit 1
