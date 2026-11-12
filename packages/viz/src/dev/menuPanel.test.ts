@@ -74,7 +74,10 @@ import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
 import { initialMenuState } from '../menu/menu.js';
 import type { ChallengeBoardRow, ChallengeView } from '../menu/challenge.js';
 import {
+  FLOOR_OF_SCREEN,
+  MAIN_FLOORS,
   applyIntent,
+  floorRowFor,
   type ChallengeScreenInput,
   type CommissioningScreenInput,
   type MenuIntent,
@@ -1850,5 +1853,71 @@ describe('the recorder records', () => {
 
     rows[0]?.listeners.get('click')?.();
     expect(asked[0]).toEqual({ kind: 'navigate', to: 'campaign' });
+  });
+});
+
+/* ---- § D1635: the root is drawn as a building, and a landing's plate is its key ---- */
+describe('§ D1635 — the Engineer menu’s root is a shaft of landings', () => {
+  const platesOf = (root: Recorded): readonly string[] =>
+    walk(root)
+      .filter((node) => node.tag === 'button' && node.attrs.has('data-floor'))
+      .map((node) => node.attrs.get('data-floor') ?? '');
+
+  it('gives every root row one plate, each different, top floor first', async () => {
+    const loaded = await catalogue();
+    const { root } = render(initialMenuState(loaded), loaded);
+    const plates = platesOf(root);
+    expect(plates).toEqual(Object.values(MAIN_FLOORS));
+    expect(new Set(plates).size).toBe(plates.length);
+    /* Scenarios stands on 3 and the board on M, as they do in Everyday (`everyday/floors.ts`). */
+    expect(MAIN_FLOORS['main.campaign']).toBe('3');
+    expect(MAIN_FLOORS['main.leaderboard']).toBe('M');
+    expect(walk(root).some((node) => node.attrs.get('data-floors') === 'on'), 'the list is not marked as a shaft').toBe(true);
+  });
+
+  it('draws no shaft and no landing off the root, and plates the floor’s title', async () => {
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'settings' }, loaded);
+    expect(platesOf(root)).toEqual([]);
+    expect(walk(root).some((node) => node.attrs.has('data-floors'))).toBe(false);
+    const title = walk(root).find((node) => node.tag === 'h1');
+    expect(title?.attrs.get('data-floor')).toBe(FLOOR_OF_SCREEN.settings);
+    const home = render(initialMenuState(loaded), loaded);
+    expect(walk(home.root).find((node) => node.tag === 'h1')?.attrs.has('data-floor')).toBe(false);
+  });
+
+  it('presses a landing by its plate, either case, and asks for exactly what a click asks', async () => {
+    const loaded = await catalogue();
+    for (const [key, to] of [['3', 'campaign'], ['m', 'leaderboard'], ['S', 'settings']] as const) {
+      const { asked, press } = render(initialMenuState(loaded), loaded);
+      expect(press(key).prevented, `${key} was left to the browser`).toBe(true);
+      expect(asked).toEqual([{ kind: 'navigate', to }]);
+    }
+  });
+
+  it('does not press a refused landing, a mark that is not a key, or anything off the root', async () => {
+    const loaded = await catalogue();
+    /* Resume is refused with no run behind the menu, and its key is as refused as its click. */
+    const cold = render(initialMenuState(loaded), loaded);
+    expect(cold.press('r').prevented).toBe(false);
+    expect(cold.press('▲').prevented).toBe(false);
+    expect(cold.asked).toEqual([]);
+    const running = render(initialMenuState(loaded), loaded, {
+      runState: () => ({ hasRun: true, rankingRefusal: undefined }),
+    });
+    expect(running.press('r').prevented).toBe(true);
+    const settings = render({ ...initialMenuState(loaded), screen: 'settings' }, loaded);
+    expect(settings.press('3').prevented).toBe(false);
+    expect(settings.asked).toEqual([]);
+  });
+
+  it('names the row a key means from the rows alone', () => {
+    const row = (id: string, floor: string | undefined, enabled = true) =>
+      ({ id, label: id, kind: 'navigate', scope: 'presentation', enabled, floor, intent: { kind: 'back' } }) as const;
+    const rows = [row('a', '3'), row('b', 'M', false), row('c', undefined)];
+    expect(floorRowFor(rows, '3')?.id).toBe('a');
+    expect(floorRowFor(rows, 'm')).toBeUndefined();
+    expect(floorRowFor(rows, 'Enter')).toBeUndefined();
+    expect(floorRowFor(rows, '')).toBeUndefined();
   });
 });

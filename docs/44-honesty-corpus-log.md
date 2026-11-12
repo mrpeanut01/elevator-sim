@@ -19,6 +19,20 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave BD
+
+**Wave BD moves +70.00 strings a case always-on, with the surface set unchanged.** One lane: the
+Engineer menu's root drawn as floors ([§ D1635](../DECISIONS.md)). The base is wave BC's row, on the
+head that merges #668 and #669 under this wave, and the move is the same +3 430 the lane measured
+on wave BB's row. The same 80 surfaces speak, so the move is text on an existing producer: the plate of
+each root landing and of each floor's title, swept wherever the menu adapter already swept the row.
+The deep row still names `c181913`.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base, wave BC's row (#668 and #669 integrated) | 1 166 964 | | | 80 |
+| wave BD's head, integrated on that base | **1 170 394** | **+3 430** | **+70.00** | 80, **same set** |
+
 ## Wave BC
 
 **Wave BC moves +9.00 strings a case always-on, with the surface set unchanged.** One lane merged by

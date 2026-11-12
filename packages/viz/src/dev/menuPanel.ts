@@ -33,6 +33,7 @@ import type { BoardPage, ClaimedMetrics } from '../menu/client.js';
 import type { ChallengeScore } from '../menu/challenge.js';
 
 import {
+  floorRowFor,
   screenOf,
   withChosenValue,
   type ChallengeScreenInput,
@@ -420,6 +421,9 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
   const children: Node[] = [];
   const heading = draw.retain('h1', 'title', { className: 'menu-title' });
   setText(heading, view.title);
+  /* § D1635: a screen reached from a landing says which floor it is, by the plate beside its title. */
+  if (view.floor === undefined) heading.removeAttribute(FLOOR_ATTR);
+  else heading.setAttribute(FLOOR_ATTR, view.floor);
   children.push(heading);
 
   view.notices.forEach((notice, index) => {
@@ -452,8 +456,31 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     children.push(accountForm(draw, host, account, naming));
   }
 
+  /*
+   * § D1635: the root is drawn as a building. Its rows are landings on a shaft, each with its
+   * floor's plate, and a car stands at the one the player is pointing at. The car is drawn after
+   * the pointer or the focus moves and nothing waits on it: a press is `dispatch`, as it was.
+   */
+  const floors = view.rows.some((row) => row.floor !== undefined);
   const list = draw.retain('div', 'list', { className: 'menu-list' });
-  const rows: Node[] = view.rows.map((row) => affordance(draw, host, row));
+  /* An attribute, so the list keeps the one class every other screen's list has. */
+  if (floors) list.setAttribute(FLOORS_ATTR, 'on');
+  else list.removeAttribute(FLOORS_ATTR);
+  const car = floors
+    ? draw.retain('div', 'floor-car', { className: 'menu-floor-car', attrs: { 'aria-hidden': 'true' } })
+    : undefined;
+  const rows: HTMLElement[] = view.rows.map((row) => {
+    const node = affordance(draw, host, row);
+    if (car !== undefined && row.floor !== undefined) {
+      const ride = (): void => {
+        standCarAt(car, node);
+      };
+      on(node, 'pointerenter', ride);
+      on(node, 'focus', ride);
+    }
+    return node;
+  });
+  const landings = [...rows];
   /*
    * **Second, directly under the row that recommends a path** — GitHub issue #98, which asks for
    * *How to play* at the top of the nav or behind a persistent `?`.
@@ -480,7 +507,9 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     const recommended = view.rows.findIndex((row) => row.primary === true);
     rows.splice(recommended + 1, 0, guideEntry(draw, view.guide));
   }
-  reconcile(list, ...rows);
+  if (car === undefined) reconcile(list, ...rows);
+  /* Last, so the recommended row is still the list's first child; it is positioned, not flowed. */
+  else reconcile(list, ...rows, car);
   children.push(list);
 
   if (view.issues.length > 0) children.push(issueList(draw, 'issues', view.issues));
@@ -509,6 +538,51 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
   // papering over one.
   coverShell(host.shell(), Boolean(root.hidden));
   restoreFocus(doc, root, controls, wasOn);
+  FLOOR_ROWS.set(root, floors ? view.rows : []);
+  if (car !== undefined) {
+    /* Where the car stands on a draw: the focused landing, or the recommended one. */
+    const focused = focusedControlKey(doc, root);
+    const at = view.rows.findIndex((row) => row.floor !== undefined && row.id === focused);
+    const stand = at === -1 ? view.rows.findIndex((row) => row.primary === true) : at;
+    const landing = landings[stand === -1 ? 0 : stand];
+    if (landing !== undefined) standCarAt(car, landing);
+  }
+}
+
+/** The attribute a landing and a floor's title carry their plate on; the stylesheet draws it. */
+const FLOOR_ATTR = 'data-floor';
+
+/** The mark on the root's list that says it is drawn as a shaft. */
+const FLOORS_ATTR = 'data-floors';
+
+/** The root's rows as of the last draw, for the plate keys — empty off the root. */
+const FLOOR_ROWS = new WeakMap<HTMLElement, readonly MenuAffordance[]>();
+
+/**
+ * Stand the shaft's car beside a landing. One transform, eased by the stylesheet and switched off
+ * there under reduced motion. Where layout is not available (the node tier's document) the offset
+ * is not a number and the car is left where it is: it is decoration, and nothing reads it.
+ */
+function standCarAt(car: HTMLElement, landing: HTMLElement): void {
+  const top: unknown = landing.offsetTop;
+  const height: unknown = landing.offsetHeight;
+  if (typeof top !== 'number' || typeof height !== 'number') return;
+  car.style.transform = `translateY(${String(Math.round(top + height / 2))}px)`;
+  /* The landing the car stands at says so, so its plate is inked to be read on the car. */
+  const was = CAR_AT.get(car);
+  if (was !== landing) was?.removeAttribute(CAR_ATTR);
+  landing.setAttribute(CAR_ATTR, 'on');
+  CAR_AT.set(car, landing);
+}
+
+/** The mark on the landing the car stands at. */
+const CAR_ATTR = 'data-car';
+const CAR_AT = new WeakMap<HTMLElement, HTMLElement>();
+
+/** Whether a key event came from a control that takes text, where a letter is a letter. */
+function isTyping(target: EventTarget | null): boolean {
+  const tag = (target as { tagName?: unknown } | null)?.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }
 
 /**
@@ -635,6 +709,18 @@ function asModal(
       event.preventDefault();
       DISPATCH.get(root)?.({ kind: 'close' });
       return;
+    }
+    /*
+     * § D1635: a landing's plate is its key. Never with a modifier and never while typing into a
+     * control, and only an enabled row answers, exactly as a click would.
+     */
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && !isTyping(event.target)) {
+      const landing = floorRowFor(FLOOR_ROWS.get(root) ?? [], event.key);
+      if (landing !== undefined) {
+        event.preventDefault();
+        DISPATCH.get(root)?.(landing.intent);
+        return;
+      }
     }
     if (event.key !== 'Tab') return;
     const list = CONTROLS.get(root) ?? [];
@@ -836,6 +922,8 @@ function affordance(draw: Draw, host: MenuPanelHost, row: MenuAffordance): HTMLE
     kids.push(help);
   }
   reconcile(button, ...kids);
+  if (row.floor === undefined) button.removeAttribute(FLOOR_ATTR);
+  else button.setAttribute(FLOOR_ATTR, row.floor);
   if (row.enabled) button.removeAttribute('disabled');
   else button.setAttribute('disabled', 'disabled');
   on(button, 'click', () => {

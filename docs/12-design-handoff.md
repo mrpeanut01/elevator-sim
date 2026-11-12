@@ -1127,6 +1127,9 @@ the mode cards are the lobby's three top landings, and there is no setting betwe
 watch* ships as *Test simulation*; and § 3.2's *Switch to Engineer* is drawn as the top stop of the
 shaft, where the guide puts it at the rail's foot.
 
+**And the Engineer menu, which the handoff does not draw (§ 4.8), is a shaft too**
+([§ D1635](../DECISIONS.md)): its root's rows are landings with plates, in the Engineer palette.
+
 **And one cell is not drawn on a narrow lobby** ([§ D1631](../DECISIONS.md)). § 3.3's menu row
 carries an inert leave. On a narrow screen the lobby's bar omits it and lets the note wrap in its own
 cell, so the bar is one row; the row is unchanged as data and the wide bar draws it as before.
