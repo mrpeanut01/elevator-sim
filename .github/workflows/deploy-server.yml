@@ -1,4 +1,4 @@
-# Deploy the server: build the image in the registry and redeploy infra/azure/main.bicep — DECISIONS.md § D1631.
+# Deploy the server: build the image in the registry and redeploy infra/azure/main.bicep — DECISIONS.md § D1634.
 #
 # Until this file the server had no automation: `infra/README.md` § 3 was `docker build` and
 # `az deployment group create` from a workstation, and the image went unbuilt from 2026-08-15 until a

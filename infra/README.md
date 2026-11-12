@@ -139,7 +139,7 @@ Communication Service is a DNS-verified manual step a template cannot perform.
 
 ## 3. Deploy
 
-> **Since [§ D1631](../DECISIONS.md) this is automated.** `.github/workflows/deploy-server.yml` builds
+> **Since [§ D1634](../DECISIONS.md) this is automated.** `.github/workflows/deploy-server.yml` builds
 > the image in the registry and redeploys this template on every push to `main` that touches the
 > server, carrying the last deployment's parameters forward. It is armed once, by
 > `infra/azure/provision-server-deployer.sh`. The steps below are what it does, and what to run by

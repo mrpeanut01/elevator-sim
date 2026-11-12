@@ -55924,7 +55924,7 @@ integers.
 **Numbers spent.** This session took the charter row's **D1630** and moved the row to D1631; nothing
 is holed.
 
-## D1631 — the server deploys itself on a push to `main`, with the last deployment's parameters carried forward
+## D1634 — the server deploys itself on a push to `main`, with the last deployment's parameters carried forward
 
 > **Taken 2026-11-12 by the product owner** ("set up the automatic deploy like CropCard"), during the
 > SQLite cutover of [§ D1630](#d1630), after the server image was found unbuilt since 2026-08-15 and
@@ -55966,6 +55966,6 @@ request's CI passed before merge.
 last step. No run has happened yet: the workflow is unarmed until the owner runs the provisioning
 script.
 
-**Numbers spent.** This session took the charter row's **D1631** and moved the row to D1632; nothing
+**Numbers spent.** This session took the charter row's **D1634** and moved the row to D1635; nothing
 is holed.
 

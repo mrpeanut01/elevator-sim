@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup for `.github/workflows/deploy-server.yml` — DECISIONS.md § D1631.
+# One-time setup for `.github/workflows/deploy-server.yml` — DECISIONS.md § D1634.
 #
 # Gives GitHub Actions a way into the `elevator-sim` resource group without a stored secret: a
 # user-assigned managed identity that trusts this repository's `server-production` environment through
