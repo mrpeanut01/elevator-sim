@@ -230,10 +230,15 @@ describe('the warnings, most serious first, and the fixes some of them carry', (
     const key = keyAt(SIZED, 0);
     /* Twelve floors above the lobby is thirteen landings: one is left over. */
     const decked = withDecks(SIZED, [key], 2);
-    /* One pair beside ordinary shafts is not a blocker, and is still said, with the way out. */
+    /*
+     * One pair beside ordinary shafts runs sectored, so the line names the boundary the board
+     * wrote and what the upper car cannot do, and no longer says the pair locks.
+     */
     const one = withCars(SIZED, [keyAt(SIZED, 0)], 2);
     const locked = warningsOf(one).find((warning) => warning.text.includes('a pair of cars'));
-    expect(locked?.severity).toBe('class');
+    expect(locked?.severity).toBe('comfort');
+    expect(locked?.text).toContain('The lower car serves 6 and below');
+    expect(locked?.text).not.toContain('locks');
     expect(warningsOf(one).some((warning) => warning.severity === 'blocker')).toBe(false);
     expect((locked?.fix?.apply(one) as TowerPlan).shafts.every((shaft) => shaft.cars === 1)).toBe(true);
     expect(warningsOf(SIZED).some((warning) => warning.text.includes('a pair of cars'))).toBe(false);

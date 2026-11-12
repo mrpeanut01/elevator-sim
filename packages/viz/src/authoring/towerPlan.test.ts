@@ -359,6 +359,30 @@ describe('the drawing board is not decoration — every control moves the legs',
     expect(legsOf(paired)).not.toBe(control);
   });
 
+  it('a pair is written with a sector boundary, so nobody is left aboard or waiting', () => {
+    /*
+     * `docs/11` § 3.2's R1. Without a boundary a pair under up/down buttons runs the free regime,
+     * in which each car boards riders bound past its mate and the shaft ends the run with people
+     * still in the cars (`sim/twinShaftSector.test.ts`). The board writes the middle stop of the
+     * group, and the assertion is on the legs: every rider who arrived was carried and put down.
+     */
+    const paired = withCars(zonedTowerPlan(), ['s1'], 2);
+    const bank = planAnalysisOf(paired, SPECS).resolved?.banks.find((entry) =>
+      entry.shafts.some((shaft) => shaft.carIds.length === 2),
+    );
+    const pair = bank?.shafts.find((shaft) => shaft.carIds.length === 2);
+    expect(pair?.sectorBoundaryFloorId).toBe('10');
+    expect(bank?.servesFloors).toContain(pair?.sectorBoundaryFloorId);
+
+    const run = recordRun(configFor(paired, { seed: 7000n, durationS: 1800 }), { recordDecisions: false });
+    const legs = run.recording.legs;
+    expect(legs.filter((leg) => leg.boardedAt !== undefined && leg.alightedAt === undefined)).toEqual([]);
+    expect(legs.filter((leg) => leg.boardedAt === undefined && leg.alightedAt === undefined)).toEqual([]);
+    expect(legs.some((leg) => leg.carId === 'bank-1-A1')).toBe(true);
+    expect(legs.some((leg) => leg.carId === 'bank-1-A2')).toBe(true);
+    expect(JSON.stringify(run.result.warnings)).not.toContain('free regime');
+  });
+
   it('a block stood apart is a group of its own, and the run changes', () => {
     const podium = podiumPlan();
     expect(legsOf(withWing(podium, ['s5', 's9'], 1))).not.toBe(legsOf(podium));
