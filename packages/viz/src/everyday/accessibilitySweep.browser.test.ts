@@ -503,7 +503,7 @@ describe.skipIf(!HAS_BROWSER)('the accessibility sweep — WCAG 2.1 A and AA ove
      * rule set stays honest about which criterion it maps to — and a bump that silently changed the
      * gate is exactly the move this assertion exists to make visible.
      */
-    expect(derived.version).toBe('4.13.0');
+    expect(derived.version).toBe('4.14.0');
     /*
      * A selection, not the catalogue. If these were equal the tag filter would be doing nothing and
      * the sweep would be gating on axe's best-practice rules under the name of a standard.

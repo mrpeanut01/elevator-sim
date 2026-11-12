@@ -1866,7 +1866,7 @@ function mountWorkshop(
       if (rowView.canAddCondition) {
         const more = el(doc, 'button', 'everyday-workshop-and-add', 'and…');
         more.type = 'button';
-        more.setAttribute('aria-label', `Add a further condition to rule ${String(index + 1)}`);
+        more.setAttribute('aria-label', `and… a further condition for rule ${String(index + 1)}`);
         more.style.cssText = PILL;
         more.addEventListener('click', () => {
           setRows(rows.map((entry, at) => (at === index ? rowWithAnotherCondition(entry) : entry)));
