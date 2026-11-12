@@ -26,11 +26,27 @@
  *     before children; `importer.test.ts` holds it equal to the schema's own table list in both
  *     directions, so a new table cannot be forgotten here.
  *
+ * ## A source older than this schema, which is what the first cutover met
+ *
+ * The importer reads the source as it finds it and never migrates it, and on 2026-11-12 the deployed
+ * PostgreSQL turned out to hold the schema of 2026-08-15: no `telemetry_events`, `chime_entries` or
+ * `rush_entries`, and an `entries` table keyed by `config_hash` (`store.ts`'s header says why that
+ * change has no migration). The current server cannot boot on that database, so nothing could bring
+ * it forward first. Two rules follow, and `importer.test.ts` holds both against that schema:
+ *
+ *   * **A table the source does not have is copied as no rows**, and named in the outcome's
+ *     `absentFromSource`, because a table that never existed held nothing to lose.
+ *   * **A row the destination has no column for stops the copy by name.** A legacy `entries` row has
+ *     no `board_key`, and only a replay can write one, so the copy is refused and rolled back before
+ *     a row is dropped quietly. An empty legacy table copies as no rows.
+ *
+ * The docstring is the record of this (§ D405): it binds nothing outside this module.
+ *
  * Copying back from SQLite to PostgreSQL is not built: it would need a transaction on a pool, and it
  * has no caller.
  */
 
-import type { Sql } from './sql.js';
+import type { Sql, SqlResult } from './sql.js';
 import { HOUSE_USER_ID, Store } from './store.js';
 
 /** Every table the store owns but its migration register, parents before children. */
@@ -47,7 +63,12 @@ export const IMPORT_ORDER: readonly string[] = Object.freeze([
 ]);
 
 export type ImportOutcome =
-  | { readonly imported: true; readonly rows: Readonly<Record<string, number>> }
+  | {
+      readonly imported: true;
+      readonly rows: Readonly<Record<string, number>>;
+      /** Tables an older source never had, copied as no rows. Empty for a source on this schema. */
+      readonly absentFromSource: readonly string[];
+    }
   | { readonly imported: false; readonly reason: 'destination-has-players' | 'source-is-empty' };
 
 export async function importOnce(source: Sql, destination: Sql, now: () => number): Promise<ImportOutcome> {
@@ -61,13 +82,28 @@ export async function importOnce(source: Sql, destination: Sql, now: () => numbe
   if ((await players(source)) === 0) return { imported: false, reason: 'source-is-empty' };
 
   const rows: Record<string, number> = {};
+  const absentFromSource: string[] = [];
   await destination.query('BEGIN');
   try {
     for (const table of IMPORT_ORDER) {
-      const found = await source.query(`SELECT * FROM ${table}`);
+      const found = await readTable(source, table);
+      if (found === undefined) {
+        absentFromSource.push(table);
+        rows[table] = 0;
+        continue;
+      }
+      const known = await columnsOf(destination, table);
       let copied = 0;
       for (const row of found.rows) {
         const columns = Object.keys(row);
+        const unknown = columns.filter((column) => !known.has(column));
+        if (unknown.length > 0) {
+          throw new Error(
+            `importOnce: the source's ${table} has ${String(found.rows.length)} row(s) with column(s) this schema ` +
+              `does not have (${unknown.join(', ')}). They are from an older schema and cannot be copied as they ` +
+              'are; nothing was imported.',
+          );
+        }
         const placeholders = columns.map((_, index) => `$${String(index + 1)}`);
         const written = await destination.query(
           `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders.join(', ')}) ON CONFLICT DO NOTHING`,
@@ -82,7 +118,23 @@ export async function importOnce(source: Sql, destination: Sql, now: () => numbe
     await destination.query('ROLLBACK');
     throw error;
   }
-  return { imported: true, rows: Object.freeze(rows) };
+  return { imported: true, rows: Object.freeze(rows), absentFromSource: Object.freeze(absentFromSource) };
+}
+
+/** Every row of a source table, or `undefined` when the source has no such table (SQLSTATE 42P01). */
+async function readTable(source: Sql, table: string): Promise<SqlResult | undefined> {
+  try {
+    return await source.query(`SELECT * FROM ${table}`);
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '42P01') return undefined;
+    throw error;
+  }
+}
+
+/** The destination's own columns for a table. The destination is SQLite, so this is its pragma. */
+async function columnsOf(destination: Sql, table: string): Promise<ReadonlySet<string>> {
+  const found = await destination.query(`SELECT name FROM pragma_table_info('${table}')`);
+  return new Set(found.rows.map((row) => String(row['name'])));
 }
 
 /** Accounts other than the house. */

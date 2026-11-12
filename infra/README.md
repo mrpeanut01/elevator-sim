@@ -425,7 +425,10 @@ starts replicating it. A copy that fails rolls back, and the next boot tries aga
 az containerapp logs show -g elevator-sim -n elevsim-app --tail 300 | grep '\[import\]'
 ```
 
-`{"imported":true,"rows":{…}}` with a count for each table is the copy. `destination-has-players`
+`{"imported":true,"rows":{…}}` with a count for each table is the copy. `absentFromSource` names any
+table the PostgreSQL schema was too old to have, copied as no rows: the first cutover's source held
+the schema of 2026-08-15, which the current server cannot boot on (`store/importer.ts` says what the
+copy does about it). `destination-has-players`
 on a later boot is the guard doing its job: the store already holds the copy. Then open the boards
 and sign in as a player you know.
 
@@ -438,10 +441,20 @@ az postgres flexible-server list -g elevator-sim --query "[].name" -o tsv
 az postgres flexible-server delete -g elevator-sim -n <that name> --yes
 ```
 
+**A cutover that fails takes the site down, and the previous revision cannot cover for it.** A
+Container App's secrets belong to the app, not to a revision, so once `database-url` holds the SQLite
+path the last PostgreSQL revision cannot boot either. That is what happened on 2026-11-12, when the
+image had no certificate authorities and Litestream could not reach Blob Storage (fixed in the
+`Dockerfile`). Rehearse a change to the image locally first, and read the workflow's last step, which
+passes only when the newest revision is the ready one.
+
 **Going back to PostgreSQL** is `databaseEngine=postgres` and a PostgreSQL password, which deploys a
 server again. It comes up **empty**: nothing copies SQLite into PostgreSQL, because that copy would
 need a transaction on a connection pool, and the seam has none (`importer.ts` says why). Rows written
-after the cutover would have to be moved by hand.
+after the cutover would have to be moved by hand. And while the old server still exists, going back
+lands on its old schema: the current server refuses to boot on a database from before 2026-09-01
+(`column "board_key" does not exist`, `store.ts`'s header), so the deployment's last ready revision
+keeps serving and the new one never starts.
 
 **A brand new deployment with nothing to import** uses `databaseEngine=sqlite allowEmptyDatabase=true`
 for its first deployment, then drops `allowEmptyDatabase`. Without it, a boot that finds no replica
