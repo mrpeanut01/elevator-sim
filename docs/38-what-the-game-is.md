@@ -533,8 +533,9 @@ Named so the next lane does not discover it. None of it is built by this page.
   the walkthrough there by name. A run started from the design floor is a *test
   simulation* and files nothing; a building is played on a mode's floor. **§ 2.1's *Build your own*
   is built in part** ([§ D1629](../DECISIONS.md)): the Scenario floor lists the buildings a player
-  saved and plays a day in one, on a week of its own that banks nothing. A goal, a budget, a
-  survivor count and sharing are not built.
+  saved and plays a day in one, on a week of its own that banks nothing. A saved building can be
+  renamed and removed there ([§ D1631](../DECISIONS.md)). A goal, a budget, a survivor count and
+  sharing are not built.
 
 ## 4. What this does not change
 

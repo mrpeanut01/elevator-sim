@@ -173,7 +173,13 @@ import {
   DOOR_STEPS,
   sameForEveryoneLine,
 } from '../everyday/doorView.js';
-import { HOST_PENDING_REASON, OWN_BUILDING_GONE } from '../everyday/host.js';
+import {
+  HOST_PENDING_REASON,
+  OWN_BUILDING_GONE,
+  OWN_BUILDING_NAMELESS,
+  OWN_BUILDING_OPEN,
+  OWN_BUILDING_STANDING,
+} from '../everyday/host.js';
 import {
   BUILD_NOTES_POINTER,
   buildNotesSummaryOf,
@@ -15750,6 +15756,9 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/scenarioModel.ts#OWN_BUILDINGS_COPY',
     'everyday/scenarioModel.ts#ownBuildingsViewOf',
     'everyday/host.ts#OWN_BUILDING_GONE',
+    'everyday/host.ts#OWN_BUILDING_STANDING',
+    'everyday/host.ts#OWN_BUILDING_OPEN',
+    'everyday/host.ts#OWN_BUILDING_NAMELESS',
     /*
      * The hub's two session shapes — GitHub issue #559, [§ D753](../../../../DECISIONS.md). They
      * are the shapes `ENTRIES` carries, which `scenarioHubViewOf` above already seeds one row at a
@@ -16382,8 +16391,12 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
           seeds.push({ field: `${at}.play`, text: own.playLabel, role: 'label' });
           seeds.push({ field: `${at}.design`, text: own.designLabel, role: 'label' });
           if (own.empty !== undefined) seeds.push({ field: `${at}.empty`, text: own.empty, role: 'prose' });
+          for (const [key, text] of Object.entries(own.keep)) seeds.push({ field: `${at}.keep.${key}`, text, role: key === 'removeAsk' ? 'prose' : 'label' });
         }
         seeds.push({ field: `${arm}.scenario.own.gone`, text: OWN_BUILDING_GONE, role: 'reason' });
+        seeds.push({ field: `${arm}.scenario.own.standing`, text: OWN_BUILDING_STANDING, role: 'reason' });
+        seeds.push({ field: `${arm}.scenario.own.open`, text: OWN_BUILDING_OPEN, role: 'reason' });
+        seeds.push({ field: `${arm}.scenario.own.nameless`, text: OWN_BUILDING_NAMELESS, role: 'reason' });
         void OWN_BUILDINGS_COPY;
         seeds.push({ field: `${arm}.scenario.eyebrow`, text: hub.eyebrow, role: 'prose' });
         seeds.push({ field: `${arm}.scenario.title`, text: hub.title, role: 'prose' });

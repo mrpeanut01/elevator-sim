@@ -18,6 +18,7 @@ import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { OWN_BUILDING_NAME_MAX, ownBuildingNameOf } from './host.js';
 import { EVERYDAY_MODES } from './modes.js';
 import { isScreenBuilt } from './screens.js';
 import {
@@ -412,6 +413,20 @@ describe('your buildings, on the Scenario floor', () => {
     expect(view.rows[1]?.spec).toBe('');
     expect(view.empty).toBeUndefined();
     expect(view.playLabel).toBe(OWN_BUILDINGS_COPY.play);
+  });
+
+  /* § D1631: the keeping controls are worded once, and a typed name is cleaned the same way everywhere. */
+  it('words a row’s rename and remove, and asks before removing', () => {
+    const view = ownBuildingsViewOf([{ id: 'bld-1', name: 'First Tower' }]);
+    expect(view.keep.rename).toBe(OWN_BUILDINGS_COPY.rename);
+    expect(view.keep.removeAsk).toMatch(/cannot be brought back/u);
+    expect(view.keep.removeNo).not.toBe(view.keep.removeYes);
+  });
+
+  it('keeps a typed name to one line: spaces collapsed, ends trimmed, cut at the cap', () => {
+    expect(ownBuildingNameOf('  Harbour   House ')).toBe('Harbour House');
+    expect(ownBuildingNameOf(' \t ')).toBe('');
+    expect(ownBuildingNameOf('x'.repeat(90))).toHaveLength(OWN_BUILDING_NAME_MAX);
   });
 
   it('says where a building comes from when there is none, and never draws an empty list', () => {
