@@ -55788,6 +55788,8 @@ holed.
 
 ## D1629 — a building you drew is played from the Scenario floor, saving only saves, and the building's loose ends are closed
 
+> **Status 2026-11-12: AMENDED by [§ D1631](#d1631)** (on the owner's delegation). Clause 3, *saving only saves*, is confirmed. A saved building can now be renamed and removed, which this entry named as not built, and the first-visit question is closed: a first visit meets the lobby.
+
 > **Taken 2026-11-11 by the product owner** ("continue with all of it, starting with playing your own
 > building"), against the list of outstanding work this session reported after [§ D1628](#d1628)
 > merged, and built the same day by the same session (wave AZ, a single lane). The owner added that
@@ -55923,6 +55925,55 @@ integers.
 
 **Numbers spent.** This session took the charter row's **D1630** and moved the row to D1631; nothing
 is holed.
+
+## D1631 — the four questions the navigation left open are settled: save only saves, the lobby comes first, the shelf can be kept, and a narrow lobby's bar is one row
+
+> **Taken 2026-11-12 by this session on the product owner's instruction** ("continue with the four
+> open decisions, using your best judgement"), against the four questions reported after
+> [§ D1629](#d1629) merged. Built the same day (wave BB, a single lane). **Amends § D1629**, which
+> named a saved building as not renamable or removable and left the first-visit question open.
+> **Owner-reversible**, clause by clause: each is a judgement the owner delegated and may retake.
+
+**Why an entry.** It settles a question two earlier entries left to the owner, adds two writes to
+the Everyday host, and changes how the shell draws one row of the handoff's § 3.3 table.
+
+**What is ruled.**
+
+1. **Save only saves, and the next press is offered.** § D1629's clause 3 stands: the drawing
+   board's *Save* writes the shelf and does not move the week, where #655 had it do both. A building
+   is played on a mode's floor (§ D1627), and a save that also moved the week would start a day the
+   player had not asked for. What was missing was the way on, so the saved line is followed by one
+   press, *Go to Your buildings*, drawn only while that line stands.
+2. **A first visit meets the lobby.** § D1628's arrangement is kept: the lobby is the first screen,
+   it offers the walkthrough by name, and *What this is* is one press away. Nobody is sent to a page
+   they did not choose. The question § D1628 recorded as open is closed on that answer.
+3. **The shelf can be kept.** A row under *Your buildings* carries *Rename* and *Remove*
+   (`EverydayHost.renameOwnBuilding`, `removeOwnBuilding`). A name is one line: runs of space
+   collapsed, the ends trimmed, cut at `OWN_BUILDING_NAME_MAX`. *Remove* asks first, with the keeping
+   answer drawn first. **Neither writes while the week stands on the building**, or while the
+   Engineer editor has it open: a brief, a report and a run in memory read the building by id, so
+   the row is left alone until the week has moved, and the row says so. Both ask the attempt hold
+   (§ D1360) as a save does.
+4. **A narrow lobby's bar is one row.** Measured at 320 × 320 with the consent ask standing, the bar
+   wrapped to 92 px and left the lobby 18 px. On a narrow lobby the shell does not draw the inert
+   leave, which names the screen the player is on, and the note wraps inside its own cell. The bar
+   is 52 px there and the lobby has 58 px, which scrolls. § 3.3's row is unchanged as data; the wide
+   bar and every other screen's bar are untouched.
+
+**What is not built, named.** A goal, a budget, a survivor count and sharing for a player's
+building still wait on the gameplay revamp, and all of a player's buildings still share one week.
+At 320 × 320 the lobby is usable and still small while the ask stands; the ask's own height is
+[issue #630](https://github.com/mrpeanut01/elevator-sim/issues/630)'s and is not moved here.
+
+**Held by** `everyday/ownBuilding.browser.test.ts` (the press after a save, a rename, a remove asked
+twice, and the refusal while the week stands on the building), `everyday/scenarioModel.test.ts`
+(the words and the name rule), `everyday/attemptDoors.test.ts` (both writes refuse while a scored
+attempt stands) and `everyday/lobby.browser.test.ts` (the bar's height, the lobby's room and the
+undrawn leave at 320 × 320).
+
+**Numbers spent.** Wave BB took the charter row's **D1631** and moved the row to D1632; nothing is
+holed.
+
 ## D1632 — an escalator may declare a carrying capacity, and one that does has a queue
 
 > **Taken 2026-11-11** on the product owner's request for escalator handling as an engine feature,

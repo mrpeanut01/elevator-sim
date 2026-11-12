@@ -336,7 +336,22 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   saveButton.style.cssText = `width:100%;border:0;cursor:pointer;background:${C.sun};color:${C.ink};border-radius:${String(R.row)}px;padding:9px 14px;font-size:13px;font-weight:600`;
   const savedNote = el(doc, 'div', 'everyday-designer-saved', savedLine);
   savedNote.style.cssText = `font-size:11px;color:${C.warmGrey};line-height:1.4;margin-top:auto`;
-  nameCard.append(nameLabel, nameInput, saveButton, savedNote);
+  /*
+   * § D1631: a save leaves the week where it is (§ D1629), so the saved line is followed by the one
+   * press that takes the player to where the building is played. Shown only while that line stands.
+   */
+  const goPlay = el(doc, 'button', 'everyday-designer-goplay', COPY.goPlay);
+  goPlay.type = 'button';
+  goPlay.hidden = true;
+  goPlay.style.cssText = `width:100%;cursor:pointer;background:transparent;color:${C.ink};border:1px solid ${C.rule};border-radius:${String(R.row)}px;padding:8px 14px;font-size:13px;font-weight:600`;
+  goPlay.addEventListener('click', () => {
+    context.go('scenario');
+  });
+  function showSaved(): void {
+    savedNote.textContent = savedLine;
+    goPlay.hidden = savedLine !== COPY.savedLine;
+  }
+  nameCard.append(nameLabel, nameInput, saveButton, savedNote, goPlay);
   topRow.append(nameCard);
 
   const figureRow = el(doc, 'div', 'everyday-designer-figures');
@@ -1831,7 +1846,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     if (!keepSide) drawSide();
     drawGroups();
     drawSpecBlock();
-    savedNote.textContent = savedLine;
+    showSaved();
     if (focusKey !== undefined && !keepSide) {
       for (const candidate of root.querySelectorAll<HTMLElement>('[data-k]')) {
         if (candidate.dataset['k'] === focusKey) {
@@ -1860,7 +1875,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   });
   saveButton.addEventListener('click', () => {
     applyAndReport();
-    savedNote.textContent = savedLine;
+    showSaved();
   });
 
   redraw();
@@ -1884,7 +1899,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
         context.host.runSandbox({ building: undefined, plan, pattern: undefined, dwell: undefined });
       } catch (error) {
         savedLine = error instanceof Error ? error.message : String(error);
-        savedNote.textContent = savedLine;
+        showSaved();
         return;
       }
       context.go('stage');

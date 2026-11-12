@@ -52,6 +52,7 @@
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import { actionBarFor } from './actionBar.js';
+import { OWN_BUILDING_NAME_MAX } from './host.js';
 import { SCENARIO_COPY, ownBuildingsViewOf, scenarioHubViewOf } from './scenarioModel.js';
 import { onScenarioLadderProvided, scenarioLadder } from './scenarioLadderPort.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
@@ -86,64 +87,165 @@ function clearedStageIds(): ReadonlySet<string> {
  * (a scored attempt standing elsewhere, § D1360) is drawn under the list in the host's own words.
  */
 function ownBuildingsBlock(doc: Document, context: EverydayScreenShellContext): HTMLElement {
-  const view = ownBuildingsViewOf(context.host.ownBuildings(), (id) => context.host.buildingSpecLine(id));
   const block = el(doc, 'section', 'everyday-scenario-own');
   block.style.cssText = `margin:30px 0 0;padding:22px 0 0;border-top:1px solid ${C.rule};max-width:760px`;
-  const heading = el(doc, 'h2', 'everyday-scenario-own-title', view.heading);
-  heading.style.cssText = `font-family:${TYPE.heading};font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0`;
-  const lede = el(doc, 'p', 'everyday-scenario-own-lede', view.lede);
-  lede.style.cssText = `font-size:14.5px;line-height:1.55;color:${C.inkSoft};margin:8px 0 0;max-width:60ch;text-wrap:pretty`;
-  block.append(heading, lede);
+  /** The row a keeping control has open, and which: the block is redrawn whole on every change (§ D1631). */
+  let open: { readonly id: string; readonly what: 'rename' | 'remove' } | undefined;
+  let refused = '';
 
-  const refusal = el(doc, 'p', 'everyday-scenario-own-refusal');
-  refusal.setAttribute('role', 'status');
-  refusal.style.cssText = `font-size:13px;line-height:1.5;color:${C.terracotta};margin:10px 0 0;max-width:60ch`;
+  const quiet = (button: HTMLButtonElement): void => {
+    button.type = 'button';
+    button.style.cssText = `flex:none;padding:8px 12px;border:1px solid ${C.rule};border-radius:${R.control}px;background:transparent;color:${C.ink};font:600 13px ${TYPE.heading};cursor:pointer`;
+  };
 
-  if (view.empty !== undefined) {
-    const empty = el(doc, 'p', 'everyday-scenario-own-empty', view.empty);
-    empty.style.cssText = `font-size:14px;line-height:1.5;color:${C.inkSoft};margin:14px 0 0;max-width:60ch`;
-    block.append(empty);
-  } else {
-    const rows = el(doc, 'ul', 'everyday-scenario-own-rows');
-    rows.style.cssText = 'list-style:none;margin:16px 0 0;padding:0;display:grid;gap:10px';
-    for (const row of view.rows) {
-      const item = el(doc, 'li', 'everyday-scenario-own-row');
-      item.dataset['building'] = row.id;
-      item.style.cssText = `display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;border:1px solid ${C.rule};border-radius:${String(R.card)}px;background:${C.paper};min-width:0`;
-      const text = el(doc, 'div');
-      text.style.cssText = 'min-width:0;flex:1 1 220px';
-      const name = el(doc, 'div', 'everyday-scenario-own-name', row.name);
-      name.style.cssText = `font-family:${TYPE.heading};font-size:18px;font-weight:650;letter-spacing:-.01em;color:${C.ink}`;
-      text.append(name);
-      if (row.spec !== '') {
-        const spec = el(doc, 'div', 'everyday-scenario-own-spec', row.spec);
-        spec.style.cssText = `font:500 11px ${TYPE.mono};letter-spacing:.03em;color:${C.label};margin:5px 0 0`;
-        text.append(spec);
-      }
-      const play = el(doc, 'button', 'everyday-scenario-own-play', view.playLabel);
-      play.type = 'button';
-      play.style.cssText = `flex:none;padding:9px 16px;border:0;border-radius:${R.control}px;background:${C.sun};color:${C.ink};font:600 14px ${TYPE.heading};cursor:pointer`;
-      play.addEventListener('click', () => {
-        const refused = context.host.playOwnBuilding(row.id);
-        if (refused !== undefined) {
-          refusal.textContent = refused;
-          return;
+  function draw(focus?: string): void {
+    const view = ownBuildingsViewOf(context.host.ownBuildings(), (id) => context.host.buildingSpecLine(id));
+    block.replaceChildren();
+    const heading = el(doc, 'h2', 'everyday-scenario-own-title', view.heading);
+    heading.style.cssText = `font-family:${TYPE.heading};font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0`;
+    const lede = el(doc, 'p', 'everyday-scenario-own-lede', view.lede);
+    lede.style.cssText = `font-size:14.5px;line-height:1.55;color:${C.inkSoft};margin:8px 0 0;max-width:60ch;text-wrap:pretty`;
+    block.append(heading, lede);
+
+    const refusal = el(doc, 'p', 'everyday-scenario-own-refusal', refused);
+    refusal.setAttribute('role', 'status');
+    refusal.style.cssText = `font-size:13px;line-height:1.5;color:${C.terracotta};margin:10px 0 0;max-width:60ch`;
+
+    /** Run a host write that answers a refusal or nothing, then redraw with the list as it now is. */
+    const act = (write: () => string | undefined): void => {
+      refused = write() ?? '';
+      if (refused === '') open = undefined;
+      draw();
+    };
+
+    if (view.empty !== undefined) {
+      const empty = el(doc, 'p', 'everyday-scenario-own-empty', view.empty);
+      empty.style.cssText = `font-size:14px;line-height:1.5;color:${C.inkSoft};margin:14px 0 0;max-width:60ch`;
+      block.append(empty);
+    } else {
+      const rows = el(doc, 'ul', 'everyday-scenario-own-rows');
+      rows.style.cssText = 'list-style:none;margin:16px 0 0;padding:0;display:grid;gap:10px';
+      for (const row of view.rows) {
+        const item = el(doc, 'li', 'everyday-scenario-own-row');
+        item.dataset['building'] = row.id;
+        item.style.cssText = `display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;padding:14px 18px;border:1px solid ${C.rule};border-radius:${String(R.card)}px;background:${C.paper};min-width:0`;
+        const mine = open?.id === row.id ? open.what : undefined;
+
+        if (mine === 'rename') {
+          /* The name, in place: a form, so Enter saves and the label is the field's own. */
+          const form = el(doc, 'form', 'everyday-scenario-own-rename-form');
+          form.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1 1 100%;min-width:0';
+          const field = el(doc, 'input', 'everyday-scenario-own-name-input');
+          field.type = 'text';
+          field.value = row.name;
+          field.maxLength = OWN_BUILDING_NAME_MAX;
+          field.setAttribute('aria-label', view.keep.nameLabel);
+          field.style.cssText = `flex:1 1 180px;min-width:0;padding:8px 10px;border:1px solid ${C.rule};border-radius:${R.control}px;background:${C.card};color:${C.ink};font:600 15px ${TYPE.heading}`;
+          const save = el(doc, 'button', 'everyday-scenario-own-rename-save', view.keep.saveName);
+          quiet(save);
+          save.type = 'submit';
+          const cancel = el(doc, 'button', 'everyday-scenario-own-cancel', view.keep.cancel);
+          quiet(cancel);
+          cancel.addEventListener('click', () => {
+            open = undefined;
+            refused = '';
+            draw(`rename:${row.id}`);
+          });
+          form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            act(() => context.host.renameOwnBuilding(row.id, field.value));
+          });
+          form.append(field, save, cancel);
+          item.append(form);
+          rows.append(item);
+          if (focus === `field:${row.id}`) field.focus();
+          continue;
         }
-        context.go('brief');
-      });
-      item.append(text, play);
-      rows.append(item);
+
+        const text = el(doc, 'div');
+        text.style.cssText = 'min-width:0;flex:1 1 220px';
+        const name = el(doc, 'div', 'everyday-scenario-own-name', row.name);
+        name.style.cssText = `font-family:${TYPE.heading};font-size:18px;font-weight:650;letter-spacing:-.01em;color:${C.ink};overflow-wrap:anywhere`;
+        text.append(name);
+        if (row.spec !== '') {
+          const spec = el(doc, 'div', 'everyday-scenario-own-spec', row.spec);
+          spec.style.cssText = `font:500 11px ${TYPE.mono};letter-spacing:.03em;color:${C.label};margin:5px 0 0`;
+          text.append(spec);
+        }
+        const controls = el(doc, 'div', 'everyday-scenario-own-controls');
+        controls.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:none;max-width:100%';
+
+        if (mine === 'remove') {
+          /* Asked in place, with the keeping answer first: nothing is removed on one press. */
+          const ask = el(doc, 'span', 'everyday-scenario-own-remove-ask', view.keep.removeAsk);
+          ask.style.cssText = `font-size:13px;line-height:1.45;color:${C.ink};flex:1 1 200px;min-width:0`;
+          const no = el(doc, 'button', 'everyday-scenario-own-remove-no', view.keep.removeNo);
+          quiet(no);
+          no.addEventListener('click', () => {
+            open = undefined;
+            refused = '';
+            draw(`remove:${row.id}`);
+          });
+          const yes = el(doc, 'button', 'everyday-scenario-own-remove-yes', view.keep.removeYes);
+          quiet(yes);
+          yes.addEventListener('click', () => {
+            act(() => context.host.removeOwnBuilding(row.id));
+          });
+          controls.style.flex = '1 1 100%';
+          controls.append(ask, no, yes);
+          item.append(text, controls);
+          rows.append(item);
+          if (focus === `ask:${row.id}`) no.focus();
+          continue;
+        }
+
+        const play = el(doc, 'button', 'everyday-scenario-own-play', view.playLabel);
+        play.type = 'button';
+        play.style.cssText = `flex:none;padding:9px 16px;border:0;border-radius:${R.control}px;background:${C.sun};color:${C.ink};font:600 14px ${TYPE.heading};cursor:pointer`;
+        play.addEventListener('click', () => {
+          const answer = context.host.playOwnBuilding(row.id);
+          if (answer !== undefined) {
+            refused = answer;
+            draw();
+            return;
+          }
+          context.go('brief');
+        });
+        const rename = el(doc, 'button', 'everyday-scenario-own-rename', view.keep.rename);
+        quiet(rename);
+        rename.setAttribute('aria-label', `${view.keep.rename} ${row.name}`);
+        rename.addEventListener('click', () => {
+          open = { id: row.id, what: 'rename' };
+          refused = '';
+          draw(`field:${row.id}`);
+        });
+        const remove = el(doc, 'button', 'everyday-scenario-own-remove', view.keep.remove);
+        quiet(remove);
+        remove.setAttribute('aria-label', `${view.keep.remove} ${row.name}`);
+        remove.addEventListener('click', () => {
+          open = { id: row.id, what: 'remove' };
+          refused = '';
+          draw(`ask:${row.id}`);
+        });
+        controls.append(play, rename, remove);
+        item.append(text, controls);
+        rows.append(item);
+        if (focus === `rename:${row.id}`) rename.focus();
+        if (focus === `remove:${row.id}`) remove.focus();
+      }
+      block.append(rows);
     }
-    block.append(rows);
+
+    const design = el(doc, 'button', 'everyday-scenario-own-design', view.designLabel);
+    design.type = 'button';
+    design.style.cssText = `margin:14px 0 0;padding:8px 14px;border:1px solid ${C.rule};border-radius:${R.control}px;background:transparent;color:${C.ink};font:600 13px ${TYPE.heading};cursor:pointer`;
+    design.addEventListener('click', () => {
+      context.go('designer');
+    });
+    block.append(design, refusal);
   }
 
-  const design = el(doc, 'button', 'everyday-scenario-own-design', view.designLabel);
-  design.type = 'button';
-  design.style.cssText = `margin:14px 0 0;padding:8px 14px;border:1px solid ${C.rule};border-radius:${R.control}px;background:transparent;color:${C.ink};font:600 13px ${TYPE.heading};cursor:pointer`;
-  design.addEventListener('click', () => {
-    context.go('designer');
-  });
-  block.append(design, refusal);
+  draw();
   return block;
 }
 
