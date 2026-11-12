@@ -106,6 +106,10 @@ jobs:
           ENGINE_INPUT: ${{ inputs.databaseEngine || 'keep' }}
           IMPORT_INPUT: ${{ inputs.importFromPostgres || 'keep' }}
           IMAGE: ${{ steps.last.outputs.server }}/elevator-sim:${{ steps.last.outputs.tag }}
+          # The token seed-boards.yml sends. The repository secret is the one source of it; when
+          # this job cannot read one, the Container App's own copy is carried forward, so a
+          # deployment never turns seeding off by accident.
+          SEED_TOKEN_SECRET: ${{ secrets.ELEVATOR_SIM_SEED_TOKEN }}
         run: |
           app=$(az resource list -g "$RG" --resource-type Microsoft.App/containerApps --query "[0].name" -o tsv)
           secret() { az containerapp secret show -g "$RG" -n "$app" --secret-name "$1" --query value -o tsv 2>/dev/null || true; }
@@ -120,7 +124,10 @@ jobs:
             DB_PASSWORD=$(python3 -c 'import sys, urllib.parse as u; print(u.unquote(u.urlsplit(sys.argv[1]).password or ""))' "$PG_URL")
             echo "::add-mask::$DB_PASSWORD"
           fi
-          export APP_SECRET DB_PASSWORD
+          SEED_TOKEN="$SEED_TOKEN_SECRET"
+          if [ -z "$SEED_TOKEN" ]; then SEED_TOKEN=$(secret seed-token); fi
+          if [ -n "$SEED_TOKEN" ]; then echo "::add-mask::$SEED_TOKEN"; fi
+          export APP_SECRET DB_PASSWORD SEED_TOKEN
           python3 - "$RUNNER_TEMP/last.json" "$RUNNER_TEMP/params.json" <<'PY'
           import json, os, sys
           last = json.load(open(sys.argv[1]))
@@ -128,6 +135,8 @@ jobs:
           params["containerImage"] = {"value": os.environ["IMAGE"]}
           params["appSecret"] = {"value": os.environ["APP_SECRET"]}
           params["databaseAdminPassword"] = {"value": os.environ["DB_PASSWORD"]}
+          if os.environ["SEED_TOKEN"]:
+              params["seedToken"] = {"value": os.environ["SEED_TOKEN"]}
           engine = os.environ["ENGINE_INPUT"]
           if engine != "keep":
               params["databaseEngine"] = {"value": engine}
@@ -142,8 +151,9 @@ jobs:
                        "recorded on the Container App to carry forward")
           json.dump({"$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
                      "contentVersion": "1.0.0.0", "parameters": params}, open(sys.argv[2], "w"))
-          shown = {k: v["value"] for k, v in params.items() if k not in ("appSecret", "databaseAdminPassword")}
+          shown = {k: v["value"] for k, v in params.items() if k not in ("appSecret", "databaseAdminPassword", "seedToken")}
           print(json.dumps(shown, indent=2))
+          print("board seeding:", "configured" if "seedToken" in params else "not configured")
           PY
 
       - name: Deploy the template

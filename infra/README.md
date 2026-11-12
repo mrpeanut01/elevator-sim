@@ -247,6 +247,22 @@ arrives. Per § 0 item 2, this is the most likely thing to be broken, and the fa
 registration that returns 500 with `Azure Communication Services did not accept the message` in the
 logs.
 
+### 4.1 Seeding the daily board
+
+`POST /api/boards/seed` posts the house's runs to today's daily board (§ D521, § D522), and answers
+503 until the deployment holds a token. Turning it on is one secret, held in one place:
+
+```sh
+openssl rand -hex 32 | gh secret set ELEVATOR_SIM_SEED_TOKEN
+```
+
+The next run of `.github/workflows/deploy-server.yml` passes it to the template as `seedToken`, and
+the app receives it as `ELEVATOR_SIM_SEED_TOKEN`. A run that cannot read the repository secret
+carries the Container App's own copy forward, so a deployment never turns seeding off by accident.
+`.github/workflows/seed-boards.yml` sends the same secret: run it by hand, or set the repository
+variable `SEED_BOARDS_ENABLED` to `true` for its nightly schedule. To rotate the token, set the
+secret again and redeploy.
+
 ---
 
 ## 5. Cost
