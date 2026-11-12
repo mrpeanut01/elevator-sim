@@ -3256,11 +3256,12 @@ describe('the sentence a screen shows while the game loads', () => {
     expect(HOST_PENDING_REASON).not.toMatch(/\b(soon|shortly|in a moment|any second)\b/u);
   });
 
-  it('is the one sentence both of the shell\u2019s waiting screens draw, and no copy of the old one survives', () => {
+  it('is the one sentence the shell\u2019s waiting screen draws, and no copy of the old one survives', () => {
     const src = new URL('./', import.meta.url);
     const shell = readFileSync(fileURLToPath(new URL('shell.ts', src)), 'utf8');
-    // The front door's waiting state and a registered screen's: both draw the constant itself.
-    expect(shell.match(/el\(doc, 'p', undefined, HOST_PENDING_REASON\)/gu)?.length).toBe(2);
+    // A registered screen's waiting state draws the constant itself. It was two until § D1628: the
+    // front door had one as well, and the lobby that replaced it draws from nothing the host holds.
+    expect(shell.match(/el\(doc, 'p', undefined, HOST_PENDING_REASON\)/gu)?.length).toBe(1);
     // And nothing else in the shipped tree authors the old words as a string a player could read.
     const root = fileURLToPath(new URL('../', import.meta.url));
     const offenders: string[] = [];
@@ -3326,5 +3327,129 @@ describe('the stage’s call rows: a lost moment and a quiet wrinkle — § D133
 
   it('says nothing of either where the shell reports neither — the control', () => {
     expect(hostWith({}).dayCallRowsAt(recording, 36_000)).toEqual([]);
+  });
+});
+
+describe('the workshop’s shelf — save, copy, duplicate and delete', () => {
+  /** A harness whose state follows its own patches, so a save can be read back. */
+  function live(state: ViewerState): { readonly h: Harness; readonly host: EverydayHost; settle(): void } {
+    const h = harnessOf(state);
+    let applied = 0;
+    return {
+      h,
+      host: createEverydayHost(h.bindings),
+      settle: () => {
+        for (; applied < h.patches.length; applied += 1) h.state = { ...h.state, ...h.patches[applied] };
+      },
+    };
+  }
+
+  it('files a first save as the player’s own, selects it, and leaves the industry design alone', () => {
+    const { h, host, settle } = live(base());
+    const industry = host.editingSource();
+    if (industry === undefined) throw new Error('the base state opens on no dispatcher');
+    expect(host.workingDispatcherStatus()).toMatchObject({ kind: 'industry', unsaved: false });
+
+    expect(host.saveWorkingDispatcher('save')).toBeUndefined();
+    settle();
+    const saved = h.state.savedDispatchers;
+    expect(saved).toHaveLength(1);
+    // Never the industry design's own name: two rows that read alike are indistinguishable.
+    expect(saved[0]?.profile.name).toBe(`${industry.name} v2`);
+    expect(saved[0]?.basedOn).toBe(industry.id);
+    // The save and the selection are one patch — a save nothing selects reaches no run.
+    expect(h.state.dispatcherId).toBe(saved[0]?.id);
+    expect(h.state.editingDispatcherId).toBe(saved[0]?.id);
+    expect(host.dispatcherById(industry.id)).toEqual(industry);
+    expect(host.workingDispatcherStatus()).toMatchObject({
+      kind: 'yours',
+      basedOn: industry.name,
+      unsaved: false,
+    });
+  });
+
+  it('replaces one of the player’s own under the same id, and refuses a name another holds', () => {
+    const { h, host, settle } = live(base());
+    const industry = host.editingSource();
+    host.saveWorkingDispatcher('save');
+    settle();
+    const id = h.state.editingDispatcherId;
+
+    const spec = host.workingSpec();
+    host.setWorkingSpec({ ...spec, name: 'Patience', weights: { ...spec.weights, starvation: 80 } });
+    settle();
+    expect(host.workingDispatcherStatus().unsaved).toBe(true);
+    expect(host.saveWorkingDispatcher('save')).toBeUndefined();
+    settle();
+    expect(h.state.savedDispatchers).toHaveLength(1);
+    expect(h.state.savedDispatchers[0]).toMatchObject({ id, profile: { name: 'Patience' } });
+    expect(h.state.savedDispatchers[0]?.profile.weights['starvation']).toBeCloseTo(0.8);
+    expect(host.workingDispatcherStatus().unsaved).toBe(false);
+
+    host.setWorkingSpec({ ...host.workingSpec(), name: industry?.name ?? '' });
+    settle();
+    expect(host.saveWorkingDispatcher('save')).toBe('taken');
+    host.setWorkingSpec({ ...host.workingSpec(), name: '  ' });
+    settle();
+    expect(host.saveWorkingDispatcher('save')).toBe('empty');
+    expect(h.state.savedDispatchers[0]?.profile.name).toBe('Patience');
+  });
+
+  it('saves a copy under the next version, keeping the original and its lineage', () => {
+    const { h, host, settle } = live(base());
+    const industry = host.editingSource();
+    host.saveWorkingDispatcher('save');
+    settle();
+    expect(host.saveWorkingDispatcher('copy')).toBeUndefined();
+    settle();
+    expect(h.state.savedDispatchers.map((entry) => entry.profile.name)).toEqual([
+      `${industry?.name ?? ''} v2`,
+      `${industry?.name ?? ''} v3`,
+    ]);
+    expect(h.state.savedDispatchers[1]?.basedOn).toBe(industry?.id);
+    expect(h.state.editingDispatcherId).toBe(h.state.savedDispatchers[1]?.id);
+
+    host.duplicateSavedDispatcher(h.state.savedDispatchers[0]?.id ?? '');
+    settle();
+    expect(h.state.savedDispatchers).toHaveLength(3);
+    expect(h.state.savedDispatchers[2]?.profile.name).toBe(`${industry?.name ?? ''} v4`);
+    expect(h.state.dispatcherId).toBe(h.state.savedDispatchers[2]?.id);
+  });
+
+  it('carries the rules a player wrote into the save, and opens another design without them', () => {
+    const { h, host, settle } = live(base());
+    const industry = host.editingSource();
+    host.setRuleRows([{ when: 'shaft-out', then: 'nearest-car' }]);
+    settle();
+    expect(host.workingDispatcherStatus().unsaved).toBe(true);
+    host.saveWorkingDispatcher('save');
+    settle();
+    expect(h.state.savedDispatchers[0]?.profile.rules?.rows).toHaveLength(1);
+
+    host.startFromDispatcher(industry?.id ?? '');
+    settle();
+    expect(h.state.ruleRows).toEqual([]);
+    host.startFromDispatcher(h.state.savedDispatchers[0]?.id ?? '');
+    settle();
+    expect(h.state.ruleRows).toHaveLength(1);
+  });
+
+  it('deletes without leaving an id that names nothing', () => {
+    const { h, host, settle } = live(base());
+    const industry = host.editingSource();
+    host.saveWorkingDispatcher('save');
+    settle();
+    const id = h.state.editingDispatcherId;
+    host.deleteSavedDispatcher('no-such-dispatcher');
+    settle();
+    expect(h.state.savedDispatchers).toHaveLength(1);
+
+    host.deleteSavedDispatcher(id);
+    settle();
+    expect(h.state.savedDispatchers).toEqual([]);
+    expect(host.dispatcherById(h.state.dispatcherId)).toBeDefined();
+    expect(h.state.editingDispatcherId).toBe(h.state.dispatcherId);
+    expect(host.workingDispatcherStatus()).toMatchObject({ kind: 'industry', unsaved: false });
+    expect(industry).toBeDefined();
   });
 });

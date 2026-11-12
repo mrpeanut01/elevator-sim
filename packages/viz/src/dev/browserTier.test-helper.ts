@@ -424,7 +424,6 @@ export async function enterEngineerStage(page: Page): Promise<void> {
     undefined,
     { timeout: 30_000 },
   );
-  /* The swap is a rail row, and the lobby has the viewport on a cold launch — § D1445. */
   await leaveLobbyIfShown(page);
   await page.locator('.everyday-engineer-swap').click();
   await page.waitForFunction(
@@ -559,42 +558,19 @@ export async function openEverydayRail(page: Page): Promise<void> {
  * Idempotent, so a caller may run it twice, and a no-op on a visit that is not a first one.
  */
 /**
- * **Past the lobby by its own *Main menu*, if a cold launch is standing on it** — § D1445.
- *
- * The lobby has the whole viewport, so the rail is stepped aside while it shows; a player who wants
- * a rail row presses *Main menu* first, and so does the tier. Waits for the lobby or the shell's
- * region first, because on a cold page neither may be drawn yet, and a no-op anywhere else.
+ * **Wait for the front door** — § D1628. The lobby is the main menu and is drawn inside the shell,
+ * so there is nothing to leave: the rail is beside it from the first paint. The name is kept from
+ * § D1445's full-viewport lobby, which had to be left before a rail row could be pressed, because
+ * thirteen files call it and every one of them means *the shell is up and its rail is there*.
  */
 export async function leaveLobbyIfShown(page: Page): Promise<void> {
-  await page.waitForSelector('.everyday-lobby, .everyday-screen', { timeout: 30_000 });
-  if ((await page.locator('.everyday-lobby').count()) === 0) return;
-  await page.locator('.everyday-lobby-menu').click();
-  await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 30_000 });
+  await page.waitForSelector('.everyday-rail-floor', { state: 'attached', timeout: 30_000 });
 }
 
 /**
- * **Settings → *Skip the lobby*, before the page loads** — § D1445.
- *
- * The first-visit offer (the landing page, then the walkthrough) is still the product's front door
- * for a player who skips the lobby, and it is that path the files about the offer drive. They reach
- * it through the setting a player has, written to the slot the setting writes, before the first
- * paint, because a press on Settings would have to cross the lobby first and the offer is decided on
- * the cold paint. Persists across `page.reload`, as the setting does.
- */
-export async function skipTheLobby(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    try {
-      window.localStorage.setItem('elevator-sim.everyday.skip-lobby', '1');
-    } catch {
-      /* A context without storage meets the lobby, and the case says so by timing out on the offer. */
-    }
-  });
-}
-
-/**
- * **The landing page, from the lobby's own link** — § D1445. GitHub issue #244's page used to be what
- * a fresh context met; the lobby is now, and its *What this is* is the press a player makes to read
- * the page. Shared because the tutorial's routes go through the landing page's call to action.
+ * **The landing page, from the lobby's own link** — § D1445, § D1628. GitHub issue #244's page used to
+ * be what a fresh context met; the lobby is now, and its *What this is* is the press a player makes to
+ * read the page. Shared because the tutorial's routes go through the landing page's call to action.
  */
 export async function openLandingFromLobby(page: Page): Promise<void> {
   await page.waitForSelector('.everyday-lobby-landing', { timeout: 30_000 });
@@ -616,17 +592,12 @@ export async function leaveTutorialIfOffered(page: Page): Promise<void> {
    * can read against the change that needed it.
    */
   /*
-   * **And since § D1445 the first screen is the lobby**, for every cold launch rather than only a
-   * first one. It is left by its own *Main menu*, the player's way past the ride, and the lobby
-   * spends the first-arrival offer, so nothing bounces the menu afterwards.
+   * **And since § D1628 nothing is offered in front of the menu**: the lobby is the menu, and a first
+   * visit is not bounced off it. The two arms below still leave a landing page or a walkthrough a
+   * caller has opened on purpose.
    */
-  const OFFERED = '.everyday-lobby, .everyday-landing, .everyday-tutorial';
+  const OFFERED = '.everyday-landing, .everyday-tutorial';
   await page.waitForSelector(`${OFFERED}, .everyday-mode[data-screen]`, { timeout: 30_000 });
-  if ((await page.locator('.everyday-lobby').count()) > 0) {
-    await page.locator('.everyday-lobby-menu').click();
-    await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 30_000 });
-    return;
-  }
   if ((await page.locator(OFFERED).count()) === 0) return;
   await page.locator('.everyday-bar-leave').click();
   await page.waitForSelector('.everyday-mode[data-screen]', { timeout: 15_000 });
@@ -791,8 +762,7 @@ export const EVERYDAY_SCREEN_ROUTES: Readonly<
 > = Object.freeze({
   /*
    * The shell's own front door. `leaveTutorialIfOffered` first because every page this tier opens is
-   * a fresh context and therefore a first visit, which `shell.ts#offerTutorial` bounces to the
-   * landing page.
+   * a fresh context, and the helper also leaves a landing page or a walkthrough a caller opened.
    */
   menu: async (page) => {
     await leaveTutorialIfOffered(page);
@@ -804,12 +774,6 @@ export const EVERYDAY_SCREEN_ROUTES: Readonly<
    * navigating to it. That also makes this the one route here that reaches a screen in the state a
    * stranger actually arrives in.
    */
-  /*
-   * § D1445's lobby. Reached by **not leaving it**: it is what every cold launch meets now.
-   */
-  lobby: async (page) => {
-    await page.waitForSelector('.everyday-lobby', { timeout: 30_000 });
-  },
   landing: openLandingFromLobby,
   /*
    * § D529's walkthrough is reached by no tile and no rail row: the shell's only `go` to it is the

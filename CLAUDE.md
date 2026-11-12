@@ -59,15 +59,15 @@ verdict:
   to be corrected ([§ D186](DECISIONS.md)); and mode parity is **derived from the code**, proved
   against a fail state the product deliberately does not ship.
 
-  **The honesty corpus: the always-on row is wave AW's, measured 2026-10-27 on the integrated tree;
+  **The honesty corpus: the always-on row is wave BA's, measured 2026-11-11 on that wave's head;
   the deep row is the nightly job's on `c181913`, the first after waves AU and AV merged, and the first
-  nightly after wave AW merges republishes it.**
+  nightly after wave BA merges republishes it.**
   Every earlier wave's move, its decomposition and what it taught are in
   [`docs/44`](docs/44-honesty-corpus-log.md), newest first:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **1 053 801** | **606** | **80** | **0** | **green**, and the register is empty |
+  | always-on | 49 | **1 162 750** | **606** | **80** | **0** | **green**, and the register is empty |
   | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **1 314 338** | **4 710** | **81** | **0** | **green**, and the register is empty |
 
   **How this row is kept.** Each rule below was learned the hard way at least once, and the log says
@@ -135,9 +135,22 @@ canvases size from their laid-out box. `dev/main.ts` may not import the Everyday
 back goes through `everyday/swap.ts`. The browser tier reaches the Engineer surface through the
 player's own path (`enterEngineerStage`, `reopenEngineerMenu`). The swap is not remembered, by the
 guide's § 3.5. `everyday/types.ts#EVERYDAY_SCREENS` carries the screen count, so it is not repeated
-here ([§ D723](DECISIONS.md)). A first arrival meets `everyday/landingScreen.ts` on the tutorial's
-own gate; that page publishes no figure, and `landingView.test.ts` holds both that and its button's
-two labels.
+here ([§ D723](DECISIONS.md)). A first arrival meets the lobby like everybody else and is
+offered the walkthrough there by name ([§ D1628](DECISIONS.md)); `everyday/landingScreen.ts` is one
+press away as *What this is*. That page publishes no figure, and `landingView.test.ts` holds both
+that and its button's two labels.
+
+**Everyday is navigated as a building** ([§ D1627](DECISIONS.md), the owner's direction of
+2026-11-11). `everyday/floors.ts` is the one floor directory: 3 Scenario, 2 Career, 1 Rush,
+M Records, L Lobby, B Design. The left tray draws it as a shaft with a car at the player's floor,
+and the lobby draws it in section. **The lobby is the main menu** ([§ D1628](DECISIONS.md)): one
+screen, the shell's root under the `menu` key, with the three modes as its top landings. Nothing
+stands in front of it and the host's arrival navigates nobody. **No handler may wait on motion before it navigates**: the car's
+glide and the doors over the screen are drawn after the press. A run started from the design floor
+is a *test simulation* and must stay a sandbox day; a building is played on a mode's floor. A
+building the player drew is played from the Scenario floor's *Your buildings*
+([§ D1629](DECISIONS.md)), on a week of its own that banks nothing: `saveBuilding` writes the shelf
+and must not move the player's week, and a sandbox must leave no building on the shelf.
 
 **The viewer is built to a design handoff**, vendored at [`docs/design/`](docs/design/) and
 extracted in [`docs/12-design-handoff.md`](docs/12-design-handoff.md)

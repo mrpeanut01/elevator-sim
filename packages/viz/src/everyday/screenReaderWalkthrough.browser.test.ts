@@ -573,41 +573,27 @@ const OBSCURING_SCREENS: readonly EverydayScreen[] = Object.freeze([
 ]);
 
 /**
- * **The one SC 2.4.11 finding, recorded rather than fixed, with its mechanism measured.**
+ * **SC 2.4.11's register, empty since 2026-11-11.**
  *
- * The Workshop's left column is `aside.everyday-workshop-panel`, `position: sticky; top: 0`, and it
- * is **1 525 px tall inside a 675 px scrollport**. A sticky box taller than the scrollport does not
- * move: it pins at its offset and the 850 px below the fold stay below it, whatever the region
- * scrolls. Measured rather than reasoned:
+ * It held one finding, measured on 2026-09-15: the Workshop's left column was a sticky
+ * `aside.everyday-workshop-panel` 1 525 px tall inside a 675 px scrollport, so a style card low on
+ * it took focus below the fold with the pinned action bar over it, and no scrolling brought it up
+ * until the containing block let go. It was recorded rather than fixed because every remedy was a
+ * layout decision (`docs/36` AX-11, GitHub issue #239).
  *
- * - focusing the fourth *style* card moves `main.everyday-screen`'s `scrollTop` to 71 and leaves the
- *   card at `top: 838, bottom: 915` in a 900 px viewport, with the pinned action bar over it from
- *   844 down;
- * - `scrollIntoView({ block: 'center' })` on the sixth card scrolls the region to 639 and moves that
- *   card *further away*, to `top: 1027`;
- * - sweeping the region's whole scroll range, the card stays at 1 027 until `scrollTop` passes about
- *   1 560, at which point the containing block finally unsticks the panel and it comes into view.
+ * The layout decision has since been taken for another reason: the style cards moved off that
+ * panel onto the workshop's shelf, which scrolls with the page, and the panel that is left holds a
+ * name, four rows and the save buttons. The finding stopped reproducing on that change and came
+ * out of the register, which is this case's own rule.
  *
- * So the controls are **reachable** — this is not a control drawn out of reach — and they are not
- * reachable *at the moment focus lands on them*, which is precisely what the criterion is about.
- *
- * **Recorded rather than fixed because every remedy is a design decision.** Making the panel static
- * loses the following-the-scroll behaviour it was given; bounding it with `max-height` and
- * `overflow-y: auto` puts a second scrollbar inside the screen; splitting the column changes the
- * Workshop's layout. `docs/36` § 8 item 2 handles `tapping-foot` the same way — the floor is set and
- * the remedy is left to whoever owns the surface — and `AX-0` rules out the cheapest answer, which
- * is to stop drawing the three cards. Owner: `docs/36` AX-11, GitHub issue #239.
+ * **What this case no longer walks.** The route opens the workshop on its shelf, so the editor's
+ * controls are not swept here; `workshopScreen.browser.test.ts` drives them.
  *
  * Written as the expected value of the case rather than as a filter, so the two directions are one
- * assertion: a new obscured control fails, and this one ceasing to reproduce fails too.
+ * assertion: a new obscured control fails, and a recorded one ceasing to reproduce fails too.
  */
 const OBSCURED_OUTSTANDING: Readonly<Partial<Record<EverydayScreen, readonly string[]>>> =
-  Object.freeze({
-    workshop: Object.freeze([
-      'button.everyday-workshop-style takes focus while its box is outside the viewport and ' +
-        'div.everyday-bar is drawn over its centre',
-    ]),
-  });
+  Object.freeze({});
 
 /** Every screen's tree, filled in by the per-screen cases and read by the ghost check. */
 const walked = new Map<EverydayScreen, readonly Finding[]>();

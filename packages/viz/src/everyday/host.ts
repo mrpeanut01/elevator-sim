@@ -146,6 +146,7 @@ import type { ChallengeBoardPage, ChallengeIndex, ChallengeView } from '../menu/
 import type { PriceSchedule } from '../pricing/types.js';
 
 import { specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
+import { planFromBuilding, type PlanReading, type TowerPlan } from '../authoring/towerPlan.js';
 import {
   specFromProfile,
   specIsDirty,
@@ -154,9 +155,13 @@ import {
   type GroupLevers,
 } from '../authoring/dispatcherSpec.js';
 import { specFromTrafficProfile, type PatternSpec } from '../authoring/patternSpec.js';
-import { templateHasClock, type RuleRow } from '../authoring/ruleSpec.js';
+import { builtProfileOf, sameProfile, versionedNameOf } from '../authoring/dispatcherShelf.js';
+import { rulesFromProfile, templateHasClock, type RuleRow } from '../authoring/ruleSpec.js';
+import { nextSavedId, saveNameRefusalOf, type NameRefusal } from '../dev/dispatcherEditor.js';
 import {
   selectorContextFrom,
+  specFromProfile as selectorSpecFromProfile,
+  specIsDirty as selectorSpecIsDirty,
   type SelectorContext,
   type SelectorSpec,
 } from '../authoring/selectorSpec.js';
@@ -209,7 +214,7 @@ import {
   type TowerChoiceView,
 } from './towerChoice.js';
 import type { VizRecording } from '../contract/types.js';
-import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
+import { savedBuildingFromPlan } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
 import {
   allBuildingIds,
@@ -225,6 +230,7 @@ import {
   shiftLengthForContract,
   shiftRunConfigOf,
   specsWithSaved,
+  withBuilding,
   withDispatcher,
   type PatternSelection,
   type PlannedDay,
@@ -971,6 +977,15 @@ export interface CampaignDayFacts {
   readonly answered: boolean;
 }
 
+/** One building the player drew and saved — {@link EverydayHost.ownBuildings}, [§ D1629](../../../../DECISIONS.md). */
+export interface OwnBuilding {
+  readonly id: string;
+  readonly name: string;
+}
+
+/** {@link EverydayHost.playOwnBuilding}'s refusal for an id the shelf no longer holds. */
+export const OWN_BUILDING_GONE = 'That building is no longer saved on this device, so there is nothing to play.';
+
 /** What *Tune the tower* opens on — {@link EverydayHost.sandboxStanding}, [§ D1368](../../../../DECISIONS.md). */
 export interface SandboxStanding {
   /** The tower its contract's rung hands over, as the authoring model's spec. */
@@ -979,6 +994,18 @@ export interface SandboxStanding {
   readonly pattern: PatternSpec;
   /** The levers' door dwell, or `undefined` for *the dispatcher's own*. */
   readonly dwell: DwellChoice | undefined;
+}
+
+/** What the dispatcher workshop has open — see {@link EverydayHost.workingDispatcherStatus}. */
+export interface WorkingDispatcherStatus {
+  /** An industry design, one of the player's own, or a source that no longer exists. */
+  readonly kind: 'industry' | 'yours' | 'gone';
+  /** The name on the shelf, for one of the player's own. */
+  readonly savedName: string | undefined;
+  /** The industry design this is, or was first saved from, by name. */
+  readonly basedOn: string | undefined;
+  /** Whether a save would write something the shelf does not already hold. */
+  readonly unsaved: boolean;
 }
 
 export interface EverydayHost {
@@ -1195,6 +1222,13 @@ export interface EverydayHost {
    */
   tomorrowBriefing(): TomorrowBriefing | undefined;
 
+  /**
+   * The buildings this build ships, in `data/`'s order — without the player's saved ones. The
+   * workshop's test bed offers these: `dev/batchWorker.ts` loads a building by id from `data/`,
+   * so a saved tower is one it cannot run yet.
+   */
+  shippedBuildingIds(): readonly string[];
+
   /** Every building id on offer — shipped plus saved. Read-only. */
   buildingIds(): readonly string[];
 
@@ -1316,6 +1350,42 @@ export interface EverydayHost {
   savedDispatchers(): readonly SavedDispatcher[];
 
   /**
+   * What the workshop has open, as its nameplate needs it — GAMEPLAY § 11.1.
+   *
+   * `unsaved` asks whether **a save would write a different document** from the one on the shelf
+   * (`authoring/dispatcherShelf.ts#sameProfile`), so the line and the Save button cannot disagree.
+   * For an industry design there is no saved document to compare against, so it reports whether
+   * anything a save would hold — the working copy, the switching, the rules — has moved.
+   */
+  workingDispatcherStatus(): WorkingDispatcherStatus;
+
+  /**
+   * Save what the workshop has built — § 11.1's *save* and *save as a copy*.
+   *
+   * `'save'` on a dispatcher of the player's own **replaces** it under the same id, so everything
+   * that names the id (a run, the bench, the board's picker) follows. On an industry design, and
+   * always under `'copy'`, it files a new one — industry designs are never written — whose name is
+   * versioned rather than refused when it is taken. The new or replaced dispatcher becomes the one
+   * open and the one driving, in the same patch: a save nothing selects reaches no run
+   * (`scope/surface.ts`'s `viewer.savedDispatchers`).
+   *
+   * Returns `undefined` when it saved. A replace can be refused for an empty name or one another
+   * dispatcher holds, as a {@link NameRefusal}; any save answers with {@link attemptHold}'s own
+   * sentence and writes nothing while a scored attempt stands, because it changes who drives.
+   */
+  saveWorkingDispatcher(mode: 'save' | 'copy'): string | undefined;
+
+  /** File a copy of a saved dispatcher under the next free version of its name, and open it. Held like a save. */
+  duplicateSavedDispatcher(id: string): string | undefined;
+
+  /**
+   * Remove a saved dispatcher. If it was open or driving, the industry design it was made from
+   * takes its place (the first one shipped, when that is not known), so no id is left naming
+   * nothing. An id that is not on the shelf writes nothing. Held like a save.
+   */
+  deleteSavedDispatcher(id: string): string | undefined;
+
+  /**
    * The dispatcher the workshop has open, and whether it has changes that are not saved.
    *
    * Added with its consumer — the § 20.10 gauntlet gate, which *"must require a saved dispatcher"*
@@ -1352,6 +1422,15 @@ export interface EverydayHost {
    * honest-lookup rule.
    */
   buildingSpec(): BuildingSpec | undefined;
+
+  /**
+   * The building the next run will be built from, as the drawing board's plan — every shaft with
+   * its own height, stops, decks and cars — and the kinds of authored fact a plan cannot hold.
+   *
+   * `authoring/towerPlan.ts#planFromBuilding` over the same document {@link buildingSpec} reads, so
+   * the two boards agree about which floor is which. `undefined` on the honest-lookup rule.
+   */
+  buildingPlan(): PlanReading | undefined;
 
   /**
    * **What *Tune the tower* opens on: the day as it will run** — wave AO, lane AO-2,
@@ -2039,25 +2118,41 @@ export interface EverydayHost {
   answerIncident(atS: number, optionId: string): string | undefined;
 
   /**
-   * Save a drawn building **and stand the next run on it**, answering the id it took.
+   * **Save a drawn building to the shelf**, answering the id it took —
+   * [§ D1629](../../../../DECISIONS.md).
    *
-   * The exact two presses the Engineer building editor's *Save* and *Run it* make, in one call:
-   * `savedBuildingFrom` allocates a fresh id and runs the document through the real loader (so a
-   * spec the parser refuses throws here rather than at run time), and `stateRunningSaved` selects
-   * it through `withBuilding` — which is the load-bearing half. A bare `buildingId` write would
-   * leave the week's `contractId` in place and bank a drawn tower against a real assignment; the
-   * sandbox contract is what says a drawn building belongs to no scenario.
-   *
-   * It does **not** run. GAMEPLAY § 13's *Run a day in it* and § 3.3's tuner primary are
-   * *apply, then run*, and the two are separate because the designer's *Save as a new building*
-   * is the same apply with no run after it. Composition beats a second method that differs by a
-   * boolean.
+   * `dev/buildingEditor.ts#savedBuildingFromPlan` allocates a fresh id and runs the drawing board's
+   * plan through the real loader, so a plan the parser refuses throws here rather than at run time. **It does not stand the week on
+   * the building, and that is the change.** This was `applyBuildingSpec`, and then `applyTowerPlan` for a plan, which also moved the
+   * player's week onto the drawn tower through `withBuilding`: pressing *Save* on the design floor
+   * quietly left the Scenario week the player was on and put a tower nobody had asked to play under
+   * the front door. Drawing is the design floor's and playing is a mode's, so saving saves, and
+   * {@link playOwnBuilding} is the press that plays.
    *
    * While a scored attempt stands on the week on screen it throws {@link attemptHold}'s sentence
-   * and writes nothing — § D1360, the loader's own refusal shape, which the designer already
-   * quotes; the tuner's primary is inert with the same words, so it never reaches this.
+   * where the write would reach that day, and writes nothing (§ D1360).
    */
-  applyBuildingSpec(spec: BuildingSpec): string;
+  saveBuilding(plan: TowerPlan): string;
+
+  /**
+   * The buildings this player has drawn and saved, in the order they were saved — § D1629. The
+   * Scenario floor lists them under *Your buildings*; the name is the one the designer wrote.
+   */
+  ownBuildings(): readonly OwnBuilding[];
+
+  /**
+   * **Play a day in a building the player drew** — § D1629, `docs/38` § 2.1's *Build your own* as
+   * far as this build takes it. Stands the week on the saved building through `withBuilding`, which
+   * is the load-bearing part: a drawn tower belongs to no authored scenario, so its week carries
+   * `shift/week.ts#SANDBOX_CONTRACT_ID`, the week the player left is parked and not ended, and
+   * nothing a day there does can be banked against a real assignment. The day is then the daily
+   * flow's own (brief, stage, report), judged on the tower's rung, and filed to that week's history.
+   *
+   * Answers `undefined` when the week stands on the building, or the sentence that says why it does
+   * not: {@link attemptHold}'s while a scored attempt stands (§ D1360), or that the building is no
+   * longer on the shelf. Nothing is written on a refusal.
+   */
+  playOwnBuilding(id: string): string | undefined;
 
   /**
    * **Run a sandbox day: the day with what moved, over the week and never on it** — wave AO, lane
@@ -4299,6 +4394,7 @@ export function createEverydayHost(
     resolvedBuilding: () => resolvedBuildingOf(b.resources, b.state()),
     dayAhead: () => plannedDayOf(b.resources, { ...b.state(), ...dayPatchFor(b) }),
     tomorrowBriefing: () => b.state().tomorrow,
+    shippedBuildingIds: () => allBuildingIds(b.resources, []),
     buildingIds: () => allBuildingIds(b.resources, b.state().savedBuildings),
     buildingById: (id) => buildingConfigOf(b.resources, b.state().savedBuildings, id),
     dispatchers: () => allDispatchers(b.resources, b.state().savedDispatchers),
@@ -4368,6 +4464,136 @@ export function createEverydayHost(
     priceSchedule: () => bindings.resources.priceSchedule,
     careerNotice: () => careerLoadNotice,
     savedDispatchers: () => b.state().savedDispatchers,
+    workingDispatcherStatus: () => {
+      const state = b.state();
+      const context = selectorContextFrom(b.resources.dispatcherProfiles, state.shiftLengthS);
+      const entry = state.savedDispatchers.find((saved) => saved.id === state.editingDispatcherId);
+      const all = allDispatchers(b.resources, state.savedDispatchers);
+      const nameOf = (id: string | undefined): string | undefined =>
+        all.find((profile) => profile.id === id)?.name;
+      if (entry !== undefined) {
+        const candidate = builtProfileOf(
+          { spec: state.dispatcherSpec, levers: state.levers, selector: state.selectorSpec, rows: state.ruleRows },
+          entry.id,
+          entry.profile,
+          context,
+        );
+        return {
+          kind: 'yours',
+          savedName: entry.profile.name,
+          basedOn: nameOf(entry.basedOn),
+          unsaved: !sameProfile(candidate, entry.profile),
+        };
+      }
+      const source = all.find((profile) => profile.id === state.editingDispatcherId);
+      if (source === undefined) return { kind: 'gone', savedName: undefined, basedOn: undefined, unsaved: true };
+      return {
+        kind: 'industry',
+        savedName: undefined,
+        basedOn: source.name,
+        unsaved:
+          specIsDirty(state.dispatcherSpec, source) ||
+          state.dispatcherSpec.name.trim() !== source.name.trim() ||
+          selectorSpecIsDirty(state.selectorSpec, source, context) ||
+          JSON.stringify(state.ruleRows) !== JSON.stringify(rulesFromProfile(source)),
+      };
+    },
+    saveWorkingDispatcher: (mode) => {
+      const state = b.state();
+      const all = allDispatchers(b.resources, state.savedDispatchers);
+      const entry = state.savedDispatchers.find((saved) => saved.id === state.editingDispatcherId);
+      const source = all.find((profile) => profile.id === state.editingDispatcherId);
+      const replace = mode === 'save' && entry !== undefined;
+      let name = state.dispatcherSpec.name.trim();
+      if (replace) {
+        const refusal: NameRefusal | undefined = saveNameRefusalOf(
+          name,
+          all.filter((profile) => profile.id !== entry.id).map((profile) => profile.name),
+        );
+        if (refusal !== undefined) return refusal;
+      } else {
+        name = versionedNameOf(name, all.map((profile) => profile.name));
+      }
+      const id = replace ? entry.id : nextSavedId('yours', all.map((profile) => profile.id));
+      const profile = builtProfileOf(
+        {
+          spec: { ...state.dispatcherSpec, name },
+          levers: state.levers,
+          selector: state.selectorSpec,
+          rows: state.ruleRows,
+        },
+        id,
+        source,
+        selectorContextFrom(b.resources.dispatcherProfiles, state.shiftLengthS),
+      );
+      // An industry design is what a first save is based on; a copy of a saved one keeps its line.
+      const basedOn = entry === undefined ? source?.id : entry.basedOn;
+      const filed: SavedDispatcher = { id, profile, ...(basedOn === undefined ? {} : { basedOn }) };
+      return editorWrite({
+        savedDispatchers: replace
+          ? state.savedDispatchers.map((saved) => (saved.id === id ? filed : saved))
+          : [...state.savedDispatchers, filed],
+        dispatcherId: id,
+        editingDispatcherId: id,
+        dispatcherSpec: specFromProfile(profile, profile.name),
+        ruleRows: rulesFromProfile(profile),
+        selectorSpec: selectorSpecFromProfile(
+          profile,
+          selectorContextFrom(b.resources.dispatcherProfiles, state.shiftLengthS),
+        ),
+      });
+    },
+    duplicateSavedDispatcher: (id) => {
+      const state = b.state();
+      const entry = state.savedDispatchers.find((saved) => saved.id === id);
+      if (entry === undefined) return undefined;
+      const all = allDispatchers(b.resources, state.savedDispatchers);
+      const copyId = nextSavedId('yours', all.map((profile) => profile.id));
+      const profile = {
+        ...entry.profile,
+        id: copyId,
+        name: versionedNameOf(entry.profile.name, all.map((other) => other.name)),
+      };
+      return editorWrite({
+        savedDispatchers: [
+          ...state.savedDispatchers,
+          { id: copyId, profile, ...(entry.basedOn === undefined ? {} : { basedOn: entry.basedOn }) },
+        ],
+        dispatcherId: copyId,
+        editingDispatcherId: copyId,
+        dispatcherSpec: specFromProfile(profile, profile.name),
+        ruleRows: rulesFromProfile(profile),
+        selectorSpec: selectorSpecFromProfile(
+          profile,
+          selectorContextFrom(b.resources.dispatcherProfiles, state.shiftLengthS),
+        ),
+      });
+    },
+    deleteSavedDispatcher: (id) => {
+      const state = b.state();
+      if (!state.savedDispatchers.some((saved) => saved.id === id)) return undefined;
+      const remaining = state.savedDispatchers.filter((saved) => saved.id !== id);
+      // The design it was made from is the nearest thing to it still on the shelf; failing that,
+      // the first one shipped.
+      const shipped = allDispatchers(b.resources, []);
+      const basedOn = state.savedDispatchers.find((saved) => saved.id === id)?.basedOn;
+      const fallback = shipped.find((profile) => profile.id === basedOn) ?? shipped[0];
+      const orphaned = state.dispatcherId === id || state.editingDispatcherId === id;
+      if (!orphaned || fallback === undefined) {
+        return editorWrite({ savedDispatchers: remaining, dispatcherId: state.dispatcherId });
+      }
+      return editorWrite({
+        savedDispatchers: remaining,
+        dispatcherId: fallback.id,
+        editingDispatcherId: fallback.id,
+        dispatcherSpec: specFromProfile(fallback, fallback.name),
+        ruleRows: rulesFromProfile(fallback),
+        selectorSpec: selectorSpecFromProfile(
+          fallback,
+          selectorContextFrom(b.resources.dispatcherProfiles, state.shiftLengthS),
+        ),
+      });
+    },
     recording: () => b.state().recording,
     runPending: () => b.runPending?.() ?? false,
     runFailure: () => b.runFailure?.(),
@@ -4407,6 +4633,11 @@ export function createEverydayHost(
       const state = b.state();
       const config = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
       return config === undefined ? undefined : specFromBuilding(config, state.buildingId);
+    },
+    buildingPlan: () => {
+      const state = b.state();
+      const config = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
+      return config === undefined ? undefined : planFromBuilding(config, state.buildingId);
     },
     sandboxStanding: () => {
       const state = b.state();
@@ -4485,6 +4716,13 @@ export function createEverydayHost(
       return editorWrite({
         dispatcherId,
         editingDispatcherId: dispatcherId,
+        // The rules and the switching are part of what a dispatcher is, so opening another one
+        // opens its own: a rule written for the last design does not follow the player onto this one.
+        ruleRows: rulesFromProfile(wanted),
+        selectorSpec: selectorSpecFromProfile(
+          wanted,
+          selectorContextFrom(b.resources.dispatcherProfiles, state.shiftLengthS),
+        ),
         dispatcherSpec:
           settings === undefined
             ? spec
@@ -5162,23 +5400,52 @@ export function createEverydayHost(
       b.intervene(atS, composed.change);
       return undefined;
     },
-    applyBuildingSpec: (spec) => {
+    saveBuilding: (plan) => {
       const state = b.state();
-      const saved = savedBuildingFrom(spec, state, b.resources);
-      const next = stateRunningSaved(state, b.resources, saved);
-      /*
-       * The whole derived state as the patch, rather than a hand-picked field list.
-       * `stateRunningSaved` goes through `withBuilding`, which touches the week, the parked weeks
-       * and both editor working copies under their own pristine guards — a list here would be a
-       * second opinion about which of those matter, and would go stale the next time that function
-       * learns to carry one more thing. It is a patch over the same `state` this call read, so
-       * nothing else can have moved underneath it.
-       */
+      const saved = savedBuildingFromPlan(plan, state, b.resources);
+      const patch = {
+        savedBuildings: [
+          ...state.savedBuildings.filter((entry) => entry.id !== saved.id),
+          { id: saved.id, config: saved.config },
+        ],
+      };
       /* § D1360: the loader's refusal shape, which the designer quotes; nothing is written. */
-      const held = attemptHoldOver({ ...next });
+      const held = attemptHoldOver(patch);
       if (held !== undefined) throw new Error(held);
-      b.applyPatch({ ...next });
+      b.applyPatch(patch);
       return saved.id;
+    },
+    ownBuildings: () => b.state().savedBuildings.map((entry) => ({ id: entry.id, name: entry.config.name })),
+    playOwnBuilding: (id) => {
+      const state = b.state();
+      if (!state.savedBuildings.some((entry) => entry.id === id)) return OWN_BUILDING_GONE;
+      /*
+       * The whole derived state, as `withBuilding` makes it: the week moved to the sandbox contract
+       * with the week left behind parked, and both editor working copies under their own guards.
+       */
+      const next = withBuilding(state, b.resources, id);
+      const held = attemptHoldOver({ ...next });
+      if (held !== undefined) return held;
+      releaseCareer();
+      const standing = state.buildingId === id && state.week.contractId === next.week.contractId;
+      if (!standing) {
+        /* The day being left goes with the week being parked — {@link moveWeekTo}'s rule. */
+        if (b.dayClosed()) b.cancelRun?.();
+        else b.abandonDay?.();
+        b.applyPatch({
+          ...next,
+          windowStartS: null,
+          interventions: [],
+          recording: undefined,
+          report: undefined,
+          tomorrow: undefined,
+          withheld: [],
+        });
+        const dealt = dealPatchFor(b, b.state());
+        if (dealt.seed !== undefined) b.applyPatch(dealt);
+      }
+      notifyCampaign();
+      return undefined;
     },
     runSandbox: (presses) => {
       /* § D1360: a sandbox day plays the attempt's crowd, so it is refused while an attempt stands. */

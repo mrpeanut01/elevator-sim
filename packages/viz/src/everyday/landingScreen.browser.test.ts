@@ -35,8 +35,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   CHROMIUM,
   HAS_BROWSER,
+  openLandingFromLobby,
   openPage,
-  skipTheLobby,
   startShippedSite,
   type ShippedSite,
 } from '../dev/browserTier.test-helper.js';
@@ -57,16 +57,17 @@ afterAll(async () => {
   await site?.close();
 });
 
-/** A cold page — a fresh context is a first visit, which is the state this screen is about. */
+/** A cold page, a fresh context being a first visit, with this screen opened from the lobby. */
 async function coldLoad(): Promise<Page> {
   const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-  await skipTheLobby(page);
   await page.goto(origin, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
     undefined,
     { timeout: 30_000 },
   );
+  /* § D1628: nothing bounces a first visit here. The page is opened by the lobby's own *What this is*. */
+  await openLandingFromLobby(page);
   return page;
 }
 
@@ -117,31 +118,20 @@ describe.skipIf(!HAS_BROWSER)('the landing page — GitHub issue #244', () => {
   }, 120_000);
 
   /**
-   * **And it is not drawn *after* the mode picker either** — the front door's own race, driven in
-   * time rather than at a settled moment.
+   * **A first visit is not moved off the lobby** — [§ D1628](../../../../DECISIONS.md).
    *
-   * The case above asks what is on the page once it has settled. This asks what was on it on the
-   * way there, because the answer used to be *the mode picker, for a quarter of a second*: this
-   * shell mounts synchronously while `dev/main.ts`'s async boot is still fetching `data/`, and the
-   * first-arrival offer cannot be answered until the host it reads arrives. Measured on the built
-   * bundle before the fix — tiles at **t ≈ 190 ms**, replaced by this page at **t ≈ 430 ms** — and
-   * a *Scenario* press inside that window opened `host.ts#HOST_PENDING_REASON`, while a press that
-   * arrived on the swap itself was lost on a node the shell had already removed.
+   * This case used to assert the opposite sequence: that the landing page was drawn before the mode
+   * picker ever was, because the first-arrival offer replaced the front door the moment the host
+   * published and a press in that window landed on a removed node (§ D844). The lobby is the front
+   * door for everybody now, so the offer is gone and with it the race. What is left to hold is the
+   * other half: the host arriving moves nobody, and a first visit is told about the walkthrough by a
+   * button on the screen it is already looking at.
    *
-   * It is not a cosmetic complaint. It took the browser tier's own front-door helper with it:
-   * `dev/browserTier.test-helper.ts#leaveTutorialIfOffered` sampled the front door, found the
-   * tiles, returned, and left `builtBundle.browser.test.ts`'s `charter S9` B1 waiting thirty
-   * seconds for a tile the offer had since taken away. Under an unloaded run the sample landed
-   * inside the window and the case passed; under tier load it landed after it and the case timed
-   * out. So the green was the race being **won**, not absent.
-   *
-   * Recorded from before the navigation commits rather than polled from the driver: a round trip
-   * is slower than the window, which is exactly why this was invisible from out here. The claim is
-   * a **sequence** — no front door before the offer — and never a timing.
+   * Recorded from before the navigation commits, as it was, because a round trip from the driver
+   * is slower than the window the old race lived in.
    */
-  it('is never preceded by the mode picker, from the first frame the shell paints', async () => {
+  it('leaves a first visit on the lobby, and offers the walkthrough there by name', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-    await skipTheLobby(page);
     try {
       await page.addInitScript(() => {
         const seen: string[] = [];
@@ -161,16 +151,14 @@ describe.skipIf(!HAS_BROWSER)('the landing page — GitHub issue #244', () => {
         requestAnimationFrame(look);
       });
       await page.goto(origin, { waitUntil: 'commit' });
-      await page.waitForSelector('.everyday-landing', { timeout: 30_000 });
+      /* The button is drawn only once the host has said this is a first visit, so it is the arrival. */
+      await page.waitForSelector('.everyday-lobby-walkthrough', { state: 'visible', timeout: 30_000 });
       const order = await page.evaluate(
         () => (window as unknown as { __frontDoor: string[] }).__frontDoor,
       );
-      expect(
-        order[0],
-        'the mode picker was drawn before the first-arrival offer had an answer, so a visitor was ' +
-          'offered three tiles that could not act yet and then had them taken away — see ' +
-          "`everyday/shell.ts`'s `'menu'` arm for the measurement",
-      ).toBe('landing');
+      expect(order, 'the host arriving moved a first visit off the front door').toEqual(['menu']);
+      await page.locator('.everyday-lobby-walkthrough').click();
+      await page.waitForSelector('.everyday-tutorial', { timeout: 30_000 });
     } finally {
       await page.close();
     }
@@ -202,7 +190,6 @@ describe.skipIf(!HAS_BROWSER)('the landing page — GitHub issue #244', () => {
    */
   it('does not replace its one control when the run lands', async () => {
     const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
-    await skipTheLobby(page);
     try {
       await page.addInitScript(() => {
         const mark = (): void => {
@@ -216,6 +203,7 @@ describe.skipIf(!HAS_BROWSER)('the landing page — GitHub issue #244', () => {
         requestAnimationFrame(mark);
       });
       await page.goto(origin, { waitUntil: 'commit' });
+      await openLandingFromLobby(page);
       await page.waitForSelector('.everyday-landing-cta', { timeout: 30_000 });
       /* Marked before the canvas exists, or there is no arrival for the button to survive. */
       expect(

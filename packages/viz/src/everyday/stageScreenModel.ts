@@ -938,6 +938,13 @@ export const STAGE_GOALS_COPY = Object.freeze({
    * GitHub issue #633. Under {@link StageGoalsInput.contractGoals}' heading on a career day.
    */
   contractLead: 'These four file today cleared or missed against the contract, and the day’s report is graded on them.',
+  /**
+   * The eyebrow over a **test simulation's** five ([§ D1627](../../../../DECISIONS.md)). A test files
+   * nothing, so *what today asks* over it claims a day that is not being played.
+   */
+  testHeading: 'WHAT A PLAYED DAY ASKS',
+  /** Under that eyebrow, in the slot a career day's sentence takes: what these bars are to a test. */
+  testNote: 'A test simulation files nothing. These are the bars a played day is held to, shown for reference.',
   /** Inside the folded week's five on a career day: what they are, and that the contract counts none. */
   weekNote: 'These five are the week’s, and the contract counts none of them.',
 });
@@ -988,7 +995,8 @@ export interface StageGoalsView {
   /** {@link STAGE_GOALS_COPY}'s `reading` or `graded`, whichever the playhead earns. */
   readonly note: string;
   /**
-   * {@link STAGE_GOALS_COPY.contract} inside a career run, and `''` everywhere else — issue #567.
+   * {@link STAGE_GOALS_COPY.contract} inside a career run, {@link STAGE_GOALS_COPY.testNote} over a
+   * test simulation, and `''` everywhere else — issue #567.
    * Empty rather than `undefined` so the mount has one branch and the corpus one string.
    */
   readonly contract: string;
@@ -1027,6 +1035,12 @@ export interface StageGoalsInput {
    * four bars are one click away is which flow the player walked in on.
    */
   readonly contract?: boolean | undefined;
+  /**
+   * Whether a test simulation is standing: the host's question (`sandboxDayLines` is non-empty),
+   * asked by the mount. Heads the strip {@link STAGE_GOALS_COPY.testHeading}. Never read on a
+   * career day, which no test can be.
+   */
+  readonly test?: boolean | undefined;
   /**
    * **The contract's four, to lead a career day's strip** — wave AR, lane AR-4, GitHub issue #633.
    *
@@ -1147,6 +1161,7 @@ export function stageGoalsOf(input: StageGoalsInput): StageGoalsView {
   const rowsOf = (raw: readonly GoalReading[]): readonly StageGoalRow[] => stageGoalRowsOf(input, raw, judged);
   const note = judged ? STAGE_GOALS_COPY.graded : STAGE_GOALS_COPY.reading;
   const lead = input.contractGoals;
+  const test = input.test === true && input.contract !== true;
   if (lead !== undefined) {
     return {
       heading: lead.heading,
@@ -1158,9 +1173,9 @@ export function stageGoalsOf(input: StageGoalsInput): StageGoalsView {
     };
   }
   return {
-    heading: STAGE_GOALS_COPY.heading,
+    heading: test ? STAGE_GOALS_COPY.testHeading : STAGE_GOALS_COPY.heading,
     note,
-    contract: input.contract === true ? STAGE_GOALS_COPY.contract : '',
+    contract: input.contract === true ? STAGE_GOALS_COPY.contract : test ? STAGE_GOALS_COPY.testNote : '',
     judged,
     rows: rowsOf(input.readings),
   };

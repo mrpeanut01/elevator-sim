@@ -45,7 +45,8 @@
 import type { BuildingSpec } from '../authoring/buildingSpec.js';
 import type { DwellChoice } from '../authoring/dispatcherSpec.js';
 import type { PatternSpec } from '../authoring/patternSpec.js';
-import { savedBuildingFrom } from '../dev/buildingEditor.js';
+import type { TowerPlan } from '../authoring/towerPlan.js';
+import { savedBuildingFrom, savedBuildingFromPlan } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
 import { nextSavedId } from '../dev/dispatcherEditor.js';
 import type { ShiftRunConfig, ViewerState } from '../dev/state.js';
@@ -60,6 +61,12 @@ import { weekHasClosed } from '../shift/weekStake.js';
 export interface SandboxPresses {
   /** The tower card's and machine card's four, written onto the standing tower; `undefined` when none moved. */
   readonly building: BuildingSpec | undefined;
+  /**
+   * A tower drawn on *Design a building*, which is always a new tower: where it is present it is the
+   * sandbox day's building and {@link building} is not read. Optional, because the tuner — the
+   * press this interface was written for — never draws one.
+   */
+  readonly plan?: TowerPlan | undefined;
   /** The crowd card's two, written onto the standing pattern; `undefined` when neither moved. */
   readonly pattern: PatternSpec | undefined;
   /**
@@ -80,14 +87,16 @@ export interface SandboxPresses {
  *
  * Not the recording: the run standing is the sandbox's once it lands, and the host refuses it on the
  * way out (`abandonDay`) rather than swapping a recording under a playback it does not own, which is
- * the same split the replay keeps. The library is not put back either: a changed tower and a tuned
- * pattern are saved to it as the designer and the traffic editor save theirs, and that is where the
- * Engineer surface finds them.
+ * the same split the replay keeps. A tuned pattern stays in the library, as the traffic editor saves
+ * its own. **The building shelf is put back** ([§ D1629](../../../../DECISIONS.md)): it used to keep
+ * every tower a test ran in, which was harmless while nothing listed the shelf, and the Scenario
+ * floor's *Your buildings* now does. A building is on the shelf because the player pressed *Save*.
  */
 export type SandboxBefore = Pick<
   ViewerState,
   | 'week'
   | 'parkedWeeks'
+  | 'savedBuildings'
   | 'buildingId'
   | 'commissioning'
   | 'pattern'
@@ -104,6 +113,8 @@ export function sandboxBeforeOf(state: ViewerState): SandboxBefore {
   return {
     week: state.week,
     parkedWeeks: state.parkedWeeks,
+    /* § D1629: a test's copy of the tower leaves the shelf with the test, so the shelf is the player's saves. */
+    savedBuildings: state.savedBuildings,
     buildingId: state.buildingId,
     commissioning: state.commissioning,
     pattern: state.pattern,
@@ -137,11 +148,17 @@ export function sandboxPatchOf(
     buildingId: state.buildingId,
     plain: presses.plainDay === true,
   });
+  const drawn =
+    presses.plan !== undefined
+      ? savedBuildingFromPlan(presses.plan, state, resources)
+      : presses.building !== undefined
+        ? savedBuildingFrom(presses.building, state, resources)
+        : undefined;
   const building =
-    presses.building === undefined
+    drawn === undefined
       ? {}
       : (() => {
-          const saved = savedBuildingFrom(presses.building, state, resources);
+          const saved = drawn;
           return {
             savedBuildings: [
               ...state.savedBuildings.filter((entry) => entry.id !== saved.id),

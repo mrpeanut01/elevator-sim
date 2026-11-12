@@ -32,6 +32,13 @@
  * driver is injected rather than constructed here so that the tests can run the *same SQL* against
  * an in-process PostgreSQL — see `sql.ts` for why that mattered enough to justify a seam.
  *
+ * **And since § D1630 it may be `node:sqlite` again, without going back.** The store's container
+ * filesystem still does not outlive the container, so the SQLite file is restored from, and
+ * replicated to, Blob Storage by Litestream (`infra/entrypoint.sh`). Every query below is written in
+ * the subset of SQL both engines parse, and the five board queries that used PostgreSQL's
+ * `DISTINCT ON` now use a window instead. The one place the engine is asked is
+ * {@link applyMigrations}, for the four migrations SQLite has no form of.
+ *
  * ## What changed in the dialect, since a silent difference here is a corrupted board
  *
  * `INTEGER` became **`BIGINT`** for every `_ms` column. PostgreSQL's `INTEGER` is four bytes and
@@ -472,7 +479,10 @@ function isUniqueViolation(error: unknown): boolean {
 
 /** Everything the store needs from outside itself. */
 export interface StoreOptions {
-  /** The database. `PgSql` in a real server, `PgliteSql` in a test — the SQL is identical. */
+  /**
+   * The database: `SqliteSql` or `PgSql` in a real server, chosen by `store/connect.ts#sqlFor`
+   * (§ D1630), and `PgliteSql` or `SqliteSql` in a test. The SQL is identical on all of them.
+   */
   readonly sql: Sql;
   /** Milliseconds since the epoch. Injected so a test can decide what "now" is. */
   readonly now: () => number;
@@ -505,9 +515,9 @@ export class Store {
    * store whose first query fails, which is a worse bargain than one `await`.
    */
   static async open(options: StoreOptions): Promise<Store> {
-    // No `PRAGMA foreign_keys = ON` equivalent: SQLite left references unenforced unless asked,
-    // which is why that line existed. PostgreSQL always enforces them, so the guarantee the pragma
-    // bought is now a property of the database rather than a line that could be deleted.
+    // No `PRAGMA foreign_keys = ON` here: PostgreSQL always enforces references, and since § D1630
+    // `SqliteSql` switches them on when it connects, so the guarantee belongs to each driver rather
+    // than to a line in this method that only one engine would understand.
     await applyMigrations(options.sql, options.now);
     const store = new Store(options);
     await store.#ensureHouseUser();
@@ -918,25 +928,32 @@ export class Store {
    * Only `awtIsValid: true` runs are here at all — `verifySubmission` refuses the others on entry
    * (§ D214 § 6), so the suppression rule cannot be worked around by ranking.
    *
-   * **`DISTINCT ON` rather than the old `GROUP BY e.user_id`.** SQLite allowed selecting `e.*`
+   * **`ROW_NUMBER()` rather than the old `GROUP BY e.user_id`.** SQLite allowed selecting `e.*`
    * while grouping by one column and picked an arbitrary row from each group; PostgreSQL rejects
    * that outright, and it was never what the board wanted anyway — it wanted one determinate row
-   * per player. `DISTINCT ON (e.user_id)` with the tie-break in its own `ORDER BY` says that
-   * directly, and it also retires the correlated `MIN` subquery the old query needed to find each
-   * player's best row. The inner ordering picks the row; the outer ordering ranks the board.
+   * per player. A window numbered within each player, with the tie-break in its own `ORDER BY`,
+   * says that directly and retires the correlated `MIN` subquery the old query needed. The inner
+   * ordering picks the row; the outer ordering ranks the board.
+   *
+   * **A window rather than `DISTINCT ON`, which this query used from the PostgreSQL port until
+   * § D1630**, because `DISTINCT ON` is PostgreSQL's alone and the query has to be the same text on
+   * SQLite. The rows are the same, with one difference that is a repair: `DISTINCT ON` picked an
+   * arbitrary row between two of one player's runs tied on the metric *and* the submission
+   * millisecond, and the window breaks that tie on `id`, so the board is now determinate there too.
    */
   async board(boardKey: string, metric: BoardMetric, limit: number): Promise<readonly EntryRow[]> {
     const column = COLUMN_OF[metric];
     const result = await this.#sql.query(
       // One best row per player — and per baseline dispatcher, so the house's thirteen runs are
       // thirteen rows a player can measure themselves against rather than one (§ D521). For every
-      // player `baseline_profile_id` is NULL, and `DISTINCT ON` treats the NULLs as equal, so the
-      // player half of the rule is exactly what it was.
+      // player `baseline_profile_id` is NULL, and a window partition puts the NULLs together on
+      // both engines, so the player half of the rule is exactly what it was.
       `SELECT * FROM (` +
-        `SELECT DISTINCT ON (e.user_id, e.baseline_profile_id) e.*, u.display_name AS display_name ` +
-        `FROM entries e JOIN users u ON u.id = e.user_id WHERE e.board_key = $1 ` +
-        `ORDER BY e.user_id, e.baseline_profile_id, e.${column} ASC, e.submitted_at_ms ASC` +
-        `) best ORDER BY best.${column} ASC, best.submitted_at_ms ASC LIMIT $2`,
+        `SELECT e.*, u.display_name AS display_name, ROW_NUMBER() OVER (` +
+        `PARTITION BY e.user_id, e.baseline_profile_id ` +
+        `ORDER BY e.${column} ASC, e.submitted_at_ms ASC, e.id ASC) AS best_rank ` +
+        `FROM entries e JOIN users u ON u.id = e.user_id WHERE e.board_key = $1` +
+        `) best WHERE best.best_rank = 1 ORDER BY best.${column} ASC, best.submitted_at_ms ASC LIMIT $2`,
       [boardKey, limit],
     );
     return Object.freeze(result.rows.map((row) => entryOf(row)));
@@ -945,7 +962,7 @@ export class Store {
   /**
    * Every contributing player's best on one axis, with the entry it came from — the observations
    * `leaderboard/distribution.ts` folds into a ladder (GitHub issue #327, § D484). The same
-   * `DISTINCT ON (e.user_id)` the ranked board uses, per axis, so a player who posted twenty times
+   * best-row-per-player window the ranked board uses, per axis, so a player who posted twenty times
    * is one observation; and the same table, so only `awtIsValid: true` runs are ever counted.
    */
   async axisObservations(
@@ -957,9 +974,11 @@ export class Store {
       // Players only: a house row is a run nobody played, and the ladder's `n` is the count of
       // players who posted (GitHub issue #222, § D521). The board draws the house; the world
       // figures do not count it.
-      `SELECT DISTINCT ON (e.user_id) e.id AS id, e.${column} AS value ` +
-        `FROM entries e WHERE e.board_key = $1 AND e.baseline_profile_id IS NULL ` +
-        `ORDER BY e.user_id, e.${column} ASC, e.submitted_at_ms ASC`,
+      `SELECT best.id AS id, best.value AS value FROM (` +
+        `SELECT e.id AS id, e.${column} AS value, ROW_NUMBER() OVER (` +
+        `PARTITION BY e.user_id ORDER BY e.${column} ASC, e.submitted_at_ms ASC, e.id ASC) AS best_rank ` +
+        `FROM entries e WHERE e.board_key = $1 AND e.baseline_profile_id IS NULL` +
+        `) best WHERE best.best_rank = 1`,
       [boardKey],
     );
     return Object.freeze(
@@ -1048,15 +1067,15 @@ export class Store {
   /**
    * One rush board, **longest held first** — the one figure a rush posts, and the one ranking on which
    * more is better. Best sitting per player, with the earlier post winning a tie, on {@link board}'s
-   * `DISTINCT ON` for {@link board}'s reason: a board of every post would rank persistence.
+   * best-row-per-player window for {@link board}'s reason: a board of every post would rank persistence.
    */
   async rushBoard(boardKey: string, limit: number): Promise<readonly RushEntryRow[]> {
     const result = await this.#sql.query(
       'SELECT * FROM (' +
-        'SELECT DISTINCT ON (r.user_id) r.*, u.display_name AS display_name ' +
-        'FROM rush_entries r JOIN users u ON u.id = r.user_id WHERE r.board_key = $1 ' +
-        'ORDER BY r.user_id, r.held_s DESC, r.submitted_at_ms ASC' +
-        ') best ORDER BY best.held_s DESC, best.submitted_at_ms ASC LIMIT $2',
+        'SELECT r.*, u.display_name AS display_name, ROW_NUMBER() OVER (' +
+        'PARTITION BY r.user_id ORDER BY r.held_s DESC, r.submitted_at_ms ASC, r.id ASC) AS best_rank ' +
+        'FROM rush_entries r JOIN users u ON u.id = r.user_id WHERE r.board_key = $1' +
+        ') best WHERE best.best_rank = 1 ORDER BY best.held_s DESC, best.submitted_at_ms ASC LIMIT $2',
       [boardKey, limit],
     );
     return Object.freeze(result.rows.map((row) => rushEntryOf(row)));
@@ -1075,11 +1094,12 @@ export class Store {
   async rushBestsOf(userId: string, buildingId: string, dayBoardKey: string): Promise<readonly RushEntryRow[]> {
     const result = await this.#sql.query(
       'SELECT * FROM (' +
-        'SELECT DISTINCT ON (r.board_key) r.*, u.display_name AS display_name ' +
+        'SELECT r.*, u.display_name AS display_name, ROW_NUMBER() OVER (' +
+        'PARTITION BY r.board_key ORDER BY r.held_s DESC, r.submitted_at_ms ASC, r.id ASC) AS best_rank ' +
         'FROM rush_entries r JOIN users u ON u.id = r.user_id ' +
-        'WHERE r.user_id = $1 AND r.building_id = $2 AND (r.board_key = $3 OR starts_with(r.board_key, $4)) ' +
-        'ORDER BY r.board_key, r.held_s DESC, r.submitted_at_ms ASC' +
-        ') best ORDER BY best.held_s DESC, best.submitted_at_ms ASC',
+        'WHERE r.user_id = $1 AND r.building_id = $2 ' +
+        'AND (r.board_key = $3 OR SUBSTR(r.board_key, 1, LENGTH($4)) = $4)' +
+        ') best WHERE best.best_rank = 1 ORDER BY best.held_s DESC, best.submitted_at_ms ASC',
       [userId, buildingId, dayBoardKey, `${dayBoardKey}/`],
     );
     return Object.freeze(result.rows.map((row) => rushEntryOf(row)));
@@ -1090,8 +1110,11 @@ export class Store {
     boardKey: string,
   ): Promise<readonly { readonly entryId: string; readonly value: number }[]> {
     const result = await this.#sql.query(
-      'SELECT DISTINCT ON (r.user_id) r.id AS id, r.held_s AS value FROM rush_entries r WHERE r.board_key = $1 ' +
-        'ORDER BY r.user_id, r.held_s DESC, r.submitted_at_ms ASC',
+      'SELECT best.id AS id, best.value AS value FROM (' +
+        'SELECT r.id AS id, r.held_s AS value, ROW_NUMBER() OVER (' +
+        'PARTITION BY r.user_id ORDER BY r.held_s DESC, r.submitted_at_ms ASC, r.id ASC) AS best_rank ' +
+        'FROM rush_entries r WHERE r.board_key = $1' +
+        ') best WHERE best.best_rank = 1',
       [boardKey],
     );
     return Object.freeze(result.rows.map((row) => ({ entryId: String(row['id']), value: Number(row['value']) })));
@@ -1181,13 +1204,13 @@ export class Store {
             'COALESCE((SELECT MAX(seq) FROM chime_entries WHERE user_id = $2), 0) + 1, ' +
             '$3, $4, $5, ' +
             'COALESCE((SELECT balance_after FROM chime_entries WHERE user_id = $2 ' +
-            'ORDER BY seq DESC LIMIT 1), 0) + $6, $7, $8, $10::text ' +
+            'ORDER BY seq DESC LIMIT 1), 0) + $6, $7, $8, CAST($10 AS TEXT) ' +
             'WHERE COALESCE((SELECT balance_after FROM chime_entries WHERE user_id = $2 ' +
             'ORDER BY seq DESC LIMIT 1), 0) + $6 >= 0 ' +
             'AND NOT EXISTS (SELECT 1 FROM chime_entries WHERE user_id = $2 AND entry_key = $4 ' +
-            'AND written_at_ms > $8::bigint - $9::bigint) ' +
-            'AND ($10::text IS NULL OR NOT EXISTS (SELECT 1 FROM chime_entries WHERE user_id = $2 ' +
-            'AND entry_key = $4 AND turn_key = $10::text)) ' +
+            'AND written_at_ms > CAST($8 AS BIGINT) - CAST($9 AS BIGINT)) ' +
+            'AND (CAST($10 AS TEXT) IS NULL OR NOT EXISTS (SELECT 1 FROM chime_entries WHERE user_id = $2 ' +
+            'AND entry_key = $4 AND turn_key = CAST($10 AS TEXT))) ' +
             'RETURNING id, seq, balance_after',
           [
             randomUUID(),
@@ -1626,7 +1649,9 @@ export class Store {
       // A real `BOOLEAN`, so this is the column's own value rather than a comparison against the
       // integer 1. Coerced rather than cast because the two drivers are entitled to disagree about
       // whether that arrives as `true` or as `'t'`.
-      displayNameChosen: row['display_name_chosen'] === true || row['display_name_chosen'] === 't',
+      // A boolean from `pg` and PGlite, and the `1` SQLite stores for one (§ D1630).
+      displayNameChosen:
+        row['display_name_chosen'] === true || row['display_name_chosen'] === 't' || row['display_name_chosen'] === 1,
       createdAtMs: Number(row['created_at_ms']),
     });
   }
@@ -2003,6 +2028,20 @@ interface Migration {
    * and the atomicity would be gone with them.
    */
   readonly sql: string;
+  /**
+   * What SQLite runs instead, where the PostgreSQL text has no SQLite form — § D1630.
+   *
+   * Absent means SQLite runs {@link sql} as written, which every migration should aim for. Present
+   * only on the four `ALTER TABLE … ADD COLUMN IF NOT EXISTS` steps, which SQLite cannot parse, and
+   * there it is the empty string: **every SQLite database starts at migration 0**, which is today's
+   * {@link SCHEMA} with those columns and that index already in it, so on SQLite there is nothing
+   * left for them to add. The version is still recorded, so the two engines keep one register.
+   *
+   * A future column must be added with a plain `ADD COLUMN` that both engines run, and not to
+   * {@link SCHEMA} as well: the register is what stops it running twice, and `IF NOT EXISTS` is the
+   * one guard SQLite does not have.
+   */
+  readonly sqlite?: string;
 }
 
 /**
@@ -2040,6 +2079,7 @@ const MIGRATIONS: readonly Migration[] = Object.freeze([
     version: 1,
     name: 'entries.legs, nullable for the rows that predate it',
     sql: 'ALTER TABLE entries ADD COLUMN IF NOT EXISTS legs INTEGER;',
+    sqlite: '',
   }),
   /*
    * GitHub issue #222, § D521: the house's dispatcher on a baseline row, `NULL` on a player's. Same
@@ -2051,6 +2091,7 @@ const MIGRATIONS: readonly Migration[] = Object.freeze([
     version: 2,
     name: 'entries.baseline_profile_id, null on every row a player posted',
     sql: 'ALTER TABLE entries ADD COLUMN IF NOT EXISTS baseline_profile_id TEXT;',
+    sqlite: '',
   }),
   /*
    * GitHub issue #340: the telemetry table, and the first migration in this list that adds a
@@ -2146,6 +2187,7 @@ const MIGRATIONS: readonly Migration[] = Object.freeze([
     version: 5,
     name: 'entries.modifiers_json, null on every row played with the standard set',
     sql: 'ALTER TABLE entries ADD COLUMN IF NOT EXISTS modifiers_json TEXT;',
+    sqlite: '',
   }),
   /*
    * GitHub issue #499, the owner's ruling of 2026-09-10: a scenario pays once per account and a rush
@@ -2170,6 +2212,7 @@ const MIGRATIONS: readonly Migration[] = Object.freeze([
       'ALTER TABLE chime_entries ADD COLUMN IF NOT EXISTS turn_key TEXT;\n' +
       'CREATE UNIQUE INDEX IF NOT EXISTS chime_entries_turn ON chime_entries (user_id, entry_key, turn_key) ' +
       'WHERE turn_key IS NOT NULL;',
+    sqlite: '',
   }),
   /*
    * **Migration 7 — the rush board's table**, GitHub issue #372, section D542. A new table on a database
@@ -2238,7 +2281,8 @@ async function applyMigrations(sql: Sql, now: () => number): Promise<void> {
   for (const migration of [...MIGRATIONS].sort((a, b) => a.version - b.version)) {
     if (applied.has(migration.version)) continue;
     try {
-      await sql.exec(`${recordOf(migration, now())}\n${migration.sql}`);
+      const text = sql.dialect === 'sqlite' && migration.sqlite !== undefined ? migration.sqlite : migration.sql;
+      await sql.exec(`${recordOf(migration, now())}\n${text}`);
     } catch (error) {
       // The one error that means somebody else did this. Anything else, including a `23505` from
       // the migration's own statements, is a migration that failed and must stay unrecorded.
@@ -2288,9 +2332,13 @@ async function ensureRegister(sql: Sql): Promise<void> {
   try {
     await sql.exec(MIGRATIONS_TABLE);
   } catch (error) {
-    const present = await sql.query(`SELECT to_regclass('schema_migrations') AS present`);
-    const value = present.rows[0]?.['present'];
-    if (value === null || value === undefined) throw error;
+    // Asked by reading the table rather than the catalog, so the question is the same text on both
+    // engines (§ D1630): a read of a missing table fails, and the original error is the one to raise.
+    try {
+      await sql.query('SELECT 1 FROM schema_migrations LIMIT 1');
+    } catch {
+      throw error;
+    }
   }
 }
 

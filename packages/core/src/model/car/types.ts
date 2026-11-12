@@ -44,6 +44,7 @@ import {
 } from '../types.js';
 import {
   assertBrakeDominatesComfort,
+  requiredGapM,
   validateSeparation,
   type ShaftSeparation,
 } from './separation.js';
@@ -143,6 +144,12 @@ export interface CarShaft {
    * to hold between.
    */
   readonly separation?: ShaftSeparation | undefined;
+  /**
+   * The highest floor the **lower** car answers, on a two-car shaft run sectored — `docs/11`
+   * § 3.2's regime R1, `ShaftConfig.sectorBoundaryFloorId`. `undefined` on every single-car
+   * shaft and on a two-car shaft left in the free regime.
+   */
+  readonly sectorBoundaryFloorId?: string | undefined;
 
   /** Floors served, ascending by {@link ServedFloor.index}. */
   readonly floors: readonly ServedFloor[];
@@ -204,6 +211,12 @@ export interface ShaftOptions {
    * `shaftForBank` and this is the same failure one layer down.
    */
   readonly separation?: ShaftSeparation | undefined;
+  /**
+   * The sector boundary of a two-car hoistway. **`createShaft` throws when this is present
+   * without a `separation`, names a floor the shaft does not serve, or leaves the upper car no
+   * floor**, on the footing of the `separation` checks above: a declaration nobody can honour.
+   */
+  readonly sectorBoundaryFloorId?: string | undefined;
 }
 
 /**
@@ -337,12 +350,36 @@ export function createShaft(floors: readonly ServedFloorInit[], options?: ShaftO
     throw new ModelError('A car shaft must serve at least one floor.');
   }
 
+  // The sector boundary (`docs/11` § 3.2 regime R1), checked where the shaft is built so a
+  // hand-assembled `ResolvedBuilding` cannot carry one the runtime would have to guess about.
+  // `config/parse.ts` reports the same three faults as located issues.
+  const sectorBoundaryFloorId = options?.sectorBoundaryFloorId;
+  if (sectorBoundaryFloorId !== undefined) {
+    if (separation === undefined) {
+      throw new ModelError(
+        `Shaft "${shaftId}" declares sector boundary "${sectorBoundaryFloorId}" without a separation. A sector boundary divides a hoistway between two cars.`,
+      );
+    }
+    const boundary = byId.get(sectorBoundaryFloorId);
+    if (boundary === undefined) {
+      throw new ModelError(
+        `Shaft "${shaftId}" declares sector boundary "${sectorBoundaryFloorId}", which it does not serve.`,
+      );
+    }
+    if (last.heightM < boundary.heightM + requiredGapM(separation)) {
+      throw new ModelError(
+        `Shaft "${shaftId}" declares sector boundary "${sectorBoundaryFloorId}" at ${boundary.heightM} m and serves no floor one required gap (${requiredGapM(separation)} m) above it. The upper car's sector would hold no floor.`,
+      );
+    }
+  }
+
   const pairs = options?.floorPairs ?? [];
   if (pairs.length === 0) {
     return Object.freeze({
       id: shaftId,
       carIds,
       ...(separation === undefined ? {} : { separation }),
+      ...(sectorBoundaryFloorId === undefined ? {} : { sectorBoundaryFloorId }),
       floors: Object.freeze(served),
       floorsById: byId,
       floorsByIndex: byIndex,
@@ -402,6 +439,7 @@ export function createShaft(floors: readonly ServedFloorInit[], options?: ShaftO
     id: shaftId,
     carIds,
     ...(separation === undefined ? {} : { separation }),
+    ...(sectorBoundaryFloorId === undefined ? {} : { sectorBoundaryFloorId }),
     floors: Object.freeze(served),
     floorsById: byId,
     floorsByIndex: byIndex,
@@ -513,10 +551,15 @@ export function shaftsForBank(building: ResolvedBuilding, bankId: string): reado
           shaft.id,
         );
       }
+      const sectorBoundaryFloorId =
+        declared === undefined
+          ? undefined
+          : declared.find((candidate) => candidate.id === shaft.id)?.sectorBoundaryFloorId;
       return shaftGeometryFor(building, bank, bankId, {
         id: shaft.id,
         carIds,
         ...(separation === undefined ? {} : { separation }),
+        ...(sectorBoundaryFloorId === undefined ? {} : { sectorBoundaryFloorId }),
       });
     }),
   );
@@ -531,6 +574,7 @@ function shaftGeometryFor(
     readonly id: string;
     readonly carIds: readonly [string] | readonly [string, string];
     readonly separation?: ShaftSeparation | undefined;
+    readonly sectorBoundaryFloorId?: string | undefined;
   },
 ): CarShaft {
   const permitted = credentialsByFloorId(building.accessZones);
@@ -564,6 +608,9 @@ function shaftGeometryFor(
       id: identity.id,
       carIds: identity.carIds,
       ...(identity.separation === undefined ? {} : { separation: identity.separation }),
+      ...(identity.sectorBoundaryFloorId === undefined
+        ? {}
+        : { sectorBoundaryFloorId: identity.sectorBoundaryFloorId }),
       ...(floorPairs === undefined ? {} : { floorPairs }),
     },
   );

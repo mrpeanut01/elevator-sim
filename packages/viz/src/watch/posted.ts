@@ -42,6 +42,7 @@
 import {
   RULE_ACTIONS,
   RULE_CONDITIONS,
+  ruleRowOf,
   type DispatcherProfile,
   type RuleRowConfig,
   type RunInterventionConfig,
@@ -106,6 +107,7 @@ export function postedSubtitleOf(place: number): string {
 export interface WireRow {
   readonly when: string;
   readonly whenValue?: number | string | undefined;
+  readonly and?: readonly { readonly when: string; readonly whenValue?: number | string | undefined }[] | undefined;
   readonly then: string;
   readonly thenValue?: number | string | undefined;
 }
@@ -125,13 +127,13 @@ function rowsFromWire(rows: readonly WireRow[]): readonly RuleRowConfig[] | stri
     if (!(RULE_ACTIONS as readonly string[]).includes(row.then)) {
       return `this build does not ship the rule action “${row.then}”`;
     }
+    for (const extra of row.and ?? []) {
+      if (!(RULE_CONDITIONS as readonly string[]).includes(extra.when)) {
+        return `this build does not ship the rule condition “${extra.when}”`;
+      }
+    }
   }
-  return rows.map((row) => ({
-    when: row.when,
-    ...(row.whenValue === undefined ? {} : { whenValue: row.whenValue }),
-    then: row.then,
-    ...(row.thenValue === undefined ? {} : { thenValue: row.thenValue }),
-  })) as readonly RuleRowConfig[];
+  return rows.map((row) => ruleRowOf(row)) as readonly RuleRowConfig[];
 }
 
 /**

@@ -58,6 +58,7 @@ import {
   isInterventionKind,
   RULE_ACTIONS,
   RULE_CONDITIONS,
+  ruleRowOf,
   storedEffectIssue,
   type EffectCarryingKind,
   type RunInterventionConfig,
@@ -183,15 +184,12 @@ export function watchRecordOf(
     interventions: state.interventions.map((entry) => ({ atS: entry.atS, change: entry.change })),
     /*
      * The rows as the player wrote them, never the profile they make — see
-     * `types.ts#WatchRecord.ruleRows`. Copied field by field rather than spread, so a `RuleRow`
-     * that grows a key does not silently enter a persisted record without a version to say so.
+     * `types.ts#WatchRecord.ruleRows`. Copied through `core`'s `ruleRowOf` rather than spread, so
+     * a key enters a persisted record only by being added to the one copy every reader shares. A
+     * row's further conditions (`and`) are such a key, and need no version: a record written
+     * before them carries none, and reads back as the row it always was.
      */
-    ruleRows: state.ruleRows.map((row) => ({
-      when: row.when,
-      ...(row.whenValue === undefined ? {} : { whenValue: row.whenValue }),
-      then: row.then,
-      ...(row.thenValue === undefined ? {} : { thenValue: row.thenValue }),
-    })),
+    ruleRows: state.ruleRows.map((row) => ruleRowOf(row)),
     /*
      * The rung the run stood on — shape 3, [§ D1139](../../../../DECISIONS.md). Read through the
      * function `shiftRunConfigOf` builds the tower from, so the record names the rung the legs were
@@ -309,6 +307,11 @@ export function recordUnreadableReason(
     }
     if (!(RULE_ACTIONS as readonly string[]).includes(row.then)) {
       return `this build does not ship the rule action “${row.then}”`;
+    }
+    for (const extra of row.and ?? []) {
+      if (!(RULE_CONDITIONS as readonly string[]).includes(extra.when)) {
+        return `this build does not ship the rule condition “${extra.when}”`;
+      }
     }
   }
   return null;

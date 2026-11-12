@@ -62,17 +62,6 @@
 export const EVERYDAY_SCREENS = [
   'menu',
   /*
-   * **The lobby** — the elevator cold-open, [§ D1445](../../../../DECISIONS.md). Every cold launch
-   * opens on it unless Settings says to skip it, and its car operating panel is a mode picker whose
-   * floors are screens below. Like `menu` it is the shell's own route rather than a registered
-   * module, because it draws before the host has published and has nothing to wait for.
-   *
-   * **Four keys past § 4's seventeen**, on the argument the landing page's entry makes: the handoff
-   * this screen comes from (`docs/design/design_handoff_lobby_intro/`) specifies a screen that
-   * comes before the front door, and there is no surface for it to be a state of.
-   */
-  'lobby',
-  /*
    * The landing page (GitHub issue #244), listed straight after the root because it sits **before**
    * it: a visitor arriving from a link meets this and then the menu, where a returning player meets
    * the menu directly.
@@ -212,8 +201,10 @@ export interface EverydayState {
 /**
  * The root, named rather than assumed — GAMEPLAY § 3.5.
  *
- * Still the menu after § D1445: the lobby is where a cold launch *starts*, and the root is where
- * *Main menu* goes back to. The handoff says the lobby is not replayed on every return.
+ * The lobby and the main menu are this one screen since [§ D1628](../../../../DECISIONS.md): where a
+ * cold launch starts, and where *Main menu* goes back to. The key stays `menu`, because it is also
+ * a route, a rail class and a word in a dozen strings, and renaming it would move all of them to buy
+ * nothing a player can see.
  */
 export const EVERYDAY_ROOT: EverydayScreen = 'menu';
 
@@ -368,3 +359,17 @@ export const ENGINEER_RETURN_TITLE =
  * depending on the shell itself.
  */
 export const EVERYDAY_ROOT_CLASS = 'everyday';
+
+/**
+ * **What the design floor calls a run started from it** — [§ D1627](../../../../DECISIONS.md),
+ * `floors.ts`. Declared here, beside the shell's other fixed words, because the action bar's table
+ * reads it and `floors.ts` reads the mode tiles, which sit downstream of that table.
+ *
+ * It is the bar's primary on the dispatcher workshop
+ * and on the drawing board, and the tray's word for the stage that follows.
+ *
+ * One label for both rooms, because it is one act: the thing on the bench is run once on the day's
+ * crowd, nothing is filed, and the player comes back to the bench. A building is *played* on the
+ * floors above the lobby.
+ */
+export const TEST_SIMULATION_LABEL = 'Test simulation';

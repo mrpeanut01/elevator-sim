@@ -30,7 +30,7 @@ import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { replicationSeed } from '@elevator-sim/experiments/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { batchLibraryOf } from './library.js';
+import { batchBuildingOf, batchLibraryOf } from './library.js';
 import { armConfigOf, runBatch } from './runBatch.js';
 import type { BatchArmRequest, BatchRequest, BatchResources } from './types.js';
 import { profileFromSpec, specFromProfile } from '../authoring/dispatcherSpec.js';
@@ -500,5 +500,52 @@ describe('every batch a surface starts carries the reader’s shelf', () => {
       'these files start a batch without the reader’s saved dispatchers, so an arm naming one ' +
         'cannot resolve — see batch/library.ts',
     ).toEqual([]);
+  });
+});
+
+describe('batchBuildingOf — a tower of the player’s own reaches the batch', () => {
+  /** A shipped building's own document under an id `data/` does not hold. */
+  const mine = (): { readonly id: string } & Record<string, unknown> => ({
+    ...(JSON.parse(readFileSync(join(DATA_DIR, 'buildings', `${BUILDING}.json`), 'utf8')) as Record<string, unknown>),
+    id: 'my-tower',
+    name: 'My tower',
+  });
+
+  it('hands back the shipped building for a shipped id, whatever document rides beside it', () => {
+    const shipped = requireBuilding(config, BUILDING);
+    const beside = { ...mine(), id: BUILDING } as never;
+    expect(batchBuildingOf(config.buildings, BUILDING, beside, config.elevatorSpecs)).toBe(shipped);
+    expect(batchBuildingOf(config.buildings, BUILDING, undefined, config.elevatorSpecs)).toBe(shipped);
+  });
+
+  it('resolves the player’s own for an id data/ does not hold, and a batch runs in it', () => {
+    const building = batchBuildingOf(config.buildings, 'my-tower', mine() as never, config.elevatorSpecs);
+    expect(building?.id).toBe('my-tower');
+    const library = batchLibraryOf(config.dispatcherProfiles, []);
+    if (!library.ok || building === undefined) throw new Error('fixture missing');
+    const request: BatchRequest = { ...requestWith([
+        { armId: 'baseline', dispatcherProfileId: 'eta' },
+        { armId: 'candidate', dispatcherProfileId: 'collective' },
+      ]), buildingId: 'my-tower' };
+    const result = runBatch(
+      request,
+      {
+        building,
+        dispatcherProfiles: library.library,
+        trafficProfiles: config.trafficProfiles,
+        elevatorSpecs: config.elevatorSpecs,
+      },
+    );
+    expect(result.arms).toHaveLength(2);
+  });
+
+  it('answers nothing for an id nobody holds, and refuses a document the designer could not have saved', () => {
+    expect(batchBuildingOf(config.buildings, 'my-tower', undefined, config.elevatorSpecs)).toBeUndefined();
+    expect(
+      batchBuildingOf(config.buildings, 'my-tower', { ...mine(), id: 'another-tower' } as never, config.elevatorSpecs),
+    ).toBeUndefined();
+    expect(() =>
+      batchBuildingOf(config.buildings, 'my-tower', { id: 'my-tower', name: 'Broken' } as never, config.elevatorSpecs),
+    ).toThrow();
   });
 });

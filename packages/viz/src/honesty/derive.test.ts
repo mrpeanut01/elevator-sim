@@ -764,11 +764,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'everyday/landingScreen.ts#LANDING_SCREEN',
         /*
-         * § D1445's lobby, on the same ground: it draws the doors, the panel and the hall plate into
-         * the shell's region and owns their timers and two synthesised sounds. Every word it draws
-         * is `everyday/lobbyModel.ts`'s, which the `EVERYDAY_LOBBY` adapter drives through every
-         * stop of the door machine; what this mount authors of its own is geometry, colours, class
-         * names and the accessible names of its controls.
+         * The lobby (§ D1445, § D1628), on the same ground: it draws the building in section into the
+         * shell's region and owns its car's timers and one synthesised sound. Every word it draws is
+         * `everyday/lobbyModel.ts`'s, which the `EVERYDAY_LOBBY` adapter drives at every landing,
+         * or the build-notes pointer's, which the menu adapter drives; what this mount authors of
+         * its own is geometry, colours and class names.
          */
         'everyday/lobbyScreen.ts#mountLobby',
         'everyday/tutorialScreens.ts#TUTORIAL_SCREEN',
@@ -1423,6 +1423,46 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'A comparison, not a sentence. `sameProfile` serialises two dispatcher profiles to ' +
+        'key-sorted JSON and answers whether they are the same document; the template literals ' +
+        'the derivation found are that serialisation’s brackets. Nothing it builds is returned, ' +
+        'let alone drawn — `everyday/host.ts#workingDispatcherStatus` reads the boolean.',
+      ids: ['authoring/dispatcherShelf.ts#sameProfile'],
+    },
+    {
+      reason:
+        'Resolves the building a batch runs in. Its one string literal is the source label it ' +
+        'hands `core`’s `parseBuilding`, which appears only inside a thrown parse error about a ' +
+        'building the designer could not have saved — and a document reaches this function only ' +
+        'from the designer’s own save. The function returns a resolved building, never text.',
+      ids: ['batch/library.ts#batchBuildingOf'],
+    },
+    {
+      reason:
+        'The id the workshop’s working copy rides to the batch worker under, and the two ' +
+        'functions that put it on a request. It is a key, never a sentence: the arm is reported ' +
+        'under the name `testBedWorkingProfileOf` gives it, which is swept, and ' +
+        '`batch/report.ts` draws profile names and not ids on a Casual surface.',
+      ids: [
+        'everyday/testBedModel.ts#TEST_BED_WORKING_ID',
+        'everyday/testBedModel.ts#testBedProfilesOf',
+        'everyday/testBedModel.ts#testBedRequestOf',
+      ],
+    },
+    {
+      reason:
+        'A parser’s refusals, for whoever edits `data/dispatcher-families.json` by hand. Every ' +
+        'string it authors is an `Error` message thrown at module load, before any screen exists ' +
+        'to draw it; a malformed shipped file fails `authoring/dispatcherFamilies.test.ts` and the ' +
+        'build, and reaches no player. The headings and lines it returns are the file’s own and ' +
+        'are swept through `everyday/workshopModel.ts#shelfOf`.',
+      ids: [
+        'authoring/dispatcherFamilies.ts#parseDispatcherFamilies',
+        'authoring/dispatcherFamilies.ts#DISPATCHER_FAMILIES',
+      ],
+    },
+    {
+      reason:
         'The refusal sentences `provenanceLineOf` used to author itself, moved one layer down by ' +
         '`docs/16` S5 so the leaderboard’s submit path cannot grow a second copy of them. They ' +
         'reach `#status` through `copyProvenance` exactly as before, so this inherits the exclusion ' +
@@ -1524,6 +1564,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         // The sentences a player reads about time rules are `ruleIssues`' clock refusal and the
         // row readbacks, both driven by the RULES_EDITOR adapter.
         'authoring/ruleSpec.ts#isTimeCondition',
+        // The same reading of an id as prose, four times over: each of these compares against or
+        // reaches the action id `no-new-pickups` and returns a row or a boolean. What a player
+        // reads about that action is its template, its lever line and `ruleIssues`' refusals,
+        // all driven by the RULES_EDITOR adapter — including the row with further conditions.
+        'authoring/ruleSpec.ts#canAddCondition',
+        'authoring/ruleSpec.ts#defaultRuleRow',
+        'authoring/ruleSpec.ts#rowWithAnotherCondition',
+        'authoring/ruleSpec.ts#rowWithThen',
       ],
     },
     {
@@ -1721,6 +1769,28 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'set-by-hand branch, which is what makes this an exclusion rather than a gap. ' +
         '`specIsDirty` returns a boolean and is derived only through the transitive clause.',
       ids: ['authoring/buildingSpec.ts#transportModesOf', 'authoring/buildingSpec.ts#specIsDirty'],
+    },
+    {
+      reason:
+        'The transfer time a building type must declare. `transferSecondsFor` returns a number or ' +
+        '`undefined`; its only sentence is the message of the error it throws on a building type ' +
+        'nothing has priced, which names two source files to edit and is a programming fault no ' +
+        'surface draws. It was module-private until `authoring/towerPlan.ts` needed the same rule ' +
+        'for the cars it writes, and exporting it is what made the derivation see it.',
+      ids: ['authoring/buildingSpec.ts#transferSecondsFor'],
+    },
+    {
+      reason:
+        'Ids and keys on the drawing board’s plan, never drawn. `planFromBuilding`’s strings are ' +
+        'the closed `PlanLoss` codes and the shaft keys it mints (`s1`, `s2`, …): the sentence for ' +
+        'each code is `everyday/designerModel.ts#designerLossLine`’s, which the standalone-screens ' +
+        'adapter drives on every code at once, and a key is a selection handle the screen never ' +
+        'prints. `DESIGNER_PROFILE_BY_KIND` maps a building kind to a traffic-profile id out of ' +
+        '`data/traffic-profiles.json`; what the Floors step draws is that profile’s own `name`.',
+      ids: [
+        'authoring/towerPlan.ts#planFromBuilding',
+        'everyday/designerModel.ts#DESIGNER_PROFILE_BY_KIND',
+      ],
     },
     {
       reason:
@@ -2511,13 +2581,6 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         '`RUSH_DEVICE_REPLAY_REFUSAL`’s, which the rush adapter drives through the line the standings ' +
         'draw. The deriver collected all three for their comments.',
       ids: [
-        /*
-         * § D1445: whether a cold launch skips the lobby. The key is its `localStorage` slot and the
-         * store reads and writes one boolean there; the words for the choice are
-         * `settingsView.ts#LOBBY_ROW_COPY`, which the settings adapter drives in both faces.
-         */
-        'everyday/lobbyStore.ts#LOBBY_SKIP_KEY',
-        'everyday/lobbyStore.ts#everydayLobbyStore',
         'everyday/rushDeviceBest.ts#RUSH_DEVICE_BEST_KEY',
         'everyday/rushDeviceBest.ts#RUSH_DEVICE_BEST_QUARANTINE_KEY',
         'everyday/rushDeviceBest.ts#rushDeviceReplayOf',

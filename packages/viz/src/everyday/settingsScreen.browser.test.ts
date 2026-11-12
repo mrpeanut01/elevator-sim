@@ -81,7 +81,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday settings screen', () => {
     expect(await page.textContent('.everyday-settings h1')).toBe('Settings');
     expect(await page.textContent('.everyday-rail-settings')).toContain('HERE');
     // The § 3.3 row for settings: ⌂ Modes on the left, Back to the modes as the primary.
-    expect(await page.textContent('.everyday-bar-leave')).toBe('⌂ Modes');
+    expect(await page.textContent('.everyday-bar-leave')).toBe('⌂ Lobby');
     expect(await page.textContent('.everyday-bar-primary')).toBe('Back to the modes');
     await page.close();
   });
