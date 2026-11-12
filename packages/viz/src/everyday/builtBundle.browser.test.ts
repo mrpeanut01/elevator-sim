@@ -200,12 +200,20 @@ const DIST_WEB = fileURLToPath(new URL('../../dist-web', import.meta.url));
  * tighter figure precisely tracking this wave's measured growth, on the same reasoning as the
  * 2026-09-11 raise: repeatedly relitigating this gate one small increment at a time costs more than
  * headroom does, and the deterministic hard-cap-plus-90%-line shape still catches an accidental
- * dependency long before 1 800 kB. The 90 % line is now 1 620 kB.
+ * dependency long before 1 800 kB. The 90 % line was then 1 620 kB.
+ *
+ * **Raised to 2 000 kB by the product owner on 2026-11-12 ([§ D1633](../../../../DECISIONS.md)).**
+ * GitHub PR #668 (escalator carrying capacity, § D1632) MEASURED **1 628.741 kB** in CI, past the
+ * 1 620 kB line. A local build of the base and of that head differed by **≈ 13.2 kB**, almost all
+ * of it `core`'s new escalator-queue code paid four times (the page bundle and the `batch`,
+ * `morning` and `shift` workers), so the base already stood at ≈ 1 615.5 kB, within 5 kB of the
+ * line. Not an accidental dependency. The owner chose a raise over the shared-`core` trim below,
+ * which stays the follow-up. The 90 % line is now 1 800 kB.
  *
  * **Worth a note for whoever next measures this**: `core` is bundled separately into all three JS
- * entry points rather than shared, so every byte `core` gains is paid three times; splitting it
- * into a shared chunk (`build.rolldownOptions.output.manualChunks` or equivalent) would very
- * likely buy back real headroom, and is the trim `docs/31` § 3 names as the alternative to raising
+ * entry points rather than shared, so every byte `core` gains is paid once per bundle (four times
+ * since the `morning` worker); splitting it into a shared chunk
+ * (`build.rolldownOptions.output.manualChunks` or equivalent) would very likely buy back real headroom, and is the trim `docs/31` § 3 names as the alternative to raising
  * the number — left as a follow-up because it changes how three separate entry points load rather
  * than one number, not because generous headroom makes it unnecessary.
  *
@@ -213,7 +221,7 @@ const DIST_WEB = fileURLToPath(new URL('../../dist-web', import.meta.url));
  * the mechanism `docs/31` asks for in place of a vendor metric whose definition can move underneath
  * the number.
  */
-const BUNDLE_BUDGET_KB = 1_800;
+const BUNDLE_BUDGET_KB = 2_000;
 
 /** One shipped file and what it costs on the wire. */
 interface ShippedFile {

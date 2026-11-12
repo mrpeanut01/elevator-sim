@@ -56080,3 +56080,29 @@ capacity; the control moves the legs at all three hop positions; conservation; t
 `authoring/towerPlan.test.ts`, `everyday/designerModel.test.ts` and `mode/disclosure.test.ts`.
 
 **Numbers spent.** One, **D1632**. The charter row moves to D1633.
+
+## D1633 — Charter S9 B2's bundle budget raised to 2 000 kB by the product owner
+
+**Date: 2026-11-12 · Owner: product owner, answering the integrator during the merge of GitHub PR
+#668 · Rules on: `packages/viz/src/everyday/builtBundle.browser.test.ts#BUNDLE_BUDGET_KB`,
+`docs/41-launch-checklist.md` § 4.1.**
+
+**Why an entry.** [§ D405](#d405)'s first ground, as for [§ D622](#d622): this moves a figure a
+document outside the deciding test file must agree with.
+
+**What happened.** CI on #668 (escalator carrying capacity, [§ D1632](#d1632)) measured the built
+bundle at **1 628.741 kB gzip**, past the 1 620 kB line that 90 % of the 1 800 kB budget sets. A
+local build of the base and of #668's head differed by **≈ 13.2 kB**, almost all of it `core`'s new
+escalator-queue code, which ships in the page bundle and in the `batch`, `morning` and `shift`
+workers alike. So the base already stood at **≈ 1 615.5 kB**, within 5 kB of the line before #668.
+Not an accidental dependency.
+
+**MEASURED: 1 628.741 kB on #668's head in CI, ≈ 1 615.5 kB base by difference.** **CHOSEN:
+2 000 kB, by the product owner**, offered beside the shared-`core` trim and holding #668. The 90 %
+line is now 1 800 kB.
+
+**The trim is still the follow-up.** `core` is bundled once per entry point, so every byte it gains
+is paid four times. Sharing it in one chunk would very likely buy back real headroom; it changes how
+four entry points load, and it was not taken here.
+
+**Numbers spent.** One, **D1633**. The charter row moves to D1634.
