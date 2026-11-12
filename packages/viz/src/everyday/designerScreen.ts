@@ -73,6 +73,7 @@ import {
   withAccessZoneRemoved,
   withDescentSpeed,
   withEscalatorSeconds,
+  withEscalatorCapacity,
   withEscalatorToggled,
   withPanel,
   withStairsAdded,
@@ -100,6 +101,8 @@ import {
   designerCapacityLine,
   designerClasses,
   designerFigures,
+  designerCapacityChoices,
+  designerEscalatorIdleNote,
   designerFloorFacts,
   designerGroupRows,
   designerLossLine,
@@ -1467,6 +1470,27 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
         numberField(ride, COPY.escalatorSecondsLabel, Math.round(facts.escalatorSeconds), (next) => {
           edit(withEscalatorSeconds(plan, low, next));
         });
+      }
+
+      if (facts.escalator) {
+        fieldName(panel, COPY.escalatorCapacityLabel);
+        chipRow(
+          panel,
+          'everyday-designer-escalator-capacity',
+          'escalator-capacity',
+          designerCapacityChoices(specs, facts.escalatorCapacity),
+          facts.escalatorCapacity ?? 0,
+          (next) => {
+            edit(withEscalatorCapacity(plan, low, next === 0 ? undefined : next));
+          },
+        );
+        hint(panel, COPY.escalatorCapacityHint);
+        const idle = designerEscalatorIdleNote(plan, analysis, low);
+        if (idle !== '') {
+          const said = el(doc, 'div', 'everyday-designer-escalator-idle', idle);
+          said.style.cssText = `font-size:12px;color:${C.terracotta};line-height:1.45`;
+          panel.append(said);
+        }
       }
 
       fieldName(panel, COPY.stairsLabel);

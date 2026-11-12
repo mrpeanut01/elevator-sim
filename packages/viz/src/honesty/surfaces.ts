@@ -198,6 +198,7 @@ import {
   DESIGNER_STEPS,
   DESIGNER_TEMPLATE_COPY,
   classOfMachine,
+  designerCapacityChoices,
   designerCapacityLine,
   designerFigures,
   designerFloorFacts,
@@ -10885,6 +10886,9 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'authoring/towerPlan.ts#TWO_CAR_FIGURES_WITHHELD',
     'everyday/designerModel.ts#designerGroupRows',
     'everyday/designerModel.ts#designerFloorFacts',
+    /* § D1632: the capacity chips, and the note that says a limit would change nothing. */
+    'everyday/designerModel.ts#designerCapacityChoices',
+    'everyday/designerModel.ts#designerEscalatorIdleNote',
     'everyday/designerModel.ts#designerServiceLine',
     'everyday/designerModel.ts#designerLossLine',
     /*
@@ -11175,7 +11179,16 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     }
 
     /* ------------------------------------------------------- § 13 designer */
-    const designerProse = new Set(['specNote', 'lede', 'notScored', 'groupsHint', 'groupNotSized', 'stairsRefused', 'accessOpen']);
+    const designerProse = new Set([
+      'specNote',
+      'lede',
+      'notScored',
+      'groupsHint',
+      'groupNotSized',
+      'stairsRefused',
+      'accessOpen',
+      'escalatorCapacityIdle',
+    ]);
     for (const [key, text] of Object.entries(DESIGNER_COPY)) {
       seeds.push({
         field: `designer.copy.${key}`,
@@ -11207,6 +11220,16 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
 
     const specs = context.elevatorSpecs;
     const classes = classesFromSpecs(specs);
+    /*
+     * **The escalator capacity control's chips** (§ D1632): *no limit*, one per row the reference
+     * table carries at the seeded speed, and the extra chip a figure off the table is shown as —
+     * drawn here with a value no row holds, since no shipped building declares a capacity and the
+     * chip would otherwise never render. The idle note is `DESIGNER_COPY`'s own and is seeded with
+     * it above; `designerEscalatorIdleNote` only decides whether it is drawn.
+     */
+    for (const choice of designerCapacityChoices(specs as ElevatorSpecs, 2500)) {
+      seeds.push({ field: `designer.escalatorCapacity.${String(choice.value)}`, text: choice.label, role: 'label' });
+    }
     /* The standing building as the Engineer editor's spec — the tuner's arms below still read it. */
     const sized = specFromBuilding(context.building.config, context.building.id);
     /*
