@@ -30,7 +30,7 @@ import {
   type ChimeTurn,
 } from '@elevator-sim/core';
 
-import { PgliteSql } from '../store/pglite.test-helper.js';
+import { testSql } from '../store/testSql.test-helper.js';
 import { Store } from '../store/store.js';
 import {
   awardSignInGift,
@@ -85,7 +85,7 @@ async function fixture(): Promise<{
   readonly userId: string;
   readonly tick: (ms: number) => void;
 }> {
-  const sql = new PgliteSql();
+  const sql = testSql();
   let clock = CLOCK_START;
   const store = await Store.open({ sql, now: () => clock });
   onTestFinished(async () => {

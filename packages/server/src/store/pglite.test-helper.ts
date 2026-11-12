@@ -28,6 +28,7 @@ import type { Sql, SqlResult } from './sql.js';
 
 /** A throwaway PostgreSQL, empty, in memory. The schema is applied by `Store.open`. */
 export class PgliteSql implements Sql {
+  readonly dialect = 'postgres';
   readonly #db: PGlite;
 
   constructor() {

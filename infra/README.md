@@ -1,7 +1,13 @@
 # Deploying the simulator to Azure
 
-One Container App serving the viewer and the API from a single origin, a PostgreSQL flexible server
-behind it, and Communication Services for the one mail this product sends.
+One Container App serving the viewer and the API from a single origin, its store behind it, and
+Communication Services for the one mail this product sends.
+
+> **The store has two engines since [§ D1630](../DECISIONS.md), chosen by `databaseEngine`.**
+> `postgres` (the default, so an existing deployment redeploys unchanged) is the PostgreSQL flexible
+> server this document always described, at a fixed ≈ $17 a month. `sqlite` is a file on the
+> container, replicated to Blob Storage by Litestream, which removes that floor. § 8 is the switch,
+> and § 5 has both bills.
 
 > **There is now a second lane, and as of 2026-08-08 it is switched on.** The page is served from a
 > CDN instead of from this container, which removes a **32.2 s** cold first load — see
@@ -110,7 +116,8 @@ it is where the itemisation belongs.
 |---|---|
 | Container App, 0.5 vCPU / 1 GiB, **scale-to-zero** | The viewer and the API in one process, one origin. `minReplicas: 0` is what makes it cheap |
 | Container Apps environment + Log Analytics | Where the app runs, and where its logs go |
-| PostgreSQL flexible server, `Standard_B1ms`, 32 GiB | Accounts and leaderboard entries. **Cannot scale to zero** — see § 5 |
+| PostgreSQL flexible server, `Standard_B1ms`, 32 GiB | Accounts and leaderboard entries with `databaseEngine: 'postgres'`. **Cannot scale to zero** — see § 5 |
+| Storage account (`Standard_LRS`, Hot) + `litestream` container | The SQLite store's replica, with `databaseEngine: 'sqlite'` instead of the server above (§ 8) |
 | Communication Services + Email + `AzureManagedDomain` | Confirmation mail, from the free `azurecomm.net` subdomain |
 | User-assigned managed identity | Sends mail with **no credential**: it holds the *Communication and Email Service Owner* role, and revocation is deleting the assignment |
 
@@ -287,6 +294,26 @@ app bills only while serving, and the $17 is the database — which is a resourc
 a SKU named in the same file. That is the criterion `docs/15` § 4 says the compute-offload contract
 should have had and did not.
 
+### With `databaseEngine: 'sqlite'` (§ D1630)
+
+The database floor above goes away. What replaces it is a storage account, billed by capacity and by
+operation, and the operations are the line to watch:
+
+| Line item | At rest |
+|---|---|
+| PostgreSQL | **$0**: no server is deployed once the cutover (§ 8) is finished |
+| Storage capacity, a few MiB of snapshots and WAL | ≈ $0 |
+| Storage operations, Litestream's restore on each cold start and its writes while serving | **expected under $1 / month, unmeasured** |
+| Container App, now pinned to **one** replica | as above, and the ceiling is the `maxReplicas: 1` row: ≈ $34 |
+
+**Why the operations line is the one named, and why its figure is a forecast.** Litestream 0.3
+starts a new generation on every cold start and lists every generation it keeps on every restore.
+The sister project, crop-card, kept a week of them on geo-redundant storage and measured
+7.9 million `ListBlobs` calls and about $65 in a month (crop-card PR #888). This template keeps 24
+hours (`infra/litestream.yml`) on locally redundant storage, which is roughly a seventh of the
+generations at about half the price per call. That is arithmetic on another deployment's bill, so
+read this row as a forecast until the first invoice after the cutover replaces it.
+
 ### There is no budget alert here, deliberately
 
 An Azure budget notifies and does not cap, and the previous template's § 6 said so correctly in one
@@ -322,12 +349,18 @@ is not repeated here.
 3. **No custom domain and no rate limiting at the edge.** The app's own per-account submission
    cooldown is in memory (`chargeCooldown`), so it bounds one replica rather than the deployment —
    at `maxReplicas: 2` a determined client gets two.
-4. **No backup of anything but the database**, whose retention is the 7-day service floor.
+4. **No backup of anything but the database**, whose retention is the 7-day service floor on
+   PostgreSQL, and 24 hours of point-in-time restore through Litestream on SQLite.
 5. **`AzureManagedDomain` is rate-limited** and its `azurecomm.net` sender is likelier to be
    filtered than a verified custom domain. It is the right choice for proving the flow and the wrong
    one for real users.
-6. **Scaling past one replica has never been tested.** The store is PostgreSQL so concurrent
-   replicas are sound in principle, but nothing has run two.
+6. **Scaling past one replica has never been tested.** On PostgreSQL concurrent replicas are sound
+   in principle, but nothing has run two. On SQLite they are not sound at all, which is why the
+   template pins `maxReplicas` to 1 there: two replicas would be two copies of the file.
+9. **A SQLite cold start restores before it serves.** Litestream fetches the newest snapshot and
+   replays up to an hour of WAL before the server listens, which adds to § 7.8's first load. The
+   store is small enough that this was a fraction of a second against a local emulator; it is
+   unmeasured on Azure.
 7. **No CI deploys this.** Deployment is `az` from your own machine with `az login`, so there is no
    stored credential in this repository because there is no automation to hold one. When that
    changes, the right credential is a federated one rather than a stored secret — add it when you
@@ -346,3 +379,61 @@ is not repeated here.
    `GET /api/wake` does not help: the page is the thing being waited on. Two fixes, and neither is
    free of a trade — `minReplicas: 1` costs roughly $34/month, and moving the page to a CDN costs
    nothing and splits the origin (`docs/16-static-site-deployment.md` § 2).
+
+---
+
+## 8. Switching the store to SQLite, and back
+
+[§ D1630](../DECISIONS.md) is the decision. Each step below is a deployment of this template, so
+`what-if` works for each one, and **every deployment must carry every parameter your last one did**
+(`viewerOrigin` above all; see the note at the top of this document).
+
+**1. Build and push an image from a commit that has § D1630**, as in § 3.
+
+**2. Deploy with the copy switched on.** Pass the PostgreSQL password you deployed with. If nobody
+has it, a new one works: the same deployment resets the server's password and writes the URL the
+app copies from, so the two cannot disagree.
+
+```sh
+az deployment group create \
+  --resource-group elevator-sim \
+  --name app \
+  --template-file infra/azure/main.bicep \
+  --parameters @infra/azure/main.parameters.json \
+  --parameters appSecret="$APP_SECRET" databaseAdminPassword="$DB_PASSWORD" \
+               databaseEngine=sqlite importFromPostgres=true
+```
+
+The new revision boots on an empty SQLite file, copies every row out of PostgreSQL in one
+transaction before it serves anything (`packages/server/src/store/importer.ts`), and Litestream
+starts replicating it. A copy that fails rolls back, and the next boot tries again.
+
+**3. Read the one line that says whether it worked:**
+
+```sh
+az containerapp logs show -g elevator-sim -n elevsim-app --tail 300 | grep '\[import\]'
+```
+
+`{"imported":true,"rows":{…}}` with a count for each table is the copy. `destination-has-players`
+on a later boot is the guard doing its job: the store already holds the copy. Then open the boards
+and sign in as a player you know.
+
+**4. Turn the copy off, then delete the server.** Redeploy as in step 2 with `importFromPostgres=false`
+(keep `databaseEngine=sqlite`). The template stops referring to PostgreSQL, but an incremental
+deployment never deletes a resource, so the server keeps billing until you do:
+
+```sh
+az postgres flexible-server list -g elevator-sim --query "[].name" -o tsv
+az postgres flexible-server delete -g elevator-sim -n <that name> --yes
+```
+
+**Going back to PostgreSQL** is `databaseEngine=postgres` and a PostgreSQL password, which deploys a
+server again. It comes up **empty**: nothing copies SQLite into PostgreSQL, because that copy would
+need a transaction on a connection pool, and the seam has none (`importer.ts` says why). Rows written
+after the cutover would have to be moved by hand.
+
+**A brand new deployment with nothing to import** uses `databaseEngine=sqlite allowEmptyDatabase=true`
+for its first deployment, then drops `allowEmptyDatabase`. Without it, a boot that finds no replica
+refuses to start (`infra/entrypoint.sh`), because a lost replica and a new deployment look the same
+from inside the container.
+
