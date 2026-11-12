@@ -186,19 +186,27 @@ jobs:
             projects: --project core
             platform: linux
             runner: ubuntu-latest
-          # **`viz` is two shards, and the first keeps the leg's name on purpose** (§ D1084). The
-          # viz leg was the critical path on nearly every run and its median climbed from 10.2 to
-          # 18.8 minutes between 09-11 and 09-25. Sharding splits its files between two runners and
-          # skips none. The first shard reports as `viz` because the `main-baseline` ruleset
-          # requires a check of that name: a required check that no job reports blocks every pull
-          # request until the owner edits the ruleset, while a renamed shard costs nothing. Shard
-          # balance is unmeasured until the first run; three shards is the fallback.
+          # **`viz` and `viz-browser` are three shards each, and each first shard keeps its leg's name
+          # on purpose** (§ D1084). The first shard reports as `viz` or `browser` because the
+          # `main-baseline` ruleset requires checks of those names: a required check that no job
+          # reports blocks every pull request until the owner edits the ruleset, while a renamed
+          # shard costs nothing; `suite (linux)` covers the rest.
+          #
+          # Two shards by file count were measured lopsided: 32 and 43 minutes of test time in run
+          # 43157297755, and the unsharded browser leg took 16 to 23 minutes on its own and set the
+          # suite's wall clock. `vitest.config.ts` now shards by measured duration
+          # (`infra/checks/testSequencer.mjs`), which packs each project's test time into three
+          # shards within seconds of each other and starts the seven-minute files first.
           - leg: viz
-            projects: --project viz --shard=1/2
+            projects: --project viz --shard=1/3
             platform: linux
             runner: ubuntu-latest
           - leg: viz-2
-            projects: --project viz --shard=2/2
+            projects: --project viz --shard=2/3
+            platform: linux
+            runner: ubuntu-latest
+          - leg: viz-3
+            projects: --project viz --shard=3/3
             platform: linux
             runner: ubuntu-latest
           - leg: experiments
@@ -210,7 +218,17 @@ jobs:
             platform: linux
             runner: ubuntu-latest
           - leg: browser
-            projects: --project viz-browser
+            projects: --project viz-browser --shard=1/3
+            browser: true
+            platform: linux
+            runner: ubuntu-latest
+          - leg: browser-2
+            projects: --project viz-browser --shard=2/3
+            browser: true
+            platform: linux
+            runner: ubuntu-latest
+          - leg: browser-3
+            projects: --project viz-browser --shard=3/3
             browser: true
             platform: linux
             runner: ubuntu-latest
@@ -383,6 +401,12 @@ jobs:
   # `npm run build` stays, for the reason the legs give: it is the typecheck, and a red one arrives
   # here first too. No Chromium, because no file here drives the browser tier and
   # `dev/browserTier.test.ts`, which demands one in CI, is deliberately not on the list.
+  #
+  # **Three cheap checks that used to fail late are here too.** `dev/bundleSize.test.ts` is charter
+  # S9's B2 built without a browser in about three seconds, so a bundle past the 90 % line is red in
+  # a minute rather than after the browser tier's twenty (runs 43162630596 and 43164763071). The
+  # price-multiplication scan and the viewport-gate claims read source and documents only, and each
+  # failed three of the twenty-five most recent red runs from inside a fifteen-minute viz shard.
   guards:
     name: guards
     runs-on: ubuntu-latest
@@ -403,7 +427,7 @@ jobs:
         run: npm run build
 
       - name: Registry, census, wiring and document guards (each also runs in its own leg)
-        run: npx vitest run --passWithNoTests=false --project viz --project experiments packages/viz/src/testCost.test.ts packages/viz/src/boundaries.test.ts packages/viz/src/deadCode.test.ts packages/viz/src/honesty/derive.test.ts packages/viz/src/deepTiers.test.ts packages/viz/src/ciLegs.test.ts packages/viz/src/ciNodeVersion.test.ts packages/viz/src/persist/persist.test.ts packages/viz/src/dev/data.test.ts packages/experiments/src/validation/documentation.test.ts packages/experiments/src/validation/citations.test.ts packages/experiments/src/validation/documentRouting.test.ts packages/experiments/src/validation/ciWorkflowMatrix.test.ts packages/experiments/src/validation/deepTierBuild.test.ts packages/experiments/src/validation/deepTierReport.test.ts packages/experiments/src/validation/blockedBy.test.ts
+        run: npx vitest run --passWithNoTests=false --project viz --project experiments packages/viz/src/testCost.test.ts packages/viz/src/boundaries.test.ts packages/viz/src/deadCode.test.ts packages/viz/src/honesty/derive.test.ts packages/viz/src/deepTiers.test.ts packages/viz/src/ciLegs.test.ts packages/viz/src/ciNodeVersion.test.ts packages/viz/src/persist/persist.test.ts packages/viz/src/dev/data.test.ts packages/viz/src/dev/bundleSize.test.ts packages/viz/src/pricing/pricesAreMultipliedOnlyHere.test.ts packages/viz/src/everyday/viewportGateClaims.test.ts packages/experiments/src/validation/documentation.test.ts packages/experiments/src/validation/citations.test.ts packages/experiments/src/validation/documentRouting.test.ts packages/experiments/src/validation/ciWorkflowMatrix.test.ts packages/experiments/src/validation/deepTierBuild.test.ts packages/experiments/src/validation/deepTierReport.test.ts packages/experiments/src/validation/blockedBy.test.ts
 
   # The single check a branch protection rule can point at, and the reason the leg names above are
   # free to change. `suite (linux)` was one job, then five legs, and since § D1084 it is six legs

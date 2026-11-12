@@ -202,4 +202,31 @@ describe('the guards job and the sharded viz leg — § D1084', () => {
     ).toEqual(Array.from({ length: total }, (_, i) => i + 1));
     expect(matrix, 'an unsharded viz leg runs beside the shards').not.toMatch(/--project viz\s*$/mu);
   });
+
+  /**
+   * The browser tier was split three ways for the same reason as `viz`, and keeps a leg called
+   * `browser` because the ruleset requires that check. Its shards are read the same way: a missing
+   * index is a third of the tier running nowhere.
+   */
+  it('keeps a leg called `browser`, and shards the viz-browser project once each', () => {
+    const text = source();
+    const matrix = text.slice(text.indexOf('include:'), text.indexOf('    steps:'));
+    expect(matrix, 'no leg is named `browser`; the main-baseline ruleset requires that check').toMatch(
+      /^\s+- leg: browser\s*$/mu,
+    );
+    const shards = [...matrix.matchAll(/--project viz-browser --shard=(\d+)\/(\d+)/gu)].map((m) => ({
+      index: Number(m[1]),
+      of: Number(m[2]),
+    }));
+    const total = shards[0]?.of ?? 0;
+    expect(total, 'the viz-browser project is not sharded').toBeGreaterThan(1);
+    expect(shards.every((shard) => shard.of === total), 'the viz-browser shards disagree on how many there are').toBe(true);
+    expect(
+      shards.map((shard) => shard.index).sort((a, b) => a - b),
+      'a viz-browser shard is missing or doubled, so some of its files run nowhere or twice',
+    ).toEqual(Array.from({ length: total }, (_, i) => i + 1));
+    expect(matrix, 'an unsharded viz-browser leg runs beside the shards').not.toMatch(
+      /--project viz-browser\s*$/mu,
+    );
+  });
 });
