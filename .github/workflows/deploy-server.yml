@@ -158,24 +158,36 @@ jobs:
       # Green means the new image is the one serving and the API answers, not that a template
       # deployment was accepted: a revision that fails to start leaves the old one serving and the
       # deployment still reports success.
+      #
+      # The image is read from the latest *ready* revision, never from the one holding the traffic
+      # weight. In single-revision mode the newest revision is given the whole weight the moment it
+      # is created, and the platform keeps routing to the last ready one until the new one passes its
+      # probe. So a revision that never started was named as serving while the previous image answered
+      # 200, and run 43240442300 went green on a crash-looping revision (2026-11-12).
       - name: The new image is serving
         env:
           IMAGE: ${{ steps.last.outputs.server }}/elevator-sim:${{ steps.last.outputs.tag }}
           URL: ${{ steps.deploy.outputs.app_url }}
         run: |
           app=$(az resource list -g "$RG" --resource-type Microsoft.App/containerApps --query "[0].name" -o tsv)
-          for attempt in $(seq 1 40); do
-            image=$(az containerapp revision list -g "$RG" -n "$app" \
-              --query "[?properties.active && properties.trafficWeight > \`0\`] | [0].properties.template.containers[0].image" -o tsv)
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$URL/api/boards" || true)
-            echo "attempt $attempt: serving $image, /api/boards answered $code"
-            if [ "$image" = "$IMAGE" ] && [ "$code" = "200" ]; then
+          # 60 attempts of at most 30 s each: thirty minutes at the outside, inside the job's 45.
+          for attempt in $(seq 1 60); do
+            ready=$(az containerapp show -g "$RG" -n "$app" --query properties.latestReadyRevisionName -o tsv)
+            latest=$(az containerapp show -g "$RG" -n "$app" --query properties.latestRevisionName -o tsv)
+            image=""
+            if [ -n "$ready" ]; then
+              image=$(az containerapp revision show -g "$RG" -n "$app" --revision "$ready" \
+                --query "properties.template.containers[0].image" -o tsv)
+            fi
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$URL/api/boards" || true)
+            echo "attempt $attempt: latest $latest, ready $ready on $image, /api/boards answered $code"
+            if [ "$ready" = "$latest" ] && [ "$image" = "$IMAGE" ] && [ "$code" = "200" ]; then
               az containerapp logs show -g "$RG" -n "$app" --tail 200 2>/dev/null | grep -E '\[import\]|\[entrypoint\]' || true
               echo "LIVE: $IMAGE at $URL"
               exit 0
             fi
             sleep 15
           done
-          echo "::error::the new revision did not start serving within ten minutes. Its last log lines:"
+          echo "::error::the new revision did not become the ready one within thirty minutes. Its last log lines:"
           az containerapp logs show -g "$RG" -n "$app" --tail 100 2>/dev/null || true
           exit 1

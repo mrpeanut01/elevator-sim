@@ -64,6 +64,56 @@ async function populatedPostgres(): Promise<PgliteSql> {
   return sql;
 }
 
+/**
+ * The schema the deployed PostgreSQL held at the first cutover, 2026-11-12: `store.ts` as of
+ * 2026-08-15 (commit c8fd6fa). Three tables do not exist yet and `entries` is keyed by `config_hash`.
+ */
+const SCHEMA_OF_2026_08_15 = `
+CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL,
+  display_name_chosen BOOLEAN NOT NULL DEFAULT FALSE, created_at_ms BIGINT NOT NULL);
+CREATE TABLE sessions (token TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  expires_at_ms BIGINT NOT NULL);
+CREATE TABLE login_tokens (jti TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  expires_at_ms BIGINT NOT NULL);
+CREATE TABLE entries (id TEXT PRIMARY KEY, config_hash TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE, seed TEXT NOT NULL, run_json TEXT NOT NULL,
+  awt_s DOUBLE PRECISION NOT NULL, wt95_s DOUBLE PRECISION NOT NULL, ttd_mean_s DOUBLE PRECISION NOT NULL,
+  pct_over_long_wait DOUBLE PRECISION NOT NULL, submitted_at_ms BIGINT NOT NULL, UNIQUE (config_hash, user_id, seed));
+CREATE TABLE challenges (id TEXT PRIMARY KEY, opens_at_ms BIGINT NOT NULL, closes_at_ms BIGINT NOT NULL,
+  issued_json TEXT NOT NULL);
+CREATE TABLE challenge_entries (id TEXT PRIMARY KEY, challenge_id TEXT NOT NULL REFERENCES challenges (id),
+  data_hash TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  dispatcher_profile_id TEXT NOT NULL, runs INTEGER NOT NULL, legs INTEGER NOT NULL, mean_awt_s DOUBLE PRECISION NOT NULL,
+  mean_wt95_s DOUBLE PRECISION NOT NULL, mean_ttd_mean_s DOUBLE PRECISION NOT NULL,
+  mean_pct_over_long_wait DOUBLE PRECISION NOT NULL, per_seed_json TEXT NOT NULL, submitted_at_ms BIGINT NOT NULL,
+  UNIQUE (challenge_id, data_hash, user_id));
+`;
+
+/** A PostgreSQL store on that older schema, with a player and no leaderboard entry. */
+async function postgresOf20260815(): Promise<PgliteSql> {
+  const sql = track(new PgliteSql());
+  await sql.exec(SCHEMA_OF_2026_08_15);
+  const at = CLOCK - 1_000;
+  await sql.query(
+    'INSERT INTO users (id, email, display_name, display_name_chosen, created_at_ms) VALUES ($1, $2, $3, $4, $5)',
+    ['u1', 'ada@example.test', 'Ada', true, at],
+  );
+  await sql.query('INSERT INTO sessions (token, user_id, expires_at_ms) VALUES ($1, $2, $3)', ['s1', 'u1', CLOCK + 9e6]);
+  await sql.query('INSERT INTO challenges (id, opens_at_ms, closes_at_ms, issued_json) VALUES ($1, $2, $3, $4)', [
+    'c1',
+    at,
+    CLOCK + 1,
+    '{}',
+  ]);
+  await sql.query(
+    'INSERT INTO challenge_entries (id, challenge_id, data_hash, user_id, dispatcher_profile_id, runs, legs, ' +
+      'mean_awt_s, mean_wt95_s, mean_ttd_mean_s, mean_pct_over_long_wait, per_seed_json, submitted_at_ms) ' +
+      'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)',
+    ['ce1', 'c1', 'h', 'u1', 'eta', 3, 900, 20, 55, 75, 0.25, '[]', at],
+  );
+  return sql;
+}
+
 async function count(sql: Sql, table: string): Promise<number> {
   return Number((await sql.query(`SELECT COUNT(*) AS n FROM ${table}`)).rows[0]?.['n']);
 }
@@ -125,6 +175,48 @@ describe('importOnce — § D1630', () => {
     fail = false;
     expect((await importOnce(source, flaky, now)).imported).toBe(true);
     expect(await count(inner, 'chime_entries')).toBe(1);
+  });
+
+  it('copies a source on the schema of 2026-08-15, naming the tables it never had', async () => {
+    const source = await postgresOf20260815();
+    const destination = track(new SqliteSql(':memory:'));
+    const outcome = await importOnce(source, destination, now);
+    expect(outcome).toEqual({
+      imported: true,
+      rows: {
+        users: 1,
+        sessions: 1,
+        login_tokens: 0,
+        challenges: 1,
+        entries: 0,
+        challenge_entries: 1,
+        telemetry_events: 0,
+        chime_entries: 0,
+        rush_entries: 0,
+      },
+      absentFromSource: ['telemetry_events', 'chime_entries', 'rush_entries'],
+    });
+    const store = await Store.open({ sql: destination, now });
+    expect(await store.userByEmail('ada@example.test')).toMatchObject({ id: 'u1', displayName: 'Ada' });
+    expect(await count(destination, 'challenge_entries')).toBe(1);
+  });
+
+  it('stops by name on a row from that schema it has no column for, and copies nothing', async () => {
+    const source = await postgresOf20260815();
+    await source.query(
+      'INSERT INTO entries (id, config_hash, user_id, seed, run_json, awt_s, wt95_s, ttd_mean_s, pct_over_long_wait, ' +
+        'submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+      ['e1', 'h', 'u1', '7', '{}', 21.5, 60.25, 80.125, 0.5, CLOCK - 1_000],
+    );
+    const destination = track(new SqliteSql(':memory:'));
+    await expect(importOnce(source, destination, now)).rejects.toThrow(/entries has 1 row\(s\) with column\(s\).*config_hash/u);
+    expect(await count(destination, 'users')).toBe(1);
+    expect(await count(destination, 'challenge_entries')).toBe(0);
+  });
+
+  it('reports no absent table for a source on this schema', async () => {
+    const outcome = await importOnce(await populatedPostgres(), track(new SqliteSql(':memory:')), now);
+    expect(outcome).toMatchObject({ imported: true, absentFromSource: [] });
   });
 
   it('refuses a PostgreSQL destination, where the copy could not be one transaction', async () => {

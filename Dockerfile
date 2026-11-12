@@ -80,6 +80,16 @@ COPY packages/cli/package.json       packages/cli/
 COPY packages/viz/package.json       packages/viz/
 RUN npm ci --omit=dev && npm cache clean --force
 
+# The system's certificate authorities, which `node:*-slim` does not ship. Node carries its own list,
+# so the server never needed them; Litestream is a Go binary and reads the system's, and without them
+# its first request to Blob Storage fails with `x509: certificate signed by unknown authority`, the
+# entrypoint refuses to start, and the revision never serves. That is how the first SQLite cutover
+# failed on 2026-11-12: § D1630's rehearsal ran against Azurite over plain HTTP, which has no
+# certificate to verify.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 # Compiled output only — no sources, no tests.
 COPY --from=build /app/packages/core/dist        packages/core/dist
 COPY --from=build /app/packages/experiments/dist packages/experiments/dist
