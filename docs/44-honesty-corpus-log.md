@@ -19,6 +19,20 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave BC
+
+**Wave BC moves +9.00 strings a case always-on, with the surface set unchanged.** One lane merged by
+the integrator: escalator carrying capacity ([§ D1632](../DECISIONS.md)), with the bundle budget
+raised beside it ([§ D1633](../DECISIONS.md)). The base is wave BB's row, re-measured on its own head
+and reproduced exactly. The same 80 surfaces speak, so the move is text on existing producers. The
+deep row still names `c181913`.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| base re-measured, wave BB's head `22cd594` | 1 166 523 | 0 against wave BB's row | | 80 |
+| wave BC's head, integrated on `main` | **1 166 964** | **+441** | **+9.00** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
 ## Wave BB
 
 **Wave BB moves +77.00 strings a case always-on, with the surface set unchanged.** One lane: the
