@@ -4,7 +4,7 @@
   "provenance": {
     "kind": "measured",
     "command": "ELEVATOR_SIM_SURVIVORS=deep ELEVATOR_SIM_REGENERATE_SURVIVORS=1 npx vitest run --project viz src/scenario/survivorSweep.test.ts",
-    "tree": "725130ff",
+    "tree": "fa5fdd99",
     "measuredAt": "2026-11-12",
     "masterSeed": 20260910,
     "sampleSize": 12,
@@ -53,7 +53,7 @@
     "unpricedDimensionCount": 0,
     "withheldDimensionCount": 13,
     "declaredDimensionCount": 60,
-    "inputHash": "effa022bcdb0326cf9426c28de600c43bfa554ec22b2e0f8bb85e29bd52251b7"
+    "inputHash": "09e4db7afbcc503967fa024c69d1d2c6b8587e1107d1aecf2e9939f47aa9ad23"
   },
   "scenarios": [
     {
