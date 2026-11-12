@@ -68,7 +68,7 @@ async function count(sql: Sql, table: string): Promise<number> {
   return Number((await sql.query(`SELECT COUNT(*) AS n FROM ${table}`)).rows[0]?.['n']);
 }
 
-describe('importOnce — § D1629', () => {
+describe('importOnce — § D1630', () => {
   it('copies every row of every table, and the store reads it back as it was written', async () => {
     const source = await populatedPostgres();
     const destination = track(new SqliteSql(':memory:'));

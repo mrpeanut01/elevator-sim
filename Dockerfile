@@ -41,7 +41,7 @@ RUN npm run build:web -w @elevator-sim/viz
 
 # --------------------------------------------------------------------------- litestream
 
-# Litestream replicates the SQLite store to Blob Storage (DECISIONS.md § D1629, infra/litestream.yml).
+# Litestream replicates the SQLite store to Blob Storage (DECISIONS.md § D1630, infra/litestream.yml).
 # Fetched in a throwaway stage because the runtime image has no downloader, and checked against the
 # SHA-256 of each release asset, which Litestream does not publish itself: both were taken from the
 # v0.3.13 assets on 2026-11-11. 0.3.13 is the version crop-card runs in production.
@@ -88,7 +88,7 @@ COPY infra/entrypoint.sh /usr/local/bin/elevator-sim-entrypoint
 
 # `node` is a real unprivileged user in the official image. The application tree stays root-owned and
 # read-only to the process that serves it. `/data` is the one writable directory: it holds the SQLite
-# store when ELEVATOR_SIM_DB is a `file:` URL (§ D1629), and nothing when the store is PostgreSQL.
+# store when ELEVATOR_SIM_DB is a `file:` URL (§ D1630), and nothing when the store is PostgreSQL.
 RUN mkdir -p /data && chown node:node /data
 USER node
 

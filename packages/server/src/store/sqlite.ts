@@ -1,5 +1,5 @@
 /**
- * SQLite behind the {@link Sql} seam — § D1629.
+ * SQLite behind the {@link Sql} seam — § D1630.
  *
  * ## Why this exists beside `PgSql`
  *

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { sqlFor } from './connect.js';
 
-describe('sqlFor — § D1629', () => {
+describe('sqlFor — § D1630', () => {
   it('opens a SQLite file for a file: URL', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'elevator-sim-connect-'));
     try {

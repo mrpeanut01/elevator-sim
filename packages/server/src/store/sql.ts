@@ -30,7 +30,7 @@
  * gap it exists to close: the query text `store.ts` writes is the query text PostgreSQL receives,
  * in tests and in production alike. What differs between the two is the transport and nothing else.
  *
- * **Since § D1629 there are two production drivers, and the argument above still holds for both.**
+ * **Since § D1630 there are two production drivers, and the argument above still holds for both.**
  * `SqliteSql` (`sqlite.ts`) runs the same query text, because the store's SQL is now written in the
  * subset both engines parse, and the store's own tests run on each (`testSql.test-helper.ts`). So
  * neither engine is the one *"nothing runs"*: each is the engine a CI run exercises and a deployment
@@ -52,7 +52,7 @@ export interface SqlResult {
 }
 
 /**
- * Which engine is behind the seam — § D1629.
+ * Which engine is behind the seam — § D1630.
  *
  * Read in exactly one place, `store.ts#applyMigrations`, because a migration written before SQLite
  * was supported may use a statement SQLite has no form of (`ADD COLUMN IF NOT EXISTS`). Every query

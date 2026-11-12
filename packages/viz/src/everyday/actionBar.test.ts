@@ -20,6 +20,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ACTION_BAR_ROWS,
+  LOBBY_LEAVE,
+  LOBBY_WAY_OUT,
   actionBarFor,
   confirmStripFor,
   GUIDE_WATCHING_NOTE,
@@ -104,6 +106,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
   {
     screen: 'menu',
     leave: '⌂ Modes',
+    leaveShipsInstead: LOBBY_LEAVE,
     leaveInert: true,
     back: null,
     timeline: null,
@@ -115,6 +118,8 @@ const GUIDE_TABLE: readonly GuideRow[] = [
      */
     primary: ['Pick a scenario', 'Play the career', 'Play the rush'],
     notes: ['Pick a mode above, then play it.'],
+    /* § D1628: the menu is the lobby, and its landings are floors. */
+    shipsInstead: 'Pick a floor above, then play it.',
     inverted: false,
   },
   {
@@ -272,6 +277,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
   {
     screen: 'workshop',
     leave: '⌂ Modes',
+    leaveShipsInstead: LOBBY_LEAVE,
     back: null,
     timeline: null,
     primary: ['Run a day with this'],
@@ -283,6 +289,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
   {
     screen: 'bench',
     leave: '⌂ Modes',
+    leaveShipsInstead: LOBBY_LEAVE,
     back: null,
     timeline: null,
     primary: ['Run the suite', 'Run the suite again'],
@@ -292,15 +299,18 @@ const GUIDE_TABLE: readonly GuideRow[] = [
   {
     screen: 'tuner',
     leave: '⌂ Modes',
+    leaveShipsInstead: LOBBY_LEAVE,
     back: null,
     timeline: null,
     primary: ['Run it and watch'],
+    primaryShipsInstead: [TEST_SIMULATION_LABEL],
     notes: ['Sandbox — this run will not be scored.', 'Scored day — three things are fixed.'],
     inverted: false,
   },
   {
     screen: 'designer',
     leave: '⌂ Modes',
+    leaveShipsInstead: LOBBY_LEAVE,
     back: null,
     timeline: null,
     primary: ['Run a day in it'],
@@ -312,6 +322,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
   {
     screen: 'week',
     leave: '⌂ Modes',
+    leaveShipsInstead: LOBBY_LEAVE,
     back: null,
     timeline: null,
     primary: ["Play today's tower", "Replay today's tower"],
@@ -321,6 +332,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
   {
     screen: 'board',
     leave: '⌂ Modes',
+    leaveShipsInstead: LOBBY_LEAVE,
     back: null,
     timeline: null,
     primary: ["Play today's tower", "Replay today's tower"],
@@ -330,6 +342,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
   {
     screen: 'settings',
     leave: '⌂ Modes',
+    leaveShipsInstead: LOBBY_LEAVE,
     back: null,
     timeline: null,
     primary: ['Back to the modes'],
@@ -404,7 +417,9 @@ describe('the table matches the guide, cell for cell', () => {
       else if (guide.shipsInstead !== undefined) expect(notes, 'note').toEqual([guide.shipsInstead]);
       else expect(notes, 'note').toEqual(guide.notes);
       expect(data.inverted, 'inversion').toBe(guide.emphasisShipsInstead?.inverted ?? guide.inverted);
-      expect(data.wayOut, 'way out').toBe(guide.emphasisShipsInstead === undefined ? guide.wayOut : guide.emphasisShipsInstead.wayOut);
+      /* § D1628: the guide's `⌂ Return to Main Menu` ships as the lobby's way out, on every row that carries it. */
+      const guideWayOut = guide.wayOut === '⌂ Return to Main Menu' ? LOBBY_WAY_OUT : guide.wayOut;
+      expect(data.wayOut, 'way out').toBe(guide.emphasisShipsInstead === undefined ? guideWayOut : guide.emphasisShipsInstead.wayOut);
     });
   }
 
@@ -436,6 +451,31 @@ describe('the table matches the guide, cell for cell', () => {
   });
 
   /**
+   * **The way home says where home is** — [§ D1628](../../../../DECISIONS.md). The guide's left
+   * button reads `⌂ Modes` and its inverted way out `⌂ Return to Main Menu`; the screen both go to
+   * is the lobby, so the build says *Lobby*. Held both ways, as the career's rename is below: the
+   * vendored guide must still carry its own cells, and nothing shipped may still say the old ones.
+   */
+  it('ships Lobby where § 3.3 says Modes and Main Menu, on every row that carries either', () => {
+    const guide = readFileSync(
+      fileURLToPath(
+        new URL('../../../../docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md', import.meta.url),
+      ),
+      'utf8',
+    );
+    for (const cell of ['`⌂ Modes`', '⌂ Return to Main Menu']) {
+      expect(guide, 'the guide has adopted the rename — the deviation has outlived its reason').toContain(cell);
+    }
+    const deviating = GUIDE_TABLE.filter((row) => row.leave === '⌂ Modes');
+    expect(deviating.length).toBeGreaterThan(5);
+    for (const row of deviating) expect(row.leaveShipsInstead).toBe(LOBBY_LEAVE);
+    for (const row of ACTION_BAR_ROWS) {
+      expect(row.leave.label, row.screen).not.toMatch(/Modes/u);
+      expect(row.wayOut ?? '', row.screen).not.toMatch(/Main Menu/u);
+    }
+  });
+
+  /**
    * **The design floor's primary, asserted in both directions** — [§ D1627](../../../../DECISIONS.md).
    *
    * The guide's two cells read *Run a day with this* and *Run a day in it*, which are an invitation
@@ -444,18 +484,18 @@ describe('the table matches the guide, cell for cell', () => {
    * the vendored guide is read and required to still carry its own words: a revision that adopted
    * the ruling turns this red, and the fix is to delete the deviation.
    */
-  it('ships Test simulation where § 3.3 offers a day from the workshop and the drawing board, and nowhere else', () => {
+  it('ships Test simulation where § 3.3 offers a day from the workshop, the tuner and the drawing board, and nowhere else', () => {
     const guide = readFileSync(
       fileURLToPath(
         new URL('../../../../docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md', import.meta.url),
       ),
       'utf8',
     );
-    for (const cell of ['`Run a day with this`', '`Run a day in it`']) {
+    for (const cell of ['`Run a day with this`', '`Run it and watch`', '`Run a day in it`']) {
       expect(guide, 'the guide has adopted the ruling — the deviation has outlived its reason').toContain(cell);
     }
     const deviating = GUIDE_TABLE.filter((row) => row.primaryShipsInstead?.includes(TEST_SIMULATION_LABEL) === true);
-    expect(deviating.map((row) => row.screen)).toEqual(['workshop', 'designer']);
+    expect(deviating.map((row) => row.screen)).toEqual(['workshop', 'tuner', 'designer']);
     for (const row of deviating) expect(row.primaryShipsInstead).toEqual([TEST_SIMULATION_LABEL]);
     /* And nothing the build ships on this bar still offers a day from a bench. */
     for (const row of ACTION_BAR_ROWS) {
@@ -552,7 +592,7 @@ describe('the § 3.3 rules, held over the data rather than the literals', () => 
 
   it('names what is abandoned on every left button — never "Back", never "Exit"', () => {
     for (const row of ACTION_BAR_ROWS) {
-      expect(row.leave.label, keyOf(row.screen, row.ctx)).toMatch(/^(?:⤺ (?:Leave|Stop)|⌂ Modes)/u);
+      expect(row.leave.label, keyOf(row.screen, row.ctx)).toMatch(/^(?:⤺ (?:Leave|Stop)|⌂ Lobby)/u);
     }
   });
 
@@ -599,9 +639,7 @@ describe('the § 3.3 rules, held over the data rather than the literals', () => 
       );
       if (row.inverted) expect(row.wayOut, keyOf(row.screen, row.ctx)).toBeDefined();
     }
-    expect(ACTION_BAR_ROWS.find((row) => row.screen === 'fixit')?.wayOut).toBe(
-      '⌂ Return to Main Menu',
-    );
+    expect(ACTION_BAR_ROWS.find((row) => row.screen === 'fixit')?.wayOut).toBe(LOBBY_WAY_OUT);
   });
 
   it('keeps the guide’s superseded menu cell, and ships a different one', () => {

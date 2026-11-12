@@ -1,5 +1,5 @@
 /**
- * The SQLite driver and the migration runner on SQLite — § D1629.
+ * The SQLite driver and the migration runner on SQLite — § D1630.
  *
  * `migrations.test.ts` stays PostgreSQL's, because it reads PostgreSQL's catalogs; `store.test.ts`
  * and `chimes/ledger.test.ts` run on both engines through the `server-sqlite` project. What is left

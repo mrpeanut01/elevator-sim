@@ -1,5 +1,5 @@
 /**
- * Copy a PostgreSQL store into an empty SQLite one, once — § D1629.
+ * Copy a PostgreSQL store into an empty SQLite one, once — § D1630.
  *
  * ## Why at boot, inside the container
  *

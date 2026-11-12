@@ -1,11 +1,11 @@
 /**
- * The database a URL names — § D1629.
+ * The database a URL names — § D1630.
  *
  * `ELEVATOR_SIM_DB` picks the engine by its scheme, so the choice between the two drivers is a
  * setting and not a code change:
  *
  *   * `postgres://…` or `postgresql://…` is Azure Database for PostgreSQL, or any PostgreSQL, through
- *     `PgSql`. This was the only form until § D1629, and it still works unchanged.
+ *     `PgSql`. This was the only form until § D1630, and it still works unchanged.
  *   * `file:/data/elevator-sim.db` is a SQLite file through `SqliteSql`, replicated to Blob Storage by
  *     Litestream in the shipped container (`infra/litestream.yml`).
  *

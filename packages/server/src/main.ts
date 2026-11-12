@@ -112,7 +112,7 @@ function requireDatabaseUrl(env: Readonly<Record<string, string | undefined>>): 
     throw new Error(
       'ELEVATOR_SIM_DB is not set. It is the database the server uses: a SQLite file, e.g. ' +
         'file:/data/elevator-sim.db, or a PostgreSQL connection string, e.g. ' +
-        'postgres://user:password@host:5432/elevator_sim?sslmode=require (§ D1629). There is deliberately ' +
+        'postgres://user:password@host:5432/elevator_sim?sslmode=require (§ D1630). There is deliberately ' +
         'no default: one pointing at localhost is how an empty database gets mistaken for a live one.',
     );
   }
@@ -386,7 +386,7 @@ export function trustedHopsFrom(env: Readonly<Record<string, string | undefined>
 }
 
 /**
- * The one-time copy from PostgreSQL into SQLite at the cutover — § D1629, `store/importer.ts`.
+ * The one-time copy from PostgreSQL into SQLite at the cutover — § D1630, `store/importer.ts`.
  *
  * Runs before `bootstrap`, so no request is served on a half-copied store. Does nothing unless
  * `ELEVATOR_SIM_IMPORT_FROM` is set, and the importer itself refuses a store that already has

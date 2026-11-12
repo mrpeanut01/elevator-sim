@@ -107,6 +107,8 @@ export const DESIGNER_COPY = Object.freeze({
     'Draw a tower, hang lifts in it, and see what it would feel like to stand in the lobby. ' +
     'Nothing here is scored.',
   saveLabel: 'Save as a new building',
+  /** What a save did, and where the building is played — § D1629. */
+  savedLine: 'Saved. Play a day in it from the Scenario floor, under Your buildings.',
   nameLabel: 'What it is called',
   templatesEyebrow: 'START FROM',
   groupsEyebrow: 'LIFT GROUPS — SHAFTS THAT ANSWER THE SAME BUTTONS',

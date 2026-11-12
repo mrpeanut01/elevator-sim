@@ -19,6 +19,23 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave AZ
+
+**Wave AZ moves +43.00 strings a case always-on, with the surface set unchanged.** One lane: a building
+the player drew is played from the Scenario floor ([§ D1629](../DECISIONS.md)). The base was re-measured
+on `main` at `9211636` and read 1 160 545, not the 1 151 823 wave AY's row published: #658 merged after
+that row was taken and moved it by 8 722, that lane's, not decomposed here. Measured once
+on wave AZ's head after `main` was merged in. The same 80 surfaces speak, so the move is text on existing
+producers: the Scenario hub's *Your buildings*, and the bar's test simulation and lobby cells. The deep
+row still names `c181913` until the first nightly after wave AZ merges.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| wave AY's row, as published (`398eed9`) | 1 151 823 | | | 80 |
+| base re-measured, `main` at `9211636` (#658) | 1 160 545 | +8 722 | | 80 |
+| wave AZ's head, `main` merged in | **1 162 652** | **+2 107** | **+43.00** | 80, **same set** |
+| cases · simulations · failing cases | 49 · 606 · 0 | **unmoved** | | |
+
 ## Wave AY
 
 **Wave AY moves +1 657.45 strings a case always-on, with the surface set unchanged.** One lane, the

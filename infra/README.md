@@ -3,7 +3,7 @@
 One Container App serving the viewer and the API from a single origin, its store behind it, and
 Communication Services for the one mail this product sends.
 
-> **The store has two engines since [§ D1629](../DECISIONS.md), chosen by `databaseEngine`.**
+> **The store has two engines since [§ D1630](../DECISIONS.md), chosen by `databaseEngine`.**
 > `postgres` (the default, so an existing deployment redeploys unchanged) is the PostgreSQL flexible
 > server this document always described, at a fixed ≈ $17 a month. `sqlite` is a file on the
 > container, replicated to Blob Storage by Litestream, which removes that floor. § 8 is the switch,
@@ -294,7 +294,7 @@ app bills only while serving, and the $17 is the database — which is a resourc
 a SKU named in the same file. That is the criterion `docs/15` § 4 says the compute-offload contract
 should have had and did not.
 
-### With `databaseEngine: 'sqlite'` (§ D1629)
+### With `databaseEngine: 'sqlite'` (§ D1630)
 
 The database floor above goes away. What replaces it is a storage account, billed by capacity and by
 operation, and the operations are the line to watch:
@@ -384,11 +384,11 @@ is not repeated here.
 
 ## 8. Switching the store to SQLite, and back
 
-[§ D1629](../DECISIONS.md) is the decision. Each step below is a deployment of this template, so
+[§ D1630](../DECISIONS.md) is the decision. Each step below is a deployment of this template, so
 `what-if` works for each one, and **every deployment must carry every parameter your last one did**
 (`viewerOrigin` above all; see the note at the top of this document).
 
-**1. Build and push an image from a commit that has § D1629**, as in § 3.
+**1. Build and push an image from a commit that has § D1630**, as in § 3.
 
 **2. Deploy with the copy switched on.** Pass the PostgreSQL password you deployed with. If nobody
 has it, a new one works: the same deployment resets the server's password and writes the URL the

@@ -27,11 +27,12 @@
  *
  * The two presses:
  *
- * - **Save as a new building** — `host.applyTowerPlan`, which allocates an id, runs the drawn
- *   document through the real loader, and stands the next run on it through `withBuilding`. It does
- *   not run.
- * - **Run a day in it** (§ 3.3's primary, which is the shell's button) — the same apply, then
- *   `startRun`, then `go('stage')`.
+ * - **Save as a new building** — `host.saveBuilding`, which allocates an id, runs the drawn
+ *   plan through the real loader and puts it on the shelf. It does not run and does not move
+ *   the player's week ([§ D1629](../../../../DECISIONS.md)); the building is played from the
+ *   Scenario floor's *Your buildings*.
+ * - **Run a day in it** (§ 3.3's primary, which is the shell's button) — `host.runSandbox` with the
+ *   drawn tower, then `go('stage')`: a sandbox day in it over the week and never on it (§ D1363).
  *
  * A plan the loader refuses throws out of the apply. The refusal is drawn where the reader is: the
  * warning card says what the engine will not build *before* the press, in the engine's own words,
@@ -1819,8 +1820,9 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 
   function applyAndReport(): string | undefined {
     try {
-      const id = context.host.applyTowerPlan(plan);
-      savedLine = `Saved as ${id}. The next run stands on it.`;
+      /* § D1629: saving saves. The week stays where it is, and the building is played from Scenario. */
+      const id = context.host.saveBuilding(plan);
+      savedLine = COPY.savedLine;
       return id;
     } catch (error) {
       /* The loader's own refusal, quoted. */

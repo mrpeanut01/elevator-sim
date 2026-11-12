@@ -71,7 +71,7 @@ import { everydayAccount, onEverydayAccount } from './accountPort.js';
 import { everydayProfileStore } from './profileStore.js';
 import { REDUCED_MOTION_QUERY } from '../dev/motion.js';
 import { engineerSettings } from './engineerBridge.js';
-import { floorDirection, floorOfScreen, gameFloorOf, type GameFloorKey } from './floors.js';
+import { floorDirection, floorKeyOf, floorOfScreen, gameFloorOf, type GameFloorKey } from './floors.js';
 import { LOBBY_GROUND, mountLobby } from './lobbyScreen.js';
 import { filedDaysOf, tutorialIsDue } from './tutorialModel.js';
 import {
@@ -243,7 +243,7 @@ const BAR_REASON_ID = 'everyday-bar-reason';
  * only that the cell is inert. Why it is inert is a fact about standing on the screen the cell
  * names, which is the shell's to know.
  */
-const MENU_LEAVE_REASON = 'You are on the main menu — this is the screen it goes to.';
+const MENU_LEAVE_REASON = 'You are in the lobby. This is the screen it goes to.';
 
 /**
  * Above every overlay the Engineer surface raises.
@@ -487,6 +487,20 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     'min-width:0',
   ].join(';');
 
+  /*
+   * The floor the player is on, beside the drawer's toggle — § D1629. On a phone the shaft is in the
+   * drawer, so without this the building's one idea, *you are on a floor*, is out of sight until the
+   * drawer is opened. Written by {@link drawRail} from the same model the tray draws.
+   */
+  const floorChip = el(doc, 'span', 'everyday-floor-chip');
+  floorChip.style.cssText = [
+    'display:inline-flex',
+    'align-items:center',
+    'gap:7px',
+    'min-width:0',
+    `font:600 14px ${TYPE.heading}`,
+    `color:${C.ink}`,
+  ].join(';');
   const railToggle = el(doc, 'button', 'everyday-rail-toggle', RAIL_DRAWER_COPY.open);
   railToggle.type = 'button';
   railToggle.setAttribute('aria-controls', RAIL_DRAWER_ID);
@@ -502,7 +516,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     'cursor:pointer',
     'flex:none',
   ].join(';');
-  narrowHeader.append(railToggle);
+  narrowHeader.append(railToggle, floorChip);
 
   /*
    * The scrim, which is what makes the open drawer dismissible by the gesture everybody already
@@ -526,10 +540,11 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     'overflow-y:auto',
     `background:${C.ink}`,
     `color:${C.paper}`,
-    'padding:18px 14px',
+    'padding:14px 14px 12px',
     'display:flex',
     'flex-direction:column',
-    `gap:${String(GAP.section)}px`,
+    /* § D1629: the whole building, a career's rooms included, in an 800 px window. */
+    'gap:9px',
     'box-sizing:border-box',
   ].join(';');
   /** Docked: an ordinary grid item in {@link FULL}'s first column. */
@@ -864,6 +879,22 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   /* `Escape` dismisses it, on § D188's precedent for the Engineer drawer — same gesture, same shell. */
   doc.addEventListener('keydown', (event: KeyboardEvent) => {
     if (event.key === 'Escape' && narrow === true && drawerOpen) setDrawer(false);
+    /*
+     * **A floor's own key rides to it** — § D1629: `3`, `2`, `1`, `M`, `L`, `B`, the plates the tray
+     * draws. Only a bare key, only while this shell has the page, never while the player is typing
+     * into a control, and never on the stage, whose keys are the run's.
+     */
+    if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+    if (world !== 'everyday' || state.screen === 'stage') return;
+    const target = event.target;
+    if (target instanceof HTMLElement && target.closest('input,textarea,select,[contenteditable="true"]') !== null) return;
+    const key = floorKeyOf(event.key);
+    if (key === undefined) return;
+    const floor = gameFloorOf(key);
+    event.preventDefault();
+    if (floor.key === 'L') requestLeave();
+    else if (floor.pick !== undefined) rideToMode(floor.pick, floor.screen);
+    else go(floor.screen);
   });
 
   /*
@@ -1790,6 +1821,27 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     | undefined;
   let railCarTop: number | undefined;
   let railCarFloor: GameFloorKey | undefined;
+  /** Every floor's button in the tray as last drawn, so the car can be pointed at one. */
+  const railAnchors = new Map<GameFloorKey, HTMLElement>();
+
+  /**
+   * **Point the tray's car at a floor without going there** — § D1629. The lobby's landings call
+   * this as the pointer or the focus moves over them, so on a wide screen there is one shaft and it
+   * is the tray's: the car glides to the floor being considered and back to L when nothing is.
+   * Nothing about where the player *is* moves: `aria-current`, the subline and the state are
+   * untouched, and the next {@link drawRail} puts the car where the state says.
+   */
+  function previewRailCar(floor: GameFloorKey | undefined): void {
+    if (railCar === undefined) return;
+    const target = floor === undefined ? railCar.anchor : (railAnchors.get(floor) ?? railCar.anchor);
+    if (target.offsetParent === null) return;
+    const top = target.offsetTop + Math.round((target.offsetHeight - RAIL_CAR_PX) / 2);
+    const glide = motionAllowed() ? 'top 220ms cubic-bezier(.3,.85,.3,1)' : 'none';
+    railCar.car.style.transition = glide;
+    railCar.rope.style.transition = glide.replace('top', 'height');
+    railCar.car.style.top = `${String(top)}px`;
+    railCar.rope.style.height = `${String(top)}px`;
+  }
 
   /**
    * Stand the tray's car at its floor, gliding there when the floor has just changed.
@@ -2042,8 +2094,56 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     hoist.append(rope, car);
 
     const floorList = el(doc, 'div');
-    floorList.style.cssText = 'position:relative;flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:4px';
+    floorList.style.cssText = 'position:relative;flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:3px';
+    /*
+     * **The machine room, over the top floor** — § 3.2's *Switch to Engineer*, and the one stop on
+     * this shaft that is not a navigation: it hands the whole page to the other shell. It was a row
+     * at the tray's foot; it is the building's roof now ([§ D1629](../../../../DECISIONS.md)), so
+     * the Engineer surface is somewhere in the building and not beside it. The car never stands
+     * here, because the page it opens is not this shell's. Its note is drawn, not left on `title`,
+     * on the mode tiles' own argument that a tooltip is not a sentence a player reads.
+     */
+    const swap = el(doc, 'button', 'everyday-engineer-swap');
+    swap.type = 'button';
+    swap.style.cssText = [
+      'display:grid',
+      'grid-template-columns:20px minmax(0,1fr)',
+      'align-items:center',
+      'column-gap:9px',
+      'width:100%',
+      'box-sizing:border-box',
+      'text-align:left',
+      'background:transparent',
+      `border:1px dashed ${RAIL_SURFACE.edge}`,
+      'border-radius:10px',
+      'padding:5px 10px 6px 6px',
+      `color:${C.fainter}`,
+      'cursor:pointer',
+    ].join(';');
+    const swapPlate = el(doc, 'span', undefined, 'E');
+    swapPlate.setAttribute('aria-hidden', 'true');
+    swapPlate.style.cssText = [
+      'flex:none',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'width:20px',
+      'height:20px',
+      'border-radius:4px',
+      `border:1px solid ${RAIL_SURFACE.edge}`,
+      `color:${C.fainter}`,
+      `font:500 11px ${TYPE.mono}`,
+    ].join(';');
+    const swapLabel = el(doc, 'span', undefined, model.footer.engineerSwap.label);
+    swapLabel.style.cssText = `display:block;min-width:0;font:600 12.5px ${TYPE.heading}`;
+    const swapNote = el(doc, 'span', undefined, model.footer.engineerSwap.note);
+    swapNote.style.cssText = `grid-column:1 / -1;display:block;font-size:9.5px;line-height:1.3;font-weight:400;color:${C.label};margin-top:3px`;
+    swap.append(swapPlate, swapLabel, swapNote);
+    swap.addEventListener('click', enterEngineer);
+    floorList.append(swap);
+
     let anchor: HTMLElement | undefined;
+    railAnchors.clear();
     for (const floor of model.shaft.floors) {
       const block = el(doc, 'div');
       const open = floor.unavailable === undefined;
@@ -2098,6 +2198,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
         text.append(why);
       }
       header.append(plate, text);
+      railAnchors.set(floor.key, header);
       if (open) {
         header.addEventListener('click', () => {
           if (floor.key === 'L') requestLeave();
@@ -2167,6 +2268,11 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       rail.append(banked);
     }
 
+    const here = model.shaft.floors.find((floor) => floor.here);
+    const chipPlate = el(doc, 'span', undefined, here?.key ?? '');
+    chipPlate.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${C.sun};font:500 11px ${TYPE.mono}`;
+    floorChip.replaceChildren(chipPlate, doc.createTextNode(here?.name ?? ''));
+
     railCar = anchor === undefined ? undefined : { car, rope, leaves, anchor };
     placeRailCar(model.shaft.car);
 
@@ -2181,7 +2287,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      * rows passing under it do not show through.
      */
     const footer = el(doc, 'div', 'everyday-rail-footer');
-    footer.style.cssText = `margin-top:auto;padding-top:18px;position:sticky;bottom:0;background:${C.ink}`;
+    footer.style.cssText = `margin-top:auto;padding-top:8px;position:sticky;bottom:0;background:${C.ink}`;
 
     const card = el(doc, 'div', 'everyday-identity');
     card.style.cssText = `border-radius:${String(R.well)}px;background:${RAIL_SURFACE.card};padding:11px 12px`;
@@ -2264,36 +2370,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     }
     footer.append(settingsRow);
 
-    /*
-     * § 3.2's last row, and the one control on this rail that is not a navigation: it hands the
-     * whole page to the other shell. It is drawn like the Settings row above it rather than like a
-     * mode tile, because it is chrome — and its note is drawn rather than left on `title`, on the
-     * mode tiles' own argument that a tooltip is not a sentence a player reads. The note is not a
-     * refusal; it is the two facts the label cannot carry.
-     */
-    const swap = el(doc, 'button', 'everyday-engineer-swap');
-    swap.type = 'button';
-    swap.style.cssText = [
-      'width:100%',
-      'box-sizing:border-box',
-      'text-align:left',
-      'margin-top:9px',
-      'background:transparent',
-      `border:1px solid ${RAIL_SURFACE.edge}`,
-      `border-radius:${String(R.control)}px`,
-      'padding:7px 10px',
-      'font-size:11.5px',
-      'font-weight:600',
-      `color:${C.fainter}`,
-      'cursor:pointer',
-    ].join(';');
-    const swapLabel = el(doc, 'span', undefined, model.footer.engineerSwap.label);
-    swapLabel.style.cssText = 'display:block';
-    const swapNote = el(doc, 'span', undefined, model.footer.engineerSwap.note);
-    swapNote.style.cssText = `display:block;font-size:10px;font-weight:400;color:${C.label};margin-top:2px`;
-    swap.append(swapLabel, swapNote);
-    swap.addEventListener('click', enterEngineer);
-    footer.append(swap);
     rail.append(footer);
   }
 
@@ -2924,6 +3000,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       },
       firstVisit: () => (dataHost === undefined ? undefined : firstVisitOf(dataHost)),
       continueTile,
+      pointTray: previewRailCar,
     });
   }
 

@@ -320,7 +320,7 @@ export function unbuiltReasonFor(screen: EverydayScreen): string {
  * picked one tab would be the rail's two-entries defect in a title.
  */
 export const SCREEN_NAMES: Readonly<Record<EverydayScreen, string>> = Object.freeze({
-  menu: 'Main menu',
+  menu: 'Lobby',
   landing: 'What this is',
   tutorial: 'How this works',
   collapse: 'Watch it come apart',

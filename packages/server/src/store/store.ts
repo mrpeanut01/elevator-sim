@@ -32,7 +32,7 @@
  * driver is injected rather than constructed here so that the tests can run the *same SQL* against
  * an in-process PostgreSQL — see `sql.ts` for why that mattered enough to justify a seam.
  *
- * **And since § D1629 it may be `node:sqlite` again, without going back.** The store's container
+ * **And since § D1630 it may be `node:sqlite` again, without going back.** The store's container
  * filesystem still does not outlive the container, so the SQLite file is restored from, and
  * replicated to, Blob Storage by Litestream (`infra/entrypoint.sh`). Every query below is written in
  * the subset of SQL both engines parse, and the five board queries that used PostgreSQL's
@@ -481,7 +481,7 @@ function isUniqueViolation(error: unknown): boolean {
 export interface StoreOptions {
   /**
    * The database: `SqliteSql` or `PgSql` in a real server, chosen by `store/connect.ts#sqlFor`
-   * (§ D1629), and `PgliteSql` or `SqliteSql` in a test. The SQL is identical on all of them.
+   * (§ D1630), and `PgliteSql` or `SqliteSql` in a test. The SQL is identical on all of them.
    */
   readonly sql: Sql;
   /** Milliseconds since the epoch. Injected so a test can decide what "now" is. */
@@ -515,7 +515,7 @@ export class Store {
    * store whose first query fails, which is a worse bargain than one `await`.
    */
   static async open(options: StoreOptions): Promise<Store> {
-    // No `PRAGMA foreign_keys = ON` here: PostgreSQL always enforces references, and since § D1629
+    // No `PRAGMA foreign_keys = ON` here: PostgreSQL always enforces references, and since § D1630
     // `SqliteSql` switches them on when it connects, so the guarantee belongs to each driver rather
     // than to a line in this method that only one engine would understand.
     await applyMigrations(options.sql, options.now);
@@ -936,7 +936,7 @@ export class Store {
    * ordering picks the row; the outer ordering ranks the board.
    *
    * **A window rather than `DISTINCT ON`, which this query used from the PostgreSQL port until
-   * § D1629**, because `DISTINCT ON` is PostgreSQL's alone and the query has to be the same text on
+   * § D1630**, because `DISTINCT ON` is PostgreSQL's alone and the query has to be the same text on
    * SQLite. The rows are the same, with one difference that is a repair: `DISTINCT ON` picked an
    * arbitrary row between two of one player's runs tied on the metric *and* the submission
    * millisecond, and the window breaks that tie on `id`, so the board is now determinate there too.
@@ -1649,7 +1649,7 @@ export class Store {
       // A real `BOOLEAN`, so this is the column's own value rather than a comparison against the
       // integer 1. Coerced rather than cast because the two drivers are entitled to disagree about
       // whether that arrives as `true` or as `'t'`.
-      // A boolean from `pg` and PGlite, and the `1` SQLite stores for one (§ D1629).
+      // A boolean from `pg` and PGlite, and the `1` SQLite stores for one (§ D1630).
       displayNameChosen:
         row['display_name_chosen'] === true || row['display_name_chosen'] === 't' || row['display_name_chosen'] === 1,
       createdAtMs: Number(row['created_at_ms']),
@@ -2029,7 +2029,7 @@ interface Migration {
    */
   readonly sql: string;
   /**
-   * What SQLite runs instead, where the PostgreSQL text has no SQLite form — § D1629.
+   * What SQLite runs instead, where the PostgreSQL text has no SQLite form — § D1630.
    *
    * Absent means SQLite runs {@link sql} as written, which every migration should aim for. Present
    * only on the four `ALTER TABLE … ADD COLUMN IF NOT EXISTS` steps, which SQLite cannot parse, and
@@ -2333,7 +2333,7 @@ async function ensureRegister(sql: Sql): Promise<void> {
     await sql.exec(MIGRATIONS_TABLE);
   } catch (error) {
     // Asked by reading the table rather than the catalog, so the question is the same text on both
-    // engines (§ D1629): a read of a missing table fails, and the original error is the one to raise.
+    // engines (§ D1630): a read of a missing table fails, and the original error is the one to raise.
     try {
       await sql.query('SELECT 1 FROM schema_migrations LIMIT 1');
     } catch {

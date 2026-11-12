@@ -1,7 +1,7 @@
 // Hosting the elevator simulator on Azure: one Container App serving the viewer and the API, its
 // store behind it, and Communication Services for the one mail this product sends.
 //
-// ## The store, and the switch between its two engines (DECISIONS.md § D1629)
+// ## The store, and the switch between its two engines (DECISIONS.md § D1630)
 //
 // `databaseEngine` picks it. `'postgres'` is a PostgreSQL flexible server, as this template has always
 // deployed; it is the default so that redeploying an existing installation changes nothing. `'sqlite'`
@@ -53,7 +53,7 @@ Generate one with: openssl rand -base64 48
 param appSecret string
 
 @description('''
-Which store the app runs on — DECISIONS.md § D1629. `postgres` (the default, and what every existing
+Which store the app runs on — DECISIONS.md § D1630. `postgres` (the default, and what every existing
 deployment runs) is a PostgreSQL flexible server. `sqlite` is a file replicated to Blob Storage by
 Litestream, at pennies a month, and pins the app to one replica, because SQLite has one writer.
 Switching an existing deployment to `sqlite` is infra/README.md § 8: do it with `importFromPostgres`.
@@ -282,7 +282,7 @@ resource commsRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 
 // --------------------------------------------------------------------------- database
 
-// The SQLite store's replica (§ D1629). Locally redundant and Hot: the replica is a backup of a file
+// The SQLite store's replica (§ D1630). Locally redundant and Hot: the replica is a backup of a file
 // that also lives on the container, so a second region's copy is a cost without a reader, and Cool
 // would bill every restore's reads. No blob versioning: Litestream keeps its own 24 hours of history,
 // and versions of WAL segments it deletes were most of what made crop-card's equivalent account
@@ -501,7 +501,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             // container carrying exactly one user-assigned identity still has to be told which.
             { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
           ], useSqlite ? [
-            // Read by infra/litestream.yml through infra/entrypoint.sh (§ D1629).
+            // Read by infra/litestream.yml through infra/entrypoint.sh (§ D1630).
             { name: 'AZURE_STORAGE_ACCOUNT', value: storage!.name }
             { name: 'AZURE_STORAGE_KEY', secretRef: 'storage-key' }
             { name: 'AZURE_BLOB_CONTAINER', value: litestreamContainerName }
@@ -563,7 +563,7 @@ output sameOrigin bool = empty(viewerOrigin)
 @description('The PostgreSQL host, for psql or a migration. Empty when no PostgreSQL server is deployed.')
 output postgresFqdn string = deployPostgres ? postgres!.properties.fullyQualifiedDomainName : ''
 
-@description('Which store the app runs on, and the storage account holding its replica when that is SQLite (§ D1629).')
+@description('Which store the app runs on, and the storage account holding its replica when that is SQLite (§ D1630).')
 output databaseEngine string = databaseEngine
 output replicaStorageAccount string = useSqlite ? storage!.name : ''
 

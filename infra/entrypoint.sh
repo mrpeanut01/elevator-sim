@@ -1,5 +1,5 @@
 #!/bin/sh
-# The container's first process — DECISIONS.md § D1629.
+# The container's first process — DECISIONS.md § D1630.
 #
 # PostgreSQL (`ELEVATOR_SIM_DB=postgres://…`): run the server, exactly as before this file existed.
 #

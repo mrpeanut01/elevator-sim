@@ -1,5 +1,5 @@
 /**
- * `ledger.test.ts` again, on SQLite — § D1629. Every case in it runs here against `SqliteSql`, so the
+ * `ledger.test.ts` again, on SQLite — § D1630. Every case in it runs here against `SqliteSql`, so the
  * store's SQL is checked on the engine production uses as well as on PostgreSQL. See
  * `store/testSql.test-helper.ts` for why this is a file that imports a suite.
  */

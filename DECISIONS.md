@@ -55628,6 +55628,8 @@ under the pass R11 amendment 5 wrote.
 
 ## D1627 — every way to play is a floor: the tray is a shaft, a floor is one press, and motion never gates a selection
 
+> **Status 2026-11-11: AMENDED by [§ D1629](#d1629)** (the product owner). What this entry named as owed, a drawn building entered from a mode's floor, is built as the Scenario floor's *Your buildings*. *Tune the tower* now carries the *Test simulation* label, the bar's way home reads *Lobby*, and the Engineer swap is a stop on the shaft.
+>
 > **Status 2026-11-11: AMENDED by [§ D1628](#d1628)** (the product owner). The floors, the shaft, the motion rule and the test simulation stand. The lobby and the main menu, which this entry kept as two screens, are one; the *Elevator hall* row, the Engineer key and *Skip the lobby* are gone. See [`docs/39`](docs/39-decisions-in-force.md).
 
 > **Taken 2026-11-11 by the product owner**, as a direction to redesign the Everyday navigation, and
@@ -55784,7 +55786,71 @@ visit sees the front door and nothing else until it presses.
 **Numbers spent.** Wave AX took the charter row's **D1628** and moved the row to D1629; nothing is
 holed.
 
-## D1629 — the store runs on SQLite or PostgreSQL behind one seam, and the URL picks the engine
+## D1629 — a building you drew is played from the Scenario floor, saving only saves, and the building's loose ends are closed
+
+> **Taken 2026-11-11 by the product owner** ("continue with all of it, starting with playing your own
+> building"), against the list of outstanding work this session reported after [§ D1628](#d1628)
+> merged, and built the same day by the same session (wave AZ, a single lane). The owner added that
+> the gameplay is to be revamped later, so this entry builds the function and leaves its rules
+> plain. **Amends [§ D1627](#d1627)**, which named *a drawn building entered from a mode's floor* as
+> owed. **Owner-reversible**, clause by clause.
+
+**Why an entry.** It moves what *Save* does to a player's week, changes what a sandbox day leaves on
+the shelf, renames cells of the handoff's § 3.3 table, and moves the Engineer swap, none of which
+one module owns.
+
+**What is ruled.**
+
+1. **Your buildings.** The Scenario floor lists the buildings the player saved on the Design floor
+   (`scenarioModel.ts#ownBuildingsViewOf`), newest first, each with one press, *Play a day*. The
+   press is `EverydayHost.playOwnBuilding`, which stands the week on the building through
+   `withBuilding` and opens its brief; the day is then the daily flow's own, brief to report.
+2. **A day there is the player's own.** A drawn tower belongs to no authored scenario, so its week
+   carries `SANDBOX_CONTRACT_ID`, as § D1368's history already had it: the week the player left is
+   parked and not ended, the day is judged on the tower's rung and filed to that week's history, and
+   **nothing is banked**: no board, no streak, no chimes (`host.ts#fileScenarioDay` returns before
+   any award where `contractById` answers nothing). The list says so in one sentence, and
+   `scenarioModel.test.ts` holds the sentence.
+3. **Saving only saves.** The designer's *Save as a new building* was `applyBuildingSpec`, which
+   also moved the player's week onto the drawn tower. It is `saveBuilding` now and writes the shelf
+   alone; `applyBuildingSpec` is deleted. The saved line says where the building is played.
+4. **A test leaves no building on the shelf.** `sandbox.ts#SandboxBefore` keeps `savedBuildings`,
+   so the copy a test simulation or *Tune the tower* ran in goes when the sandbox ends. It used to
+   stay, which was harmless while nothing listed the shelf. A building is on the list because the
+   player pressed *Save*.
+5. **Every sandbox press carries one label.** *Tune the tower*'s primary reads *Test simulation*
+   too, since it has only ever run a sandbox day since § D1451. A test started from a bench names
+   its stage's primary *See the results* where a played day reads *Close the day*.
+6. **The way home says Lobby.** The bar's left button reads *⌂ Lobby* and the inverted way out
+   *⌂ Return to the lobby*, where the guide's cells read *⌂ Modes* and *⌂ Return to Main Menu*;
+   `SCREEN_NAMES.menu`, the report's secondary and the walkthrough's last note follow.
+7. **One shaft on the lobby.** On a wide screen the lobby no longer draws a hoistway of its own:
+   pointing at a landing glides the tray's car (`shell.ts#previewRailCar`), which changes nothing
+   about where the player is. On a narrow screen the tray is in the drawer, so the lobby keeps its
+   own, and the narrow header carries the floor the player is on beside the drawer's toggle.
+8. **A floor's plate is its key.** `3`, `2`, `1`, `M`, `L` and `B` ride to their floors on a bare
+   key press (`floors.ts#floorKeyOf`), never while typing into a control and never on the stage.
+9. **The Engineer surface is a stop on the shaft.** *Switch to Engineer* moves from the tray's foot
+   to the top of the building, with its note still drawn. The car never stands there, because the
+   page it opens is the other shell's. The Engineer shell's own menu is unchanged.
+
+**What is not built, named.** *Your buildings* is not `docs/38` § 2.1's whole *Build your own*: a
+saved building carries no goal of its own, no budget and no survivor count, it cannot be shared, and
+all of a player's buildings share one week. Those wait on the gameplay revamp the owner announced.
+A saved building cannot be renamed or removed from Everyday. And the first-visit question § D1628
+recorded is still the owner's to rule.
+
+**Held by** `everyday/ownBuilding.browser.test.ts` (save does not move the week, the brief names the
+building, a test alone lists nothing), `everyday/scenarioModel.test.ts`,
+`everyday/attemptDoors.test.ts` (both new doors refuse while a scored attempt stands and write when
+free), `shift/reportWindow.test.ts` (the id movers, with *Save* no longer among them),
+`everyday/floors.test.ts` (the keys, the test bar) and `everyday/actionBar.test.ts` (each renamed
+cell as a deviation, read against the vendored guide both ways).
+
+**Numbers spent.** Wave AZ took the charter row's **D1629** and moved the row to D1630; nothing is
+holed.
+
+## D1630 — the store runs on SQLite or PostgreSQL behind one seam, and the URL picks the engine
 
 > **Taken 2026-11-11 by the product owner** ("plan it and build the PR … move it to a connection
 > handler so that a change back later will not be as difficult"), after the Azure invoice for October
@@ -55855,5 +55921,5 @@ PGlite over the PostgreSQL wire protocol through `pg`: a refused empty boot, a f
 replicated, a restore after the disk was wiped, and a cutover copy whose `BIGINT` strings landed as
 integers.
 
-**Numbers spent.** This session took the charter row's **D1629** and moved the row to D1630; nothing
+**Numbers spent.** This session took the charter row's **D1630** and moved the row to D1631; nothing
 is holed.

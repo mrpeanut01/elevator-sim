@@ -1,4 +1,4 @@
-# Litestream: the SQLite store replicated to Blob Storage — DECISIONS.md § D1629.
+# Litestream: the SQLite store replicated to Blob Storage — DECISIONS.md § D1630.
 #
 # Read by infra/entrypoint.sh, and only when ELEVATOR_SIM_DB is a `file:` URL and the storage
 # settings are present. The three ${…} values come from the Container App's environment

@@ -1,5 +1,5 @@
 /**
- * The database a store test runs against — § D1629.
+ * The database a store test runs against — § D1630.
  *
  * PostgreSQL (PGlite) by default. A `*.sqlite.test.ts` file calls {@link useTestEngine} with
  * `'sqlite'` and then imports a suite, so the same cases run on SQLite inside the `server` project
