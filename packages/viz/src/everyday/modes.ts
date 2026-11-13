@@ -88,7 +88,7 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
     screen: 'scenario' as const,
     pick: 'scenario' as const,
     title: 'Scenario',
-    blurb: 'A building with something wrong with it. Watch it, read the letter, and fix it.',
+    blurb: 'Fix a building with something wrong with it.',
     /*
      * The session shape is **composed once**, in `everyday/sittingShape.ts`, from the shipped
      * content's own span divided by the rung the stage opens on. It read *"~3-5 min a case"* until
@@ -99,7 +99,7 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
      */
     shape: SITTING_SHAPES.scenarioMode,
     unavailable: unlessBuilt(
-      'the scenarios run, but the screen that lists them is not built yet',
+      'The scenario list is not built yet.',
       'scenario',
       'door',
       'fixit',
@@ -117,10 +117,10 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
     screen: 'towers' as const,
     pick: 'campaign' as const,
     title: 'Career',
-    blurb: 'Clear days, spend units, keep the contracts you signed.',
+    blurb: 'Clear days, spend units and keep your contracts.',
     shape: SITTING_SHAPES.careerMode,
     unavailable: unlessBuilt(
-      'the career runs, but its Everyday screens are not built yet',
+      'The career screens are not built yet.',
       'towers',
       'building',
       'contract',
@@ -149,7 +149,7 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
     blurb: 'One climbing day until the building stops draining.',
     shape: SITTING_SHAPES.rushMode,
     unavailable: unlessBuilt(
-      'not built yet — the rush setup screen draws, but nothing behind it generates the climb',
+      'Rush is not built yet.',
       'rush',
     ),
   }),

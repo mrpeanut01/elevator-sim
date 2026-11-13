@@ -81,8 +81,8 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    * is held back until a player asks for it, so the list no longer promises one on every case.
    */
   railHint:
-    'Each one is a real building with one thing wrong. Decide what to spend, put it right, and the ' +
-    'tenants stop writing letters. The diagnosis is there if you ask for it.',
+    'Each building has one thing wrong. Decide what to spend and put it right. The diagnosis ' +
+    'is there if you ask for it.',
   complaintEyebrow: 'THE COMPLAINT',
   asBuiltEyebrow: 'THE BUILDING AS IT STANDS',
   /*
@@ -93,7 +93,7 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    */
   asBuiltStageEyebrow: 'WATCH IT AS IT STANDS',
   asBuiltStageNote:
-    'The morning the letter is about, as the building runs today. The four figures below are read from this run and no other.',
+    'The morning the letter is about, as the building runs today. The figures below are from this run.',
   asBuiltStageSkip: 'Skip to the figures',
   /*
    * The bank view's label, on both played blocks — `caseStage.ts#CaseStageInput.banks`. Drawn only
@@ -125,14 +125,14 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    * note and the line cannot disagree about one pair.
    */
   pairStageNote:
-    'The same morning and the same crowd, played once on each building — as it stands on the left, ' +
-    'with your change on the right. The verdict below starts from these two runs, and a change that clears this morning is then run on forty-nine more before it is called fixed.',
+    'The same morning and the same crowd: as it stands on the left, with your change on the right. ' +
+    'The verdict starts from these two runs, and a change that clears this morning is checked on forty-nine more before it is called fixed.',
   pairStageNoteThinned:
-    'The same morning, played once on each building — as it stands on the left, with your change on the right. ' +
-    'Your change moves who arrives, so the right-hand run meets the same crowd less the people it moved. The verdict below starts from these two runs, and a change that clears this morning is then run on forty-nine more before it is called fixed.',
+    'The same morning: as it stands on the left, with your change on the right. ' +
+    'Your change moves who arrives, so the right-hand run meets the same crowd less the people it moved. The verdict starts from these two runs, and a change that clears this morning is checked on forty-nine more before it is called fixed.',
   pairStageNoteRedrawn:
-    'The same morning, played once on each building — as it stands on the left, with your change on the right. ' +
-    'Your change alters which trips the lifts can carry, so the right-hand run meets a crowd drawn for the building as you changed it, not the same crowd twice. The verdict below starts from these two runs, and a change that clears this morning is then run on forty-nine more before it is called fixed.',
+    'The same morning: as it stands on the left, with your change on the right. ' +
+    'Your change alters which trips the lifts can carry, so the right-hand run meets a crowd drawn for the building as you changed it, not the same crowd twice. The verdict starts from these two runs, and a change that clears this morning is checked on forty-nine more before it is called fixed.',
   pairStageSkip: 'Skip to the verdict',
   pairStageBeforeCaption: 'As it stands',
   pairStageAfterCaption: 'With your change',
@@ -144,13 +144,13 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    */
   diagnosisShow: 'Show the diagnosis',
   diagnosisWithheld:
-    'Held back, so the search is yours. Asking costs nothing, and the case is then marked as fixed with the diagnosis rather than on your own.',
+    'Held back, so the search is yours. Asking costs nothing, but the case is then marked as fixed with the diagnosis, not on your own.',
   /*
    * The same card on a case already fixed — seat C D5. Asking then marks nothing
    * (`fixitScreen.ts#askDiagnosis` returns before the write), so the sentence above would be false.
    */
   diagnosisWithheldFixed:
-    'Held back. This case is already fixed on your own, and asking now costs nothing and does not change that mark.',
+    'Held back. You already fixed this case on your own. Asking now costs nothing and does not change that mark.',
   /*
    * The hint is **the measured witness**, never the mechanism story: which priced change the case's
    * diagnosed repair buys, and that it was run and held. `fixitDiagnosisView` composes the rows in.
@@ -175,8 +175,8 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    * *Runs the same crowd again*, which a zoning step that opens trips makes false (seat D H4).
    */
   noteReady:
-    'Runs the letter’s morning again with everything you have changed, and scores the whole building.',
-  noteSolved: 'This one is settled. There are more buildings than you have afternoons.',
+    'Runs the letter’s morning again with your changes and scores the whole building.',
+  noteSolved: 'This one is settled.',
   /*
    * **A fixed case run again is practice** — [§ D1358](../../../../DECISIONS.md), swarm DQ's Q3
    * supporting payoff. The bar's note while the order on screen has no fixed verdict of its own:
@@ -190,7 +190,7 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    * only once the order moves and nothing said so.
    */
   practiceSettled:
-    'You can run a fixed case again as practice: change anything above and Run it again comes back. It pays nothing new, the case stays fixed whatever the run says, and a fix at or under par earns the mark.',
+    'To practise on a fixed case, change anything above and Run it again comes back. It pays nothing new and the case stays fixed whatever the run says. A fix at or under par earns the mark.',
   /*
    * **A verdict that no longer describes the order on screen** — [§ D1011](../../../../DECISIONS.md),
    * assessor C's D6. Drawn over the outcome card the moment the order moves away from the one the
@@ -199,7 +199,7 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    * statement about this one, and the sentence says exactly that.
    */
   verdictStale:
-    'You have changed the order since this verdict. It describes the order you ran, not the one on screen now — run the day again to see this one.',
+    'You have changed the order since this verdict. It describes the order you ran, not the one on screen now. Run the day again to see this one.',
   /** `dev/fixitPanel.ts`'s relabel while the synchronous pair computes. */
   runningLabel: 'Running the day…',
   /**
@@ -207,7 +207,7 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    * The relabel says *what is happening*; a player looking at a dead button is asking *why can I
    * not press this*, and those are different questions (GitHub issue #262).
    */
-  runningWhy: 'The pair of days is being simulated. This finishes on its own.',
+  runningWhy: 'Running both days. This finishes on its own.',
   /*
    * [§ D1020](../../../../DECISIONS.md): the letter's morning cleared and the same order is running
    * on the forty-nine derived mornings. The relabel says what is happening and the inert sentence
@@ -215,7 +215,7 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    */
   checkingLabel: 'Checking it on 49 more mornings…',
   checkingWhy:
-    'It cleared on the letter’s morning, and one morning can be luck. The same order is running on forty-nine more; this finishes on its own.',
+    'It cleared on the letter’s morning, and one morning can be luck. The same order is running on forty-nine more. This finishes on its own.',
   /*
    * [§ D1120](../../../../DECISIONS.md) clause 4: the controls stay editable while the mornings run.
    * An edit makes the pending verdict stale (`verdictStale` above), and the press comes back with this
@@ -230,8 +230,8 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    * `fixit/held.ts`'s, where the measurement that holds it is recorded.
    */
   heldTag: 'HELD',
-  loading: 'Loading the case file…',
-  emptyFile: 'The case file holds no cases.',
+  loading: 'Loading the cases…',
+  emptyFile: 'There are no cases to play.',
   /** The machinery card's capital split when nothing bought steel — the prototype's own word. */
   noCapital: 'no capital cost',
   speedLabel: 'Rated speed',
@@ -241,12 +241,12 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   stepUp: 'buy one more step',
   stepDown: 'return one step',
   /** Why *return one step* refuses — nothing has been bought on this row yet. */
-  nothingToReturn: 'Nothing bought on this row yet, so there is nothing to give back.',
+  nothingToReturn: 'Nothing bought on this row yet.',
   /* Section 10.3's zones and service ranges — issue #422. */
   zonesLabel: 'Where the banks overlap',
   zonesNone: 'the boundaries as drawn',
   zonesAtCeiling:
-    'The banks already reach as far into each other as this building lets them; the next floor up belongs to no shaft.',
+    'The banks already reach as far into each other as this building lets them. The next floor up belongs to no shaft.',
   zonesPriced: 'once, whatever it moves',
   /*
    * **One rezone, two controls** — lane AL-B, the post-AK panel's seat D H5. The zoning step and
@@ -274,14 +274,14 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    */
   dialsEyebrow: 'THE STANDING ORDER',
   dialsHint:
-    'Every setting the controller holds, grouped by what the owner charges for it. One charge covers a whole group, however many of its settings you move.',
+    'The controller’s settings, grouped by what the owner charges. One charge covers a whole group, however many of its settings you move.',
   dialStanding: 'as it stands',
   /*
    * § D1020's UX items. The cost-term weights fold under one heading, identically on every case —
    * no shipped answer lives in them, and a fold that never varies with the case carries no
    * information about which dial is the answer (`docs/38` § 2.1's line is not rebuilt out of layout).
    */
-  weightsFold: 'The rest of the standing order — how the controller weighs one car against another',
+  weightsFold: 'More settings: how the controller weighs one car against another',
   dialOn: 'yes',
   dialOff: 'no',
   groupPricedOnce: 'once for the group',
@@ -312,7 +312,7 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    */
   tenancyEyebrow: 'THE TENANCIES',
   tenancyNone:
-    'Nobody here has a start time the owner can ask them to move, so this row has nothing to stagger.',
+    'Nobody here has a start time the owner can ask them to move.',
   tenancyAsItStands: 'as it stands — everyone on the same clock',
   tenancyPricedEach: 'a tenancy',
   /**
@@ -323,15 +323,15 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
    * paragraph's `data-fault` for a bug report, and the words say what the player can do.
    */
   runFailed:
-    'the run stopped on a fault in the game rather than in your order, so there is no verdict and nothing is banked. Try the order again, or a different one.',
+    'the run stopped on a fault in the game, not in your order. There is no verdict and nothing is banked. Try the order again, or a different one.',
   planRefused:
-    'The building would not run as drawn — a bank may have been left with no car, or with one floor to stop at. Put the last change back and run again.',
+    'The building cannot run as drawn. A bank may have no car, or only one floor to stop at. Undo the last change and run again.',
   /** Why *buy one more step* refuses — § 10.3's budget cap, said on the control. */
   noBudgetLeft: 'The repair budget will not stretch to another step on this row.',
   /* Section 10.3's elevation — issue #422. */
   elevationLabel: 'The top floor',
   elevationNone: 'as the building draws it',
-  elevationAtCeiling: 'This is as far as a repair budget moves a floor; a bigger rise is a capital project.',
+  elevationAtCeiling: 'This is as far as a repair budget moves a floor. A bigger rise is a capital project.',
   elevationPriced: 'once, however far it moves',
   /*
    * **The one thing on this screen bought with chimes rather than units** — GitHub issue **#579**,
@@ -351,16 +351,15 @@ export const FIXIT_SCREEN_COPY = Object.freeze({
   budgetRungLabel: 'What the owner will stretch to',
   /** What buying it does, said before the press. */
   budgetRungOffer:
-    'Ask the owner for more, out of what finishing things has paid you. The building does not ' +
-    'change and neither does what counts as fixed \u2014 you can just afford more of it.',
+    'Ask the owner for more, paid from your chimes. The building does not change and neither ' +
+    'does what counts as fixed. You can just afford more of it.',
   /** And once it is bought, which is the same sentence in the past tense. */
   budgetRungOwned: 'The owner stretched. This is as far as this case goes.',
   /** The tally will not cover it. The shortfall is composed beside this, never inside it. */
   budgetRungShortLead: 'Short by',
   /** Nothing has paid a chime yet, so there is nothing to ask with. */
   budgetRungNone:
-    'Finish something \u2014 a case like this one, a contract day, a rush \u2014 and this is what ' +
-    'the chimes it pays are for.',
+    'Chimes pay for this. Earn them by finishing a case like this one, a contract day or a rush.',
 } as const);
 
 /** One case rail row, worded. `towerLine` comes through {@link buildingLineOf}. */

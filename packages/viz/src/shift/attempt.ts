@@ -343,8 +343,8 @@ export const CONTINUE_HERE_CELL = 'Continue ⟨day⟩ here';
 export const DAY_ATTEMPT_COPY = Object.freeze({
   /** Under the driver cards, which are held. */
   driverHeld:
-    'Your attempt at this day is under way, so it keeps the driver it started with. To hand the day ' +
-    'to another dispatcher, do it on the stage.',
+    'This day is under way, so it keeps the driver it started with. To hand over to another ' +
+    'dispatcher, do it on the stage.',
   /** The bar's note beside *Resume*. */
   resumeNote: 'Your attempt is kept where you left it. It is the one your week banks.',
   /** § 3.4's strip, asked when a day with an attempt standing is left by its leave button. */
@@ -356,22 +356,22 @@ export const DAY_ATTEMPT_COPY = Object.freeze({
    * tab holds the attempt — § D1361. What the press does, said before it is pressed.
    */
   elsewhereNote:
-    'Your attempt at this day is open in another tab. Continue it here and that tab stops where it ' +
-    'is; it is still the one your week banks.',
+    'This day is open in another tab. Continue it here and that tab stops where ' +
+    'it is. It’s still the one your week banks.',
   /**
    * The stage's line while another tab holds the attempt — § D1361. This tab's playhead is held
    * where it stood and its presses and close do nothing, so the line says so, and where a takeover
    * picks up: the attempt as last saved, which is never further on than the other tab had shown.
    */
   elsewhereStage:
-    'This day is open in another tab, so this tab shows it no further and takes no press. Continue ' +
-    'it here to play on from where it was last saved.',
+    'This day is open in another tab, so this tab goes no further. Continue it here to play on ' +
+    'from where it was last saved.',
   /**
    * The stage's line over the run this tab was playing when another tab took the attempt over, once
    * nobody holds the attempt any more (that tab let it go) — § D1361. The run here lacks whatever the
    * other tab pressed, so it is shown no further; *Resume* plays on from the attempt as last saved.
    */
   staleStage:
-    'Your attempt at this day moved on in another tab, so this tab shows this run of it no further ' +
-    'and takes no press. Resume it to play on from where it was last saved.',
+    'This day moved on in another tab, so this tab goes no further. Resume it to play on from ' +
+    'where it was last saved.',
 });

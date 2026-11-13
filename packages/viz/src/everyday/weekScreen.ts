@@ -60,6 +60,7 @@ import {
   BODY,
   CARD,
   el,
+  explainer,
   EYEBROW,
   LEDE,
   MONO,
@@ -254,15 +255,19 @@ function mountWeek(
     eyebrow.style.cssText = EYEBROW;
     const title = el(doc, 'h1', 'everyday-week-title', view.title);
     title.style.cssText = `font-family:${TYPE.heading};font-size:34px;font-weight:700;letter-spacing:-.02em;margin:10px 0 0`;
+    /* The streak and the week's target share one line; it wraps where there is no room for both. */
+    const standing = el(doc, 'div', 'everyday-week-standing');
+    standing.style.cssText = 'display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px;margin-top:8px';
     const streak = el(doc, 'div', 'everyday-week-streak', view.streakLine);
-    streak.style.cssText = `${MONO(12.5, C.label)};margin-top:8px`;
-    root.append(eyebrow, title, streak);
+    streak.style.cssText = MONO(12.5, C.label);
+    standing.append(streak);
     /* The week's target, *k of N* — § D1176. Only where the week census speaks for the tower. */
     if (view.stake !== undefined) {
       const stake = el(doc, 'p', 'everyday-week-stake', view.stake);
-      stake.style.cssText = `${BODY};margin:8px 0 0`;
-      root.append(stake);
+      stake.style.cssText = `${BODY};margin:0`;
+      standing.append(stake);
     }
+    root.append(eyebrow, title, standing);
     /* DC-13 on a week dealt from week 2, and this week's record with each driver — § D1443. */
     for (const [cls, lines] of [
       ['everyday-week-bands', view.bands],
@@ -501,11 +506,15 @@ function mountWeek(
     }
     root.append(strip);
 
-    const tally = el(doc, 'p', 'everyday-week-tally', view.tally.line);
-    tally.style.cssText = `${QUIET};margin:11px 0 0`;
+    /* With no day closed the note under it is the whole empty state, so the tally is not drawn twice. */
+    if (view.tally.closed > 0) {
+      const tally = el(doc, 'p', 'everyday-week-tally', view.tally.line);
+      tally.style.cssText = `${QUIET};margin:11px 0 0`;
+      root.append(tally);
+    }
     const readNote = el(doc, 'p', 'everyday-week-read-note', view.readNote);
-    readNote.style.cssText = `${QUIET};margin:4px 0 0`;
-    root.append(tally, readNote);
+    readNote.style.cssText = `${QUIET};margin:${view.tally.closed > 0 ? '4px' : '11px'} 0 0`;
+    root.append(readNote);
     /* Each day on the strip that does not count, and why, in the brief's own sentence — § D1176. */
     for (const entry of view.notCounted) {
       const line = el(doc, 'p', 'everyday-week-not-counted', `${entry.weekday} · ${entry.sentence}`);
@@ -524,33 +533,51 @@ function mountWeek(
     root.append(percentile);
 
     /* ---- the world's figures: the other withheld state, kept separate ---- */
-    const world = section(doc, 'WHAT EVERYONE ELSE BROUGHT');
-    world.body.append(unavailableBand(doc, view.world));
-    const caption = el(doc, 'p', 'everyday-week-split-caption', view.splitCaption);
-    caption.style.cssText = `${QUIET};margin:9px 0 0`;
-    world.body.append(caption);
-    root.append(world.root);
+    /*
+     * The band's own label is its heading, and its one reason is drawn. What is absent is a list a
+     * reader needs once, so it is behind the link, with the caption a style split carries.
+     */
+    const world = el(doc, 'div', 'everyday-week-world');
+    world.style.cssText = 'margin-top:22px';
+    const band = unavailableBand(doc, { ...view.world, absent: [] });
+    band.querySelector('ul')?.remove();
+    const absent = el(doc, 'ul');
+    absent.style.cssText = `${BODY};margin:0 0 10px;padding-left:18px;display:grid;gap:4px`;
+    for (const entry of view.world.absent) absent.append(el(doc, 'li', undefined, entry));
+    const missing = explainer(doc, {
+      link: view.worldLink,
+      title: view.worldLink,
+      body: [absent, view.splitCaption],
+    });
+    missing.root.style.cssText = 'display:block;margin-top:8px';
+    band.append(missing.root);
+    world.append(band);
+    root.append(world);
 
     /* ---- the board: where it is, and what may share one ---- */
     const board = section(doc, view.board.heading);
     board.body.className = 'everyday-week-board';
-    board.body.style.cssText = `${CARD};display:grid;gap:13px`;
+    board.body.style.cssText = `${CARD};display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px`;
     const refusal = el(doc, 'p', 'everyday-week-board-refusal', view.board.refusal);
-    refusal.style.cssText = `${BODY};margin:0;color:${C.terracotta}`;
+    refusal.style.cssText = `${BODY};margin:0`;
     board.body.append(refusal);
+    /* What may share a board is read once, so the rules sit behind the link. */
+    const rules: HTMLElement[] = [];
     for (const rule of view.board.rules) {
-      const block = el(doc, 'div');
+      const block = el(doc, 'div', 'everyday-week-board-rule');
+      block.style.cssText = 'margin:0 0 10px';
       const ruleTitle = el(doc, 'div', undefined, rule.title);
-      ruleTitle.style.cssText = 'font-size:13.5px;font-weight:600';
+      ruleTitle.style.cssText = `font-size:13.5px;font-weight:600;color:${C.ink}`;
       const ruleBody = el(doc, 'p', undefined, rule.body);
-      ruleBody.style.cssText = `${QUIET};margin:4px 0 0;max-width:74ch`;
+      ruleBody.style.cssText = `${BODY};margin:4px 0 0`;
       block.append(ruleTitle, ruleBody);
-      board.body.append(block);
+      rules.push(block);
     }
+    board.body.append(explainer(doc, { link: view.board.link, title: view.board.link, body: rules }).root);
     root.append(board.root);
 
     /* ---- § 14.1's rows: what there is to watch, under where the board is ---- */
-    root.append(watchSection());
+    root.append(watchSection(view.watchLink));
   }
 
   /**
@@ -560,13 +587,14 @@ function mountWeek(
    * re-created with it, which is safe here for the reason `dev/watchPanel.ts`' keying is *not* —
    * this screen redraws on host notifications, which are state changes, not at 60 Hz.
    */
-  function watchSection(): HTMLElement {
+  function watchSection(watchLink: string): HTMLElement {
     const block = section(doc, WATCH_ROWS_HEADING);
     block.body.className = 'everyday-week-watch';
     block.body.style.cssText = `${CARD};display:grid;gap:13px`;
-    const lede = el(doc, 'p', 'everyday-week-watch-lede', WATCH_ROWS_LEDE);
-    lede.style.cssText = `${QUIET};margin:0;max-width:74ch`;
-    block.body.append(lede);
+    /* What a run record is and when one is not replayed, behind the link: it is read once. */
+    const how = explainer(doc, { link: watchLink, title: watchLink, body: [WATCH_ROWS_LEDE] });
+    how.root.classList.add('everyday-week-watch-lede');
+    block.body.append(how.root);
     if (watchRows === undefined) {
       const loading = el(doc, 'p', 'everyday-week-watch-status', WATCH_ROWS_LOADING);
       loading.style.cssText = `${QUIET};margin:0`;

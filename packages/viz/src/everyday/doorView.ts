@@ -155,7 +155,9 @@ export interface DoorScreenView {
    * brief's `weekStakeLineOf` states — or `undefined` where the census sets no target. Issue #631.
    */
   readonly stripTarget: string | undefined;
-  /** § 6.1's *One tower a day…* line, under the stepper. */
+  /** The link under the stepper that opens {@link rule}, {@link sameForEveryone} and {@link words}. */
+  readonly howLink: string;
+  /** § 6.1's *One tower a day…* line, behind {@link howLink}. */
   readonly rule: string;
   /**
    * **What the day's own words mean, drawn under the rule** — the post-AI playability panel's
@@ -269,7 +271,7 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
      * is the choice made before the day, which is what the step is about. `today.ts#TODAY_CHOICE_LINE`
      * carries the same correction on the lede.
      */
-    body: 'Ready-made styles, or one you built yourself. You pick before the day starts.',
+    body: 'A ready-made style, or one you built. You pick before the day starts.',
   }),
   Object.freeze({
     n: '2',
@@ -290,15 +292,13 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
      * pacing, and says what the controls on the stage do.
      */
     body:
-      'The day plays out at a speed you can change. While it plays you can park the cars, spread ' +
-      'them out, or hand the day to another dispatcher.',
+      'Set the speed. While it plays you can park the cars, spread them out, or hand the day to ' +
+      'another dispatcher.',
   }),
   Object.freeze({
     n: '3',
     head: 'Read what happened',
-    body:
-      'Plain words, then the bench if you want to know whether you were actually better or just ' +
-      'lucky.',
+    body: 'Plain words first. The test bench can tell you whether you were better or just lucky.',
   }),
 ]);
 
@@ -336,15 +336,14 @@ export const DOOR_STEPS: readonly DoorStep[] = Object.freeze([
 export function sameForEveryoneLine(crowdIsToday: boolean, crowdIsPinned: boolean, crowdIsDerived = false): string {
   if (crowdIsToday) {
     return (
-      'Everyone playing today meets the same crowd — the number above is today’s date, and the ' +
-      'run is seeded from it. The tower is the one your week is on, and the dispatcher is yours ' +
-      'to bring.'
+      'Everyone playing today meets the same crowd, set by today’s date. The tower is the one your ' +
+      'week is on, and the dispatcher is yours to bring.'
     );
   }
   if (crowdIsPinned) {
     return (
-      'This run is on the crowd its day was measured on rather than the day’s, and everyone who ' +
-      'opens this tower’s pinned day meets the same one. The tower is the one your week is on.'
+      'This day uses the crowd it was measured on, not today’s. Everyone who opens this tower’s ' +
+      'pinned day meets the same one. The tower is the one your week is on.'
     );
   }
   /*
@@ -354,13 +353,13 @@ export function sameForEveryoneLine(crowdIsToday: boolean, crowdIsPinned: boolea
    */
   if (crowdIsDerived) {
     return (
-      'You have played today’s own crowd on this tower already, so this day is dealt a new one, ' +
-      'made from today’s date, the day of the week and the weeks you have closed here. It is not ' +
-      'on today’s board. The tower is the one your week is on, and the dispatcher is yours to bring.'
+      'You’ve already played today’s crowd on this tower, so this day gets a new one, made from ' +
+      'today’s date, the day of the week and the weeks you’ve closed here. It isn’t on today’s ' +
+      'board. The tower is the one your week is on, and the dispatcher is yours to bring.'
     );
   }
   return (
-    'This run is on a crowd of its own rather than the day’s, so nobody else is playing it. ' +
+    'This run has its own crowd, not today’s, so nobody else is playing it. ' +
     'The tower is the one your week is on, and the dispatcher is yours to bring.'
   );
 }
@@ -386,9 +385,8 @@ export function sameForEveryoneLine(crowdIsToday: boolean, crowdIsPinned: boolea
  * that do make that claim are on the same screen, four lines below.
  */
 const DOOR_RULE =
-  'One crowd a day, the same for everybody, unless you are on one of the days a press decides — ' +
-  'the tower is the one your week is on. A run counts once; every earlier day stays open as a ' +
-  'replay that does not.';
+  'One crowd a day, the same for everybody, unless you are on one of the days a press decides. ' +
+  'A day counts once. Earlier days replay without counting.';
 
 /** The world band, which every world figure on this screen degrades to. */
 const WORLD_BAND: WorldBandView = Object.freeze({
@@ -470,7 +468,7 @@ export function earliestOffsetOf(week: Pick<WeekState, 'day'>): number {
 /** Why the stepper's back arrow is dimmed — {@link DoorScreenView.stepper}'s `backRefusal`. */
 export const DOOR_BACK_REFUSAL = Object.freeze({
   reach: 'The week only goes back seven days.',
-  firstDay: 'This is the week’s first day, so there is no day before it.',
+  firstDay: 'This is the week’s first day.',
 });
 
 /** `What press, standing order and pinned crowd mean` — the door's words, named in one line. */
@@ -520,8 +518,8 @@ function noteFor(state: {
  * first closed attempt the one that banks, so it says that, as `shift/week.ts#closeDay` does it.
  */
 export const RUN_TODAY_AGAIN_NOTE =
-  'Another attempt at the same day, on the same crowd and with no presses carried over. ' +
-  'It is practice: your week keeps your first attempt at this day, and this one banks nothing.';
+  'Another attempt at the same day and crowd, with no presses carried over. ' +
+  'It’s practice: your week keeps your first attempt.';
 
 /**
  * § 3.3's primary for the selected day.
@@ -549,8 +547,8 @@ function primaryOf(input: DoorScreenInput, chips: readonly DoorDayChip[]): DoorP
         label: `Open the doors on ${tomorrow}`,
         note:
           /* *…and starts it* was false: the press opens the brief, where the day starts (§ D1218, § D1250). */
-          `Today is closed and banked. This opens ${tomorrow}'s brief, where you start the day; today ` +
-          'stays in your week as it is, and on the strip as a replay that does not count.',
+          `Today is closed and banked. Next is ${tomorrow}’s brief, where you start the day. ` +
+          'Today stays in your week, and you can replay it without it counting.',
         inert: false,
         goes: 'tomorrow',
         again: {
@@ -626,14 +624,14 @@ export function todayIsBanked(input: Pick<DoorScreenInput, 'week'>): boolean {
 export const DOOR_WORLD_FOLD = 'Details';
 
 /** The *Driving today* card's note on a day whose driver the brief lets the player change. */
-export const DOOR_DRIVER_NOTE = 'Change it on the brief, which is the next screen.';
+export const DOOR_DRIVER_NOTE = 'Change it on the next screen.';
 
 /**
  * The note on a day whose driver is held (`today.ts#TodayRecord.driverHeld`) — GitHub issue #626
  * item 2: *Change it on the brief* sat over a brief whose driver cards were held until the stage's call.
  */
 export const DOOR_DRIVER_NOTE_HELD =
-  'Held until the stage’s call is answered; the brief, which is the next screen, says why.';
+  'Held until the stage’s call is answered. The next screen says why.';
 
 /**
  * The same note once the hold is over — wave AR, lane AR-2, [§ D1530](../../../../DECISIONS.md). After
@@ -651,7 +649,7 @@ export const DOOR_DRIVER_NOTE_HELD_PAST = 'Held for the stage’s call, which is
 export const DOOR_STEP_ONE_HELD: DoorStep = Object.freeze({
   n: '1',
   head: 'Who drives',
-  body: 'Today the tower’s own standing order drives until the stage’s call is answered. You pick on any other day.',
+  body: 'Today the tower’s standing order drives until the stage’s call is answered. Other days, you pick.',
 });
 
 /**
@@ -662,14 +660,14 @@ export const DOOR_STEP_ONE_HELD: DoorStep = Object.freeze({
 export const DOOR_STEP_ONE_HELD_PAST: DoorStep = Object.freeze({
   n: '1',
   head: 'Who drove',
-  body: 'Today the tower’s own standing order drove until the stage’s call. You pick on any other day.',
+  body: 'Today the tower’s standing order drove until the stage’s call. Other days, you pick.',
 });
 
 /** The driver card's heading once the day is banked and its drivers are known ({@link DoorScreenInput.droveLine}). */
 export const DOOR_DROVE_HEADING = 'DROVE TODAY';
 
 /** The § 3.3 note on today's press while its driver is held. */
-export const DOOR_PRIMARY_NOTE_HELD = 'Open the brief, then run it. The tower’s own order drives today.';
+export const DOOR_PRIMARY_NOTE_HELD = 'Open the brief, then run it. The tower’s standing order drives today.';
 
 /** § 6.1, resolved. Total: every arm answers something a player can read. */
 export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
@@ -721,12 +719,13 @@ export function doorScreenViewOf(input: DoorScreenInput): DoorScreenView {
     chips,
     upcoming: upcomingOf(input.week),
     stripTarget: weekStripTargetOf(input.week),
+    howLink: 'How days count',
     rule: DOOR_RULE,
     words: dayWords.map((entry) => entry.plain),
     wordsHeading: doorWordsHeadingOf(dayWords.map((entry) => entry.term)),
     lede: input.today.lede,
     world: WORLD_BAND,
-    stepsHeading: 'WHAT THE JOB IS',
+    stepsHeading: 'HOW A DAY GOES',
     steps,
     driver: {
       heading: drove === undefined ? 'DRIVING TODAY' : DOOR_DROVE_HEADING,

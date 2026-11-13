@@ -458,7 +458,7 @@ export function stageFigureToneOf(
 }
 
 /** Why ▶ Play is inert once the day has run out (§ D1381). Describes, as {@link STAGE_DAY_OVER} does. */
-export const STAGE_PLAY_DONE_REASON = 'the day has already run out, so there is nothing left to play';
+export const STAGE_PLAY_DONE_REASON = 'The day is over. Nothing left to play.';
 
 /** § 7.1's header row, resolved at one playhead. */
 export interface StageHeaderView {
@@ -546,7 +546,7 @@ export function stageNextStretchOf(
   if (upcoming === undefined) return undefined;
   const label = upcoming.label.trim();
   const clock = clockAt(upcoming.startS, dayStartS);
-  return label === '' ? `the next stretch starts at ${clock}` : `${label} from ${clock}`;
+  return label === '' ? `next stretch at ${clock}` : `${label} from ${clock}`;
 }
 
 /**
@@ -635,7 +635,7 @@ export function stageBookedOutOf(input: {
  * a sentence composed in `everyday/stageScreen.ts` reached the static prose sweep and no honesty
  * property at all.
  */
-export const STAGE_AWAITING_RUN = 'simulating today’s day — the stage draws the moment it lands';
+export const STAGE_AWAITING_RUN = 'Getting the day ready…';
 
 /**
  * **The overlay's one button over a paused first frame: `Play`** — GitHub issue #573,
@@ -697,8 +697,7 @@ export function stageRunFailedViewOf(ctx: RunContext): {
 /** {@link stageRunFailedViewOf}'s words, keyed so the corpus can sweep every one of them. */
 export const STAGE_RUN_FAILED_COPY = Object.freeze({
   line:
-    'Today’s day could not be simulated, so there is nothing to watch. That is a fault in the ' +
-    'game, not in anything you chose.',
+    'Today couldn’t be run, so there’s nothing to watch. That’s a fault in the game, not in anything you chose.',
   retry: 'Try the day again',
   backToDoor: 'Back to the front door',
   backToBuilding: 'Back to the building',
@@ -821,8 +820,8 @@ export function stageOpeningLineOf(input: {
 }): string {
   const clock = clockAt(input.simTimeS, input.dayStartS);
   const next = stageNextStretchOf(input.recording, input.simTimeS, input.dayStartS);
-  const opening = `Paused at ${clock}, the start of the day. Nothing has happened yet`;
-  return next === undefined ? `${opening}.` : `${opening} — ${next}.`;
+  const opening = `Paused at ${clock}, the start of the day.`;
+  return next === undefined ? opening : `${opening} Next: ${next}.`;
 }
 
 /**
@@ -839,7 +838,7 @@ function awayInsideOf(o: LiveObservations): StageFigure {
     return {
       label,
       value: '—',
-      refusal: 'nobody has boarded yet — a share of nothing is not 100 %',
+      refusal: 'nobody has boarded yet',
     };
   }
   return {
@@ -930,23 +929,23 @@ export const STAGE_GOALS_COPY = Object.freeze({
   contract: TODAY_ASKS_DECIDES,
   /** Under the rows while the playhead is short of the run's end. */
   reading:
-    'these are readings at the clock above, not results · no goal is judged until the day ends',
+    'Readings so far. Goals are judged when the day ends.',
   /** Under the rows once the playhead has reached it. */
-  graded: 'the day has run out · these are the readings the report grades',
+  graded: 'The day is over. The report grades these readings.',
   /**
    * **What the contract's four decide, when the career stage leads with them** — wave AR, lane AR-4,
    * GitHub issue #633. Under {@link StageGoalsInput.contractGoals}' heading on a career day.
    */
-  contractLead: 'These four file today cleared or missed against the contract, and the day’s report is graded on them.',
+  contractLead: 'These four file today as cleared or missed against the contract. The report grades them too.',
   /**
    * The eyebrow over a **test simulation's** five ([§ D1627](../../../../DECISIONS.md)). A test files
    * nothing, so *what today asks* over it claims a day that is not being played.
    */
   testHeading: 'WHAT A PLAYED DAY ASKS',
   /** Under that eyebrow, in the slot a career day's sentence takes: what these bars are to a test. */
-  testNote: 'A test simulation files nothing. These are the bars a played day is held to, shown for reference.',
+  testNote: 'A test files nothing. These are the bars a played day is held to.',
   /** Inside the folded week's five on a career day: what they are, and that the contract counts none. */
-  weekNote: 'These five are the week’s, and the contract counts none of them.',
+  weekNote: 'These five are for your week. The contract counts none of them.',
 });
 
 /** One goal on the strip — {@link stageGoalsOf}'s row, projected from the rail's own. */
@@ -1285,8 +1284,7 @@ export interface StageInterventionRow {
 
 /** What either parking press does to the record — one sentence for the two settings of one control. */
 const PARKING_ARM_EXPLAINS =
-  'appends to today’s record at the playhead and re-simulates the day from the start — ' +
-  'everything before this moment is unchanged, and playback resumes here';
+  'Takes effect from this moment. Everything before it stays as it was.';
 
 /**
  * The arms that need nothing from the run to construct.
@@ -1358,7 +1356,7 @@ const NO_PARKING_ARMS: readonly StageInterventionRow[] = Object.freeze([]);
  * has nothing to order.
  */
 export const STAGE_PRESS_CHANGED_NOBODY =
-  'That press changed nobody’s trip: every rider boarded and got off at the same moment as on the day without it.';
+  'That press changed nobody’s trip. Every rider boarded and got off at the same moment as on the day without it.';
 
 /**
  * **Whether a parking press changed nobody's trip**, compared on the legs — GitHub issue #588,
@@ -1476,8 +1474,7 @@ export function stageHandoverVerdictOf(input: {
  * goes stale (§ D227).
  */
 export const STAGE_SWITCH_EXPLAINS =
-  'appends to today’s record at the playhead and re-simulates the day from the start — ' +
-  SWITCH_PINS_NOTE;
+  'Takes effect now: ' + SWITCH_PINS_NOTE;
 
 /**
  * What the handover's picker is *for*, for a reader who cannot see it beside the button.
@@ -1487,7 +1484,7 @@ export const STAGE_SWITCH_EXPLAINS =
  * player-facing string, and one authored in the mount would reach the static sweep and none of the
  * ten properties — which is exactly what § D347 moved three of the cutaway's captions here for.
  */
-export const STAGE_SWITCH_PICKER_LABEL = 'Choose who to hand the day to — the button beside it hands over';
+export const STAGE_SWITCH_PICKER_LABEL = 'Choose who to hand the day to. The button beside it hands over.';
 
 /**
  * **What the picker does on its own, which is nothing** — GitHub issue **#565**, first defect,
@@ -1516,8 +1513,7 @@ export const STAGE_SWITCH_PICKER_LABEL = 'Choose who to hand the day to — the 
  * a reason a player cannot see is not a reason.
  */
 export const STAGE_SWITCH_PICKER_NOTE =
-  'Choosing here changes nothing by itself — the day keeps running on whoever is driving until you ' +
-  'press the button beside it.';
+  'Choosing here changes nothing by itself. To hand over, press the button beside it.';
 
 /**
  * Why the handover arm cannot act — it would hand the day to the dispatcher already in force.
@@ -1535,7 +1531,7 @@ export const STAGE_SWITCH_PICKER_NOTE =
  * thing the check establishes.
  */
 export const STAGE_SWITCH_NO_CHANGE =
-  'the day already runs this way — handing it over would change no decision';
+  'The day already runs this way, so handing it over would change no decision.';
 
 /**
  * **Why a dispatcher cannot take over a Rush round, said on its own row of the picker** —
@@ -1712,7 +1708,7 @@ export interface StageSwitchTarget {
 }
 
 /** § 7.6's `recomputing` beat, so a re-simulation is a state rather than a freeze. */
-export const STAGE_RECOMPUTING = 'recomputing the day from the start…';
+export const STAGE_RECOMPUTING = 'Rerunning the day…';
 
 /**
  * **What the player chose at a call, said back to them** — wave AQ, lane AQ-2, the playtest's P3
@@ -1735,9 +1731,9 @@ export function stageRecomputingLineOf(answered: string | undefined): string {
 export function stageInterventionsOf(input: StageInterventionInput): StageInterventionView {
   const stamp = interventionStampOf(input.interventions, input.simTimeS, input.dayStartS);
   const refusal = !input.hasRun
-    ? 'no day is running — nothing to change yet'
+    ? 'No day is running yet.'
     : input.dayClosed
-      ? 'the day is filed — its record is closed, and tomorrow starts a new one'
+      ? 'The day is filed. Tomorrow starts a new one.'
       : input.recomputing
         ? STAGE_RECOMPUTING
         : undefined;
@@ -2025,8 +2021,7 @@ export const STAGE_ABSENCES: readonly string[] = Object.freeze([
    * holds one plays it. What a player cannot do **on this screen** is buy one, and the reason is a
    * number that has nowhere to come from rather than a control nobody wrote.
    */
-  'no works to buy while the day plays — equipment and building changes are priced and recorded, ' +
-    'and this screen has no budget to spend against yet, so it offers none',
+  'no works to buy while the day plays: this screen has no budget to spend yet',
 ]);
 
 /* -------------------------------------------------------------------------- *
@@ -2098,7 +2093,7 @@ export interface StageBarInput {
  *
  * Recorded as § D384, whose argument this docstring is.
  */
-export const STAGE_DAY_OVER = 'the day has run out — the stage will not move again on its own';
+export const STAGE_DAY_OVER = 'The day is over.';
 
 /* -------------------------------------------------------------------------- *
  * Skip to the end — § D525 clause 4, GitHub issue #369
@@ -2135,12 +2130,10 @@ export const STAGE_SKIP_COPY = Object.freeze({
    * second press with the card up leaves the cars as they are and is recorded as a skip.
    */
   note:
-    'Runs the picture out to the end of the day, stopping at any call the stage has not had your ' +
-    'answer to. Pressed while a call is up, it leaves the cars as they are, runs on to the end, and ' +
-    'the report says the call was skipped. Nothing else about the day changes: the same people and ' +
-    'the same waits.',
-  doneReason: 'the day has already run out, so there is nothing left to skip',
-  pendingReason: 'the day is still being simulated — there is nothing to run out yet',
+    'Runs on to the end of the day, stopping at any call you haven’t answered. Pressed while a call ' +
+    'is up, it leaves the cars as they are and the report says the call was skipped.',
+  doneReason: 'The day is over. Nothing left to skip.',
+  pendingReason: 'The day isn’t ready yet.',
 });
 
 /** What {@link stageSkipViewOf} is asked about — the two facts the answer turns on. */
@@ -2240,11 +2233,11 @@ export function stageBarModelOf(state: EverydayState, input: StageBarInput): Act
     };
   }
   const refusal = !input.hasRun
-    ? 'the day has not started yet — there is nothing to file'
+    ? 'The day hasn’t started yet.'
     : input.recomputing
       ? STAGE_RECOMPUTING
       : input.dayClosed
-        ? 'the day is filed — its report is written'
+        ? 'The day is filed.'
         : undefined;
   if (refusal === undefined) {
     /*

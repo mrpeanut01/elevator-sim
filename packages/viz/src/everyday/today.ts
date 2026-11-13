@@ -260,7 +260,7 @@ export interface TodayRecord {
 
 /** {@link TodayRecord.driverHeld}'s sentence — no digit, the strip's own rule. */
 export const PRESS_DAY_DRIVER_HELD =
-  'This day is the tower’s own: its standing order drives until the stage’s call is answered. ' +
+  'The tower’s standing order drives today until the stage’s call is answered. ' +
   'Pick your own driver on any other day.';
 
 /** What {@link todayOf} needs. Every field is somebody else's fact, read rather than recomputed. */
@@ -566,7 +566,7 @@ function outOfServiceOf(
     );
   }
   sentences.push(
-    `What the cars that are left do while ${cars.length === 1 ? 'it is' : 'they are'} away is yours to change.`,
+    `You decide what the other cars do while ${cars.length === 1 ? 'it is' : 'they are'} away.`,
   );
   return { badge, sentence: sentences.join(' '), mootUnder: moot };
 }
@@ -777,8 +777,8 @@ function loadOf(
   return {
     word: `${countFigure(perCar)} per working car`,
     note:
-      `${groupThousands(building.totalPopulation)} people and ${cars}, as the building is ` +
-      'configured. The day shows whether that is comfortable; this plate does not grade it.',
+      `${groupThousands(building.totalPopulation)} people and ${cars}. ` +
+      'The day will show whether that is comfortable.',
   };
 }
 
@@ -850,8 +850,8 @@ function ledeOf(
 ): string {
   if (building === undefined) {
     return (
-      'This build does not have the document for the building the run is set to, so nothing below ' +
-      'describes it. Pick another building on the simulator’s own surface and the door fills in.'
+      'This building’s details are missing, so nothing below describes it. Pick another building ' +
+      'on the Engineer panel.'
     );
   }
   const cars = carCountOf(building);
@@ -930,10 +930,7 @@ function seedLineOf(input: TodayInput, crowdIsPinned: boolean, practice: Practic
     );
   }
   if (crowdIsDerivedOf(input)) {
-    return (
-      `${crowd} · today’s date, then the day of the week, then the weeks you have closed here: ` +
-      'you have played today’s own crowd on this tower, so this day is dealt a new one'
-    );
+    return `${crowd} · a new crowd for this day, because you have already played today’s own on this tower`;
   }
   /*
    * **And on a scenario's week, what that costs** — wave AK, [§ D1141](../../../../DECISIONS.md).

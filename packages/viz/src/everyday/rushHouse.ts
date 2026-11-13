@@ -211,14 +211,22 @@ export const RUSH_HOUSE_COPY = Object.freeze({
    * Drawn above the rows, for the reason § D376 put the fixture marker above them: a reader who has
    * already read the names has formed the belief the note is there to correct.
    */
-  note:
-    'Rows marked house are the game’s own runs: every shipped dispatcher, once, on this building ' +
-    'and the same waves you face. Nobody played them, and the order does not rank the ' +
-    'dispatchers — one crowd, one run each. Outlast one and you have outlasted a machine on the ' +
-    'same arrivals. Each row drove from the run’s first second, which is what picking one below ' +
-    'does. A day handed over part-way through runs on its opening dispatcher until the handover, ' +
-    'and a dispatcher whose door timing or call forecast is set when the day starts cannot bring ' +
-    'those with it, so a handed-over day is not what these rows measured.',
+  note: 'The game’s own runs, one per dispatcher, on the same waves you get. The order does not rank the dispatchers.',
+  /*
+   * The long account, behind a link beside the caption (the copy edit's `explainer`). The four
+   * claims the note carried in the flow: whose runs they are, that the order ranks nothing, where
+   * each run started driving, and why a handed-over day is not what the rows measured.
+   */
+  aboutLink: 'About the house runs',
+  aboutRuns:
+    'Rows marked house are the game’s own runs. Nobody played them. Every dispatcher ran once, on ' +
+    'this building, on the same waves you get.',
+  aboutOrder: 'The order does not rank the dispatchers. It is one crowd and one run each.',
+  aboutStart: 'Each house run drove from the first second, which is what picking a dispatcher here does.',
+  aboutHandover:
+    'A day handed over part-way through runs on its opening dispatcher until the handover. A ' +
+    'dispatcher whose door timing or call forecast is set when the day starts cannot bring those ' +
+    'with it. So a handed-over day is not what these rows measured.',
   /**
    * The row the player is set to run — GitHub issue **#565**, second defect,
    * [§ D858](../../../../DECISIONS.md).
@@ -234,13 +242,9 @@ export const RUSH_HOUSE_COPY = Object.freeze({
    */
   standingTag: 'yours next',
   /** A building the house has not run — anything drawn in the designer. */
-  unrun:
-    'The house has not run this building. Its runs are measured on the shipped towers as they ' +
-    'stand, so a building drawn here has nothing to hold against yet.',
+  unrun: 'No house runs for this building. The house runs only the game’s own towers, as they stand.',
   /** The table was measured on a different climb from the one this build generates. */
-  stale:
-    'The house’s runs were measured on a different climb from the one this build generates, so ' +
-    'they are withheld rather than drawn against the wrong waves.',
+  stale: 'House runs are hidden: they were measured on different waves from these.',
   /** The wave cell of a run whose line was never crossed. */
   neverBroke: 'never broke',
   /*
@@ -257,13 +261,12 @@ export const RUSH_HOUSE_COPY = Object.freeze({
    */
   yoursNote: (date: string): string =>
     `Rows marked yours are your best sitting on each of this tower’s boards for ${date} (the server’s ` +
-    'day), as the server replayed it. A sitting ranks on how long its last round held, and that round may ' +
-    'have been rebuilt between rounds or handed over while it played, so it was not run the way the ' +
-    'house’s rows were.',
+    'day), as the server replayed it. A sitting ranks on how long its last round held. That round may ' +
+    'have been rebuilt between rounds or handed over, so it was not run the way the house rows were.',
   /** Why no row is yours, by what the read answered. The build with no server says nothing. */
-  yoursNone: 'You have posted no sitting on this tower today, so no row here is yours.',
-  yoursSignedOut: 'Your best posted sitting on this tower is drawn among these rows once you are signed in and have posted one today.',
-  yoursUnreachable: 'Your posted sittings could not be read from the server just now, so no row here is yours.',
+  yoursNone: 'You haven’t posted a sitting on this tower today.',
+  yoursSignedOut: 'Sign in and post a sitting today to see your best among these rows.',
+  yoursUnreachable: 'Couldn’t load your posted sittings just now.',
 });
 
 /** One house row, as `rushScreen.ts` draws it. There is no mean here, by construction. */
@@ -504,11 +507,11 @@ function yoursLineOf(posted: RushPostedStandings): string | undefined {
  */
 export const RUSH_HOUSE_LINE_COPY = Object.freeze({
   roundBroke: (held: string, wave: number): string => `This round held ${held}, into wave ${String(wave)}.`,
-  roundStopped: (held: string, wave: number): string => `This round was ended by hand at ${held}, in wave ${String(wave)}.`,
+  roundStopped: (held: string, wave: number): string => `You ended this round at ${held}, in wave ${String(wave)}.`,
   houseBroke: (name: string, held: string, wave: number): string =>
-    `The house run on the same crowd, ${name} with no changes, held ${held}, into wave ${String(wave)}.`,
+    `On the same waves, the house run with ${name} (no changes) held ${held}, into wave ${String(wave)}.`,
   houseHeld: (name: string): string =>
-    `The house run on the same crowd, ${name} with no changes, held all ${String(LAST_GENERATED_WAVE)} waves.`,
+    `On the same waves, the house run with ${name} (no changes) held all ${String(LAST_GENERATED_WAVE)} waves.`,
   oneRunEach: 'One run of each.',
   /*
    * Wave AS, lane AS-1, § D1545 (#636 R5): the setup page's line to beat. Not the ruling's example
@@ -516,9 +519,9 @@ export const RUSH_HOUSE_LINE_COPY = Object.freeze({
    * runs, and the sentence makes none, so it says *the time to pass* instead.
    */
   toBeatBroke: (name: string, held: string, wave: number): string =>
-    `The house run on this crowd, ${name} with no changes, holds to ${held}, into wave ${String(wave)}. That is the time to pass.`,
+    `Time to pass: ${held}, into wave ${String(wave)}. That’s the house run with ${name} (no changes) on these waves.`,
   toBeatHeld: (name: string): string =>
-    `The house run on this crowd, ${name} with no changes, holds all ${String(LAST_GENERATED_WAVE)} waves, the whole climb.`,
+    `The house run with ${name} (no changes) holds all ${String(LAST_GENERATED_WAVE)} waves.`,
 });
 
 /**

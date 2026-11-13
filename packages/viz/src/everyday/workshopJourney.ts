@@ -66,14 +66,14 @@ export type WorkshopDepth = (typeof WORKSHOP_DEPTHS)[number];
 export const JOURNEY_COPY = Object.freeze({
   heading: 'ONE CALL, START TO FINISH',
   hint:
-    'Each card is one moment in a call’s life, in the order it happens. The sentence under a ' +
-    'heading says what this dispatcher does there now.',
-  depthLabel: 'HOW MUCH TO SHOW',
+    'One card per moment in a call’s life, in order. The sentence under each heading says what ' +
+    'this dispatcher does there now.',
+  depthLabel: 'DETAIL',
   depths: Object.freeze({ simple: 'Simple', detailed: 'Detailed', engineer: 'Engineer' }),
   depthNotes: Object.freeze({
-    simple: 'The plain controls. Every other setting is still in force, and each card says what it is.',
-    detailed: 'Every setting the simulator declares, with its range, in the card it belongs to.',
-    engineer: 'Every setting, with the name the simulator knows it by and the function that reads it.',
+    simple: 'The plain controls. Every other setting still applies, and each card says what it is.',
+    detailed: 'Every setting, with its range, in the card it belongs to.',
+    engineer: 'Every setting, with the simulator’s name for it and the function that reads it.',
   }),
   titles: Object.freeze({
     calling: 'How riders call',
@@ -87,8 +87,7 @@ export const JOURNEY_COPY = Object.freeze({
   }),
   /** Drawn in place of a sentence when the settings as they stand cannot be run. */
   unrunnable:
-    'These settings cannot run together as they stand. Put back the control you moved last, or ' +
-    'discard the changes.',
+    'These settings cannot run together. Undo your last change, or discard the changes.',
 } as const);
 
 /**

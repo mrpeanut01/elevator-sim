@@ -123,7 +123,7 @@ export const SIGN_IN_NOTICE_LABEL = 'SIGN-IN LINK';
  * navigation into a screen, which the rail's own Settings row already is.
  */
 export const SIGN_IN_NOTICE_POINTER =
-  'Your account is on the Settings screen — the gear row at the foot of this rail, under YOU.';
+  'Your account is in Settings, under You.';
 
 /** The banner's one control. It withdraws the report; it does not undo the sign-in. */
 export const SIGN_IN_NOTICE_DISMISS = 'Dismiss';

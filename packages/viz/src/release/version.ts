@@ -46,7 +46,7 @@ export const BUILD_VERSION: string =
 /** The sentence the build-information panel draws, in the player's words. */
 export function buildVersionLineOf(version: string): string {
   if (version === UNBUILT) {
-    return 'This copy was not built for release, so it has no build number to show.';
+    return 'This copy was not built for release, so it has no build number.';
   }
-  return `Build ${version}. Quote it if you report something; the release notes are keyed by it.`;
+  return `Build ${version}. Quote it when you report a problem.`;
 }

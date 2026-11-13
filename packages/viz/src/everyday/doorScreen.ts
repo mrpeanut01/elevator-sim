@@ -26,6 +26,7 @@ import {
   MONO,
   pill,
   QUIET,
+  explainer,
   section,
   sideBySide,
   unavailableBand,
@@ -140,7 +141,7 @@ function viewOf(context: EverydayScreenShellContext): DoorScreenView {
 
 /** The press-day card's words, when it is drawn — `rightColumn`'s own condition. */
 function pressDayTextsOf(days: PressDayChoiceView): readonly string[] {
-  return days.rows.length > 0 ? [days.heading, days.lede, days.note] : [];
+  return days.rows.length > 0 ? [days.heading, days.summary, days.lede, days.note] : [];
 }
 
 function mountDoor(
@@ -184,7 +185,7 @@ function mountDoor(
         document_,
         '‹',
         'everyday-door-back',
-        'The day before this one',
+        'Previous day',
         view.stepper.backRefusal,
         view.stepper.backEnabled,
         () => {
@@ -215,8 +216,8 @@ function mountDoor(
         document_,
         '›',
         'everyday-door-forward',
-        'The day after this one',
-        'Today is the last day there is — tomorrow has not happened.',
+        'Next day',
+        'Today is the latest day.',
         view.stepper.forwardEnabled,
         () => {
           dayOffset += 1;
@@ -227,19 +228,25 @@ function mountDoor(
     );
     column.append(stepper);
 
+    /*
+     * The copy edit: how a day counts is read once, so the rule, who else meets this crowd and the
+     * day's own words sit behind one link under the stepper. Every node keeps its class.
+     */
     const rule = el(document_, 'p', 'everyday-door-rule', view.rule);
-    rule.style.cssText = `${QUIET};margin:12px 0 0;max-width:70ch`;
-    column.append(rule);
+    rule.style.cssText = `${BODY};margin:0 0 10px`;
+    const same = el(document_, 'p', 'everyday-door-same', view.sameForEveryone);
+    same.style.cssText = `${BODY};margin:0 0 10px`;
+    const howBody: Node[] = [rule, same];
     /*
      * The day's own words, defined under the rule that first prints one — `doorView.ts#words`. Behind
      * one disclosure since wave AO, lane AO-4 (§ D1386, the post-AN panel's seat B, lost moment 3): closed on
      * arrival, its summary naming every word inside, so the door reads as a day first.
      */
     if (view.words.length > 0) {
-      const words = el(document_, 'details', 'everyday-door-words');
-      words.style.cssText = `margin:8px 0 0;max-width:70ch;padding-left:10px;border-left:2px solid ${C.ruleLight}`;
-      const summary = el(document_, 'summary', 'everyday-door-words-summary', view.wordsHeading);
-      summary.style.cssText = `${QUIET};cursor:pointer`;
+      const words = el(document_, 'div', 'everyday-door-words');
+      words.style.cssText = `margin:0 0 10px;padding-left:10px;border-left:2px solid ${C.ruleLight}`;
+      const summary = el(document_, 'div', 'everyday-door-words-summary', view.wordsHeading);
+      summary.style.cssText = `font:600 13px ${TYPE.heading};color:${C.ink}`;
       const body = el(document_, 'div');
       body.style.cssText = 'display:grid;gap:4px;margin-top:4px';
       for (const word of view.words) {
@@ -248,8 +255,11 @@ function mountDoor(
         body.append(line);
       }
       words.append(summary, body);
-      column.append(words);
+      howBody.push(words);
     }
+    const how = explainer(document_, { link: view.howLink, title: view.howLink, body: howBody });
+    how.root.style.cssText = 'display:block;margin-top:10px;text-align:center';
+    column.append(how.root);
 
     /* ---- the seven-chip week strip ---- */
     const strip = section(document_, view.weekHeading);
@@ -347,11 +357,9 @@ function mountDoor(
     /* ---- item 8: the seed line, and § 6's sentence ---- */
     const foot = el(document_, 'div', 'everyday-door-foot');
     foot.style.cssText = `margin-top:26px;padding-top:16px;border-top:1px solid ${C.ruleLight}`;
-    const same = el(document_, 'p', undefined, view.sameForEveryone);
-    same.style.cssText = `${BODY};margin:0;max-width:70ch`;
     const seed = el(document_, 'div', 'everyday-door-seed', view.seedLine);
-    seed.style.cssText = `${MONO(11.5, C.label)};margin-top:8px`;
-    foot.append(same, seed);
+    seed.style.cssText = MONO(11.5, C.label);
+    foot.append(seed);
     /* GitHub issue #208, § D514: why this tower, said once, on the day it is true and no other. */
     if (view.firstSessionLine !== undefined) {
       const drawn = el(document_, 'p', 'everyday-door-first-session', view.firstSessionLine);
@@ -586,11 +594,23 @@ function mountDoor(
     card.style.cssText = CARD;
     const heading = el(document_, 'div', undefined, days.heading);
     heading.style.cssText = EYEBROW;
+    /*
+     * The copy edit: one line says what these days are, and the measured account (the lede and what
+     * choosing one costs) is one press away. Both paragraphs keep their classes inside the popover.
+     */
+    const summary = el(document_, 'p', 'everyday-door-pressdays-summary', days.summary);
+    summary.style.cssText = `${BODY};margin:7px 0 0`;
     const lede = el(document_, 'p', 'everyday-door-pressdays-lede', days.lede);
-    lede.style.cssText = `${BODY};margin:7px 0 0`;
+    lede.style.cssText = `${BODY};margin:0 0 10px`;
     const note = el(document_, 'p', 'everyday-door-pressdays-note', days.note);
-    note.style.cssText = `${QUIET};margin:5px 0 0`;
-    card.append(heading, lede, note);
+    note.style.cssText = `${BODY};margin:0 0 10px`;
+    const how = explainer(document_, {
+      link: days.howLink,
+      title: days.howLink,
+      body: [lede, note],
+    });
+    how.root.style.cssText = 'display:block;margin-top:5px';
+    card.append(heading, summary, how.root);
     const list = el(document_, 'div');
     list.style.cssText = 'display:grid;gap:6px;margin-top:11px';
     for (const row of days.rows) {

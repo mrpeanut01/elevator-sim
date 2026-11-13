@@ -117,8 +117,8 @@ export function continueWeekEntryOf(
       /* No house beside a week the census does not deal (§ D1394, wave AO), so the line does not claim one. */
       line:
         weekDealOf(week) === undefined
-          ? `${tower}: the week has closed, and its sheet is standing`
-          : `${tower}: the week has closed, and its sheet beside the house is standing`,
+          ? `${tower}: the week has closed. Its sheet is ready`
+          : `${tower}: the week has closed. Its sheet beside the house is ready`,
       goes: 'week',
     };
   }

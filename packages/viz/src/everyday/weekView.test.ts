@@ -142,7 +142,7 @@ describe('§ 16 rule 1 — today is withheld until *Close the day* has been pres
     // Closed, and still withheld — but for the *other* reason, which is the world's. Closed means
     // the week holds today (§ D1142): a run filed this sitting that the week did not keep is not.
     const closed = weekWith(3, [dayOf(1, MET), dayOf(3, MET)]);
-    expect(viewOf(closed, true).percentile.line).toMatch(/no verified distribution/);
+    expect(viewOf(closed, true).percentile.line).toMatch(/isn’t available here/);
     expect(viewOf(week, true).percentile.line).toMatch(/not closed/);
   });
 });
@@ -183,7 +183,7 @@ describe('the tally is counted off the rendered cards — § 16 rule 5', () => {
   });
 
   it('says so plainly when no day has been closed, rather than printing three zeroes', () => {
-    expect(viewOf(weekWith(1, []), false).tally.line).toMatch(/No day of this week has been closed/);
+    expect(viewOf(weekWith(1, []), false).tally.line).toMatch(/No days closed yet this week/);
   });
 
   it('reads a day’s verdict the way `shift/report.ts` does — `allMet` and `wasGraded`, not one flag', () => {
@@ -212,7 +212,7 @@ describe('the report’s one entrance — `WeekDayCard.readable`', () => {
     });
     expect(open.cards.some((card) => card.readable)).toBe(false);
     // Today is in the week's history, so the note says the day is closed and why its sheet is not
-    // here — § D1004. A week with today not yet closed still says *once it has been closed*.
+    // here — § D1004. A week with today not yet closed still says *Close today to see how it went*.
     expect(open.readNote).toMatch(/Today is closed/);
     expect(
       weekScreenViewOf({
@@ -222,7 +222,7 @@ describe('the report’s one entrance — `WeekDayCard.readable`', () => {
         dayClosed: false,
         sheetStanding: false,
       }).readNote,
-    ).toMatch(/once it has been closed/);
+    ).toMatch(/Close today to see how it went/);
 
     // Closed, but the sheet was cleared by *Open the doors on tomorrow* — the two can disagree,
     // and a card that opened an empty sheet would be § 16 rule 4's defect.
@@ -242,7 +242,7 @@ describe('the report’s one entrance — `WeekDayCard.readable`', () => {
     });
     expect(filed.cards.filter((card) => card.readable)).toHaveLength(1);
     expect(filed.cards.find((card) => card.readable)?.isToday).toBe(true);
-    expect(filed.readNote).toMatch(/opens the account of it/);
+    expect(filed.readNote).toMatch(/opens “How it went”/);
   });
 
   it('never opens a past day, because this build keeps one sheet', () => {
@@ -271,12 +271,14 @@ describe('the rest of § 14', () => {
     expect(viewOf(weekWith(2, [dayOf(1, MET)]), false).streakLine).toContain('84%');
   });
 
-  it('states the board’s two structural rules where the board is not', () => {
+  it('says where the board is, and keeps its three rules for the link beside it', () => {
     const { board } = viewOf(weekWith(1, []), false);
-    expect(board.refusal).toMatch(/server/);
-    expect(board.rules).toHaveLength(2);
-    expect(board.rules[0]?.body).toMatch(/one-entry boards/);
-    expect(board.rules[1]?.body).toMatch(/ranking of luck/);
+    expect(board.refusal).toMatch(/Boards & ladder/);
+    expect(board.link).toBe('How boards work');
+    expect(board.rules).toHaveLength(3);
+    expect(board.rules[0]?.body).toMatch(/One tower and one crowd, the same for everyone/);
+    expect(board.rules[1]?.body).toMatch(/Only a day that ran that tower on that crowd/);
+    expect(board.rules[2]?.body).toMatch(/re-run and checked before it appeared/);
   });
 
   it('captions the style split as a share and not a ranking', () => {
@@ -500,7 +502,7 @@ describe('the week’s stake on the strip, and its sheet at the close — § D11
     expect(chancery.rush?.line).toBe(`${WEEK_TOP_RUSH_COPY.what} ${WEEK_TOP_RUSH_COPY.chimes}`);
     /* This device's best, as the host's replay answered it: the replay's hold, never a stored one. */
     expect(heldOn('c6', { kind: 'row', heldS: 1325, roundCount: 3, modifiers: [] }).rush?.line).toContain(
-      'Your best sitting here on this device, replayed now from its last round, held 22:05 over 3 rounds.',
+      'Your best here on this device held 22:05 over 3 rounds.',
     );
     expect(heldOn('c6', { kind: 'none' }).rush?.line).toContain(WEEK_TOP_RUSH_COPY.none);
     expect(heldOn('c6', { kind: 'silent' }).rush?.line).toBe(`${WEEK_TOP_RUSH_COPY.what} ${WEEK_TOP_RUSH_COPY.chimes}`);

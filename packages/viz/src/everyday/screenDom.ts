@@ -262,3 +262,99 @@ export function sideBySide(
  * idiom, and the reason {@link sideBySide} needs no `flex-grow: 0` promise from its caller.
  */
 const FLUID_GROW = 999;
+
+/** The face of the button that closes an {@link explainer} popover. Driven by the honesty sweep. */
+export const EXPLAINER_CLOSE_LABEL = 'Got it';
+
+/**
+ * **An explanation behind a link** — a short link in the flow of the screen, and the long text in a
+ * popover that opens when it is pressed.
+ *
+ * The rule this serves is the copy edit's: a screen says what the player needs to act, and an
+ * account of *how a career works* is read once, so it sits one press away rather than in the way.
+ * The text is still in the document (a closed popover is not removed, only not displayed), so the
+ * honesty sweep and a screen reader's virtual cursor both still reach it.
+ *
+ * It is the platform's own `popover`: light dismiss, Escape, the top layer and focus return are the
+ * browser's, and nothing here listens for a key. **The popover element carries no inline
+ * `display`**, for `hiddenBox.test.ts`'s reason: a closed popover is hidden by a user-agent rule,
+ * and any author `display` would outrank it and leave the box drawn.
+ *
+ * `body` is paragraphs: a string becomes a `<p>`, and a node is appended as it is, so a caller can
+ * hand over a list or a table it already draws.
+ */
+export function explainer(
+  doc: Document,
+  parts: {
+    /** The link's words: what is explained, as a question or a name. Two to five words. */
+    readonly link: string;
+    /** The popover's heading. */
+    readonly title: string;
+    readonly body: readonly (string | Node)[];
+  },
+): { readonly root: HTMLElement; readonly link: HTMLButtonElement; readonly popover: HTMLElement } {
+  const root = el(doc, 'span', 'everyday-explainer');
+  const link = el(doc, 'button', 'everyday-explainer-link', parts.link);
+  link.type = 'button';
+  link.style.cssText = [
+    'border:0',
+    'background:none',
+    'padding:0',
+    'cursor:pointer',
+    `font:500 12.5px ${TYPE.body}`,
+    `color:${C.terracotta}`,
+    'text-decoration:underline dotted',
+    'text-underline-offset:3px',
+  ].join(';');
+  const popover = el(doc, 'div', 'everyday-explainer-popover');
+  popover.setAttribute('popover', 'auto');
+  popover.setAttribute('role', 'dialog');
+  popover.setAttribute('aria-label', parts.title);
+  popover.style.cssText = [
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.card)}px`,
+    `background:${C.card}`,
+    `color:${C.inkSoft}`,
+    'padding:20px 22px',
+    'width:min(52ch, calc(100vw - 32px))',
+    'max-height:min(80vh, 640px)',
+    'overflow:auto',
+    'box-shadow:0 18px 48px rgba(35,32,28,.28)',
+  ].join(';');
+  const title = el(doc, 'h2', 'everyday-explainer-title', parts.title);
+  title.style.cssText = `font:600 17px ${TYPE.heading};color:${C.ink};margin:0 0 10px`;
+  popover.append(title);
+  for (const part of parts.body) {
+    if (typeof part === 'string') {
+      const p = el(doc, 'p', undefined, part);
+      p.style.cssText = `${BODY};margin:0 0 10px`;
+      popover.append(p);
+    } else {
+      popover.append(part);
+    }
+  }
+  const close = el(doc, 'button', 'everyday-explainer-close', EXPLAINER_CLOSE_LABEL);
+  close.type = 'button';
+  close.style.cssText = [
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.control)}px`,
+    `background:${C.cardSunk}`,
+    `color:${C.ink}`,
+    `font:500 13px ${TYPE.body}`,
+    'padding:7px 14px',
+    'margin-top:4px',
+    'cursor:pointer',
+  ].join(';');
+  popover.append(close);
+  /* The element properties rather than `popovertarget` ids: no id has to be unique on the page. */
+  (link as HTMLButtonElement & { popoverTargetElement: Element | null }).popoverTargetElement =
+    popover;
+  const closer = close as HTMLButtonElement & {
+    popoverTargetElement: Element | null;
+    popoverTargetAction: string;
+  };
+  closer.popoverTargetElement = popover;
+  closer.popoverTargetAction = 'hide';
+  root.append(link, popover);
+  return { root, link, popover };
+}

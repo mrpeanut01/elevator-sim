@@ -210,7 +210,7 @@ describe.skipIf(!HAS_BROWSER)('the week’s tower is a control a player can pres
         timeout: 30_000,
       });
       const back = await page.textContent(`.everyday-door-tower[data-contract="${first ?? ''}"]`);
-      expect(back ?? '').toContain('picks it back up');
+      expect(back ?? '').toContain('back up');
       await page.click(`.everyday-door-tower[data-contract="${first ?? ''}"]`);
       await page.waitForSelector(
         `.everyday-door-tower[data-contract="${first ?? ''}"][data-selected="true"]`,

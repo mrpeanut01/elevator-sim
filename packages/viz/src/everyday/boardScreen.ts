@@ -78,6 +78,7 @@ import { everydayProgressWith } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import { SHARE_COPY, shareArtefactOf, shareFactsOf } from './shareResult.js';
 import { WATCH_CHECKING_LABEL, WATCH_IT_LABEL } from './watchStage.js';
+import { explainer } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import { pressWatchRow } from './watchPress.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
@@ -98,8 +99,8 @@ import {
  * tower must not leave an eyebrow claiming eight.
  */
 export const BOARD_SCREEN_COPY = Object.freeze({
-  eyebrow: 'WHO HELD UP',
-  title: "Today's board · Dispatcher ladder",
+  eyebrow: 'RECORDS',
+  title: 'Boards & ladder',
   dailyTab: "Today's board",
   dailyEyebrow: 'ONE CROWD · RESETS TOMORROW',
   ladderTab: 'Dispatcher ladder',
@@ -107,7 +108,7 @@ export const BOARD_SCREEN_COPY = Object.freeze({
   columnRating: 'RATING',
   columnProof: 'PROOF CASES',
   columnWeakest: 'WEAKEST AT',
-  sendEyebrow: 'PROVE A DISPATCHER',
+  sendEyebrow: 'RATE A DISPATCHER',
   cancel: 'Stop the gauntlet',
   loading: 'Loading the proof cases…',
   /*
@@ -116,13 +117,10 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    * screen is most tempted to explain itself at length. Each of these says what happened and what
    * it means for the tab beside it, and stops.
    */
-  dailyAsking: 'Asking the server for today’s board…',
+  dailyAsking: 'Getting today’s board…',
   dailyUnreachable:
-    'Today’s board could not be reached just now. Nothing is wrong with your run, and the ladder ' +
-    'beside it is unaffected — its ratings are measured on this device.',
-  dailyUndeclared:
-    'The server answered but did not say which day is running. That is a server too old to name ' +
-    'one rather than a day with no board, so there is nothing to show rather than an empty table.',
+    'Couldn’t reach today’s board. Your run is fine, and the ladder still works. Try again later.',
+  dailyUndeclared: 'No board to show: the server didn’t say which day is running.',
   dailyEmpty: 'Nobody has posted to today’s board yet. It resets tomorrow.',
   /*
    * § 14.1: *"Your own row cannot be watched. Its button reads `your run` and does nothing."* The
@@ -157,8 +155,8 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    * than resetting at midnight.
    */
   challengeTab: 'This week’s challenge',
-  challengeEyebrow: 'A SEED SET · OPENS AND SHUTS',
-  challengeAsking: 'Asking the server for this week’s challenge…',
+  challengeEyebrow: 'A SET OF CROWDS · OPENS AND CLOSES',
+  challengeAsking: 'Getting this week’s challenge…',
   /*
    * The `no-server` arm. It says what a challenge *is* — the same courtesy the daily tab's absence
    * pays — because a player who has never seen one otherwise reads an empty tab as a broken one.
@@ -166,19 +164,16 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    * to fill and this has a tab beside two that work.
    */
   challengeAbsence:
-    'A challenge is a fixed set of numbered seeds that everybody runs, scored over the whole set ' +
-    'rather than a lucky single run, and it opens and shuts on the server’s clock. Reading one ' +
-    'needs a server, and this build has none — so there is nothing here rather than an invented ' +
-    'ladder. The two tabs beside this one are unaffected.',
+    'This week’s challenge isn’t available here. A challenge is a fixed set of crowds everybody ' +
+    'runs, scored over the whole set.',
   challengeUnreachable:
-    'This week’s challenge could not be reached just now. Nothing is wrong with your runs, and the ' +
-    'ladder beside it is unaffected — its ratings are measured on this device.',
+    'Couldn’t reach this week’s challenge. Your runs are fine, and the ladder still works. Try again later.',
   /*
    * The index came back and the board did not. The challenge is still drawn above this line, which
    * is why the sentence says *the ranking* rather than *the challenge*: an upcoming challenge has
    * no board yet, and that is the commonest reason a reader will meet this.
    */
-  challengeNoBoard: 'The ranking for it could not be read:',
+  challengeNoBoard: 'Couldn’t read its ranking:',
   challengeEmpty: 'Nobody has posted to this challenge yet.',
   /** The heading over the rows. The board's own `note` is carried under them, unparaphrased. */
   challengeRowsHeading: 'WHO HAS POSTED',
@@ -189,13 +184,11 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    * control that writes nothing, applied to a control that does not exist.
    */
   challengeCannotPost:
-    'Posting to a challenge means running every seed in the set and sending them together, and no ' +
-    'screen here does that yet. This tab reads the challenge and its ranking.',
+    'You can’t post to a challenge from here yet. This tab shows the challenge and its ranking.',
   dailyHouseTag: 'house',
   dailyHouseNote:
-    'Rows marked house are the game’s own runs, one per shipped dispatcher on today’s crowd, posted ' +
-    'so the board is never empty. Nobody played them, and they do not rank the dispatchers: one ' +
-    'crowd, one run each. Beat one and you have beaten a machine on the same arrivals.',
+    'House rows are the game’s own runs, one per shipped dispatcher on today’s crowd. Nobody played ' +
+    'them, and they do not rank the dispatchers: one crowd, one run each.',
   /*
    * § D526 clause 3 and `docs/38` § 2.3 — the modifier a row was played with, and the two board
    * sentences that go with it (GitHub issue #371).
@@ -213,12 +206,11 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    */
   dailyRowStandard: '',
   dailyModifierSetNote:
-    'This board is runs played with the modifiers named on their rows. Runs played with a different ' +
-    'set rank on their own board, and runs played as shipped rank on the standard one — a wider ' +
-    'purse is a different game, not a better player.',
+    'This board is for runs played with the modifiers named on their rows. Other sets, and runs ' +
+    'played as shipped, rank on their own boards.',
   dailyStandardBoardNote:
-    'This is the standard board: the purse the mode gives everybody and the building as shipped. ' +
-    'A run played with something bought for it ranks on that set’s own board instead.',
+    'The standard board: the standard purse and the building as shipped. Runs played with ' +
+    'modifiers rank on their own boards.',
   /*
    * **The fourth arm, and it is a defect report rather than a state a correct server can produce.**
    * A board is keyed by its modifier set, so its rows cannot disagree about what that set is —
@@ -230,27 +222,39 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    * not ask* must never share a sentence — this is a third thing again, and it gets its own.
    */
   dailyMixedNote:
-    'These rows were not all played with the same modifiers, so the order below is not a comparison ' +
-    'between players — it puts runs with different starting conditions in one column. Each row says ' +
-    'what it was played with. This is a fault in the board rather than something you did.',
+    'These rows were not all played with the same modifiers, so the order below does not compare ' +
+    'players. Each row says what it was played with. This is a fault in the board, not something ' +
+    'you did.',
   /*
    * § D509 — the reset policy, said before a rating is earned (GitHub issue #252). Two clocks and
    * two sentences: the daily board is one date and resets by construction; the ladder is a standing
    * rating over forty fixed cases and never resets, decays or deletes a verified run.
    */
   ladderPolicy:
-    'Ratings here do not reset and are not decayed. A rating is a mean over forty fixed cases, kept ' +
-    'as the cases with their seeds and recomputed from them, so two ratings a month apart are still ' +
-    'the same measurement. If the proof cases ever change, every rating is re-run from what it kept, ' +
-    'and no verified run is ever deleted.',
+    'Ratings do not reset or decay. A rating is a mean over forty fixed cases, recomputed from the ' +
+    'cases it kept, so two ratings a month apart are the same measurement. If the proof cases ever ' +
+    'change, every rating is re-run, and no verified run is deleted.',
+  /*
+   * The copy edit's links. What a board is and how a rating is made are read once, so they sit
+   * behind a link beside the thing they explain (`screenDom.ts#explainer`).
+   */
+  ratingsLink: 'How ratings work',
+  ratingGap:
+    'Each case is one run, so forty pairs sit behind a gap between two rows, and no winner is ' +
+    'named below fifty. The Test bench compares two dispatchers on matched crowds.',
+  boardsLink: 'How boards work',
+  boardsOne: 'One board a day: one tower and one crowd, the same for everyone. It resets tomorrow.',
+  boardsJoin:
+    'Only a day that ran that tower on that crowd joins it. Any other day goes to your own record.',
+  boardsChecked: 'Every row was re-run and checked before it appeared.',
   /*
    * The middle of today's board — GitHub issue #327, § D484's ladder drawn as words. Each axis is
    * its own line with its own count; no line combines two axes, none orders energy against wait
    * (the wire says why energy is absent, and that sentence is carried), and no interval is drawn.
    */
   worldHeading: "THE MIDDLE OF TODAY'S BOARD",
-  worldUnasked: 'This build did not ask the server for the middle of the board.',
-  worldUnreachable: 'The middle of the board could not be read:',
+  worldUnasked: 'The middle of the board isn’t available here.',
+  worldUnreachable: 'Couldn’t read the middle of the board:',
   worldAxisAwtS: 'Mean wait',
   worldAxisWt95S: '95th-percentile wait',
   worldAxisTtdMeanS: 'Time to destination',
@@ -262,8 +266,8 @@ export const BOARD_SCREEN_COPY = Object.freeze({
    * that sentence for every unscored case and, until #295, nothing rendered it.
    */
   droppedHeading: 'Not in this mean',
-  crowdsHeading: 'THE FIVE CROWD SHAPES',
-  towersHeading: 'THE EIGHT BUILDINGS',
+  crowdsHeading: 'THE CROWD SHAPES',
+  towersHeading: 'THE BUILDINGS',
 } as const);
 
 /** The ladder's eyebrow, from the set's own two lengths. § 14.2's `STANDING · …` card. */
@@ -722,6 +726,15 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     const basis = el(doc, 'p', RATING_BASIS);
     basis.style.cssText = NOTE;
     block.append(basis);
+    /* § D509's policy and what a gap between two rows is not, behind a link beside the button. */
+    const how = explainer(doc, {
+      link: BOARD_SCREEN_COPY.ratingsLink,
+      title: BOARD_SCREEN_COPY.ratingsLink,
+      body: [RATING_BASIS, BOARD_SCREEN_COPY.ladderPolicy, BOARD_SCREEN_COPY.ratingGap],
+    });
+    how.root.classList.add('everyday-ladder-policy');
+    how.root.style.cssText = `display:block;margin-top:${String(G.row)}px`;
+    block.append(how.root);
     return block;
   }
 
@@ -747,6 +760,15 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       p.style.cssText = line.role === 'reason' ? NOTE : `${NOTE};color:${C.label}`;
       wrap.append(p);
     }
+    /* What may share a board, behind a link: it is read once and is true in every state above. */
+    const how = explainer(doc, {
+      link: BOARD_SCREEN_COPY.boardsLink,
+      title: BOARD_SCREEN_COPY.boardsLink,
+      body: [BOARD_SCREEN_COPY.boardsOne, BOARD_SCREEN_COPY.boardsJoin, BOARD_SCREEN_COPY.boardsChecked],
+    });
+    how.root.classList.add('everyday-board-how');
+    how.root.style.cssText = `display:block;margin-top:${String(G.row)}px`;
+    wrap.append(how.root);
     if (view.rows.length === 0) {
       for (const line of view.world) {
         const p = el(doc, 'p', line.text);
@@ -1151,8 +1173,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 
     /*
      * What the player is owed about their kept ratings — GitHub issue #224, and the reason it is
-     * drawn **above** the table rather than in the footnotes: `LADDER_EMPTY` says *nothing has been
-     * through the gauntlet on this device yet*, which is a claim about the player and is false when
+     * drawn **above** the table rather than in the footnotes: `LADDER_EMPTY` says *no ratings on this
+     * device yet*, which is a claim about the player and is false when
      * a store that holds ratings could not be read. The notice is the sentence that keeps that
      * claim honest, and it is `everyday/profile.ts`'s so the fix screen says the same thing.
      */
@@ -1180,11 +1202,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     const world = el(doc, 'p', LADDER_WORLD_ABSENCE);
     world.className = 'everyday-ladder-world-absent';
     world.style.cssText = NOTE;
-    /* § D509: the policy is on the tab a rating is earned from, before the button that earns one. */
-    const policy = el(doc, 'p', BOARD_SCREEN_COPY.ladderPolicy);
-    policy.className = 'everyday-ladder-policy';
-    policy.style.cssText = NOTE;
-    body.append(world, policy, sendBlock(set, resources), disclosure(set, resources));
+    /* § D509: the policy is on the tab a rating is earned from, behind the link in the send block. */
+    body.append(world, sendBlock(set, resources), disclosure(set, resources));
   }
 
   /*
@@ -1222,9 +1241,9 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     })
     .catch((error: unknown) => {
       if (disposed) return;
-      status.textContent = `The proof cases could not be loaded: ${
+      status.textContent = `Couldn’t load the proof cases. Reload the page to try again. (${
         error instanceof Error ? error.message : String(error)
-      }`;
+      })`;
     });
 
   host.append(root);
@@ -1281,10 +1300,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
  * a board that arrives draws rows.
  */
 export const DAILY_BOARD_ABSENCE =
-  "Today's board ranks other people's runs, and every one of them is replayed and verified before " +
-  'it appears. That needs a server to post and rank runs, and this build has none — so there are ' +
-  'no rows here rather than invented ones. The ladder beside it needs no server: its ratings are ' +
-  'measured on this device, over the same forty cases for everybody.';
+  'Today’s board isn’t available here. The ladder still works: its ratings are measured on this ' +
+  'device, over the same forty cases for everybody.';
 
 /** One line of the daily tab's prose. `note` is the quieter grey the loading line uses. */
 export interface DailyBoardLine {
@@ -1484,11 +1501,11 @@ function worldLinesOf(board: Extract<EverydayDailyBoard, { kind: 'board' }>): re
   const axes: DailyBoardLine[] = spread.ladders.map((ladder) => ({
     text:
       ladder.rungs === undefined
-        ? `${worldAxisLabelOf(ladder.axis)} — withheld over ${String(ladder.n)} players`
-        : `${worldAxisLabelOf(ladder.axis)} — the middle is ${worldFigureOf(ladder.axis, ladder.rungs.p50)}; ` +
+        ? `${worldAxisLabelOf(ladder.axis)}: withheld over ${String(ladder.n)} players`
+        : `${worldAxisLabelOf(ladder.axis)}: the middle is ${worldFigureOf(ladder.axis, ladder.rungs.p50)}, ` +
           `a quarter of players are under ${worldFigureOf(ladder.axis, ladder.rungs.p25)} and a quarter over ` +
           `${worldFigureOf(ladder.axis, ladder.rungs.p75)}, the outer tenths at ${worldFigureOf(ladder.axis, ladder.rungs.p10)} ` +
-          `and ${worldFigureOf(ladder.axis, ladder.rungs.p90)} — over ${String(ladder.n)} players, one best run each`,
+          `and ${worldFigureOf(ladder.axis, ladder.rungs.p90)}, over ${String(ladder.n)} players, one best run each`,
     className: 'everyday-board-world-axis',
     role: 'note',
   }));

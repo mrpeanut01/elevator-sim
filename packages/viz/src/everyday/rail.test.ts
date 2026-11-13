@@ -316,8 +316,8 @@ describe('the footer', () => {
      * The three facts the sentence exists to carry, asserted separately from the constant so that
      * rewording it cannot quietly drop one: nothing stops, and the choice lasts one visit.
      */
-    expect(swap.note).toContain('nothing stops');
-    expect(swap.note).toContain('this visit only');
+    expect(swap.note).toContain('Nothing stops');
+    expect(swap.note).toContain('Reload to come back here');
     // The stale-refusal guard proper: no wording of "not built" may come back onto this row.
     expect(swap.note).not.toMatch(/not built/);
   });
@@ -332,9 +332,9 @@ describe('the footer', () => {
     for (const screen of ['stage', 'report'] as const) {
       const note = railFooter({ screen, ctx: 'rush' }).engineerSwap.note;
       expect(note).toBe(ENGINEER_SWAP_RUSH_NOTE);
-      expect(note).toContain('ends the rush first');
-      expect(note).not.toContain('nothing stops');
-      expect(note).toContain('this visit only');
+      expect(note).toContain('Ends the rush first');
+      expect(note).not.toContain('Nothing stops');
+      expect(note).toContain('Reload to come back here');
     }
     for (const ctx of RUN_CONTEXTS.filter((context) => context !== 'rush')) {
       expect(railFooter({ screen: 'stage', ctx }).engineerSwap.note, ctx).not.toBe(
@@ -359,9 +359,9 @@ describe('the footer', () => {
        * rewording it cannot quietly drop one: the swap ends the replay, and it does so because the
        * panel can change the day being replayed (`shell.ts#enterEngineer`, issue #531 item 3).
        */
-      expect(note).toContain('ends the replay first');
-      expect(note).not.toContain('nothing stops');
-      expect(note).toContain('this visit only');
+      expect(note).toContain('Ends the replay first');
+      expect(note).not.toContain('Nothing stops');
+      expect(note).toContain('Reload to come back here');
     }
     for (const ctx of RUN_CONTEXTS.filter((context) => context !== 'replay')) {
       expect(railFooter({ screen: 'stage', ctx }).engineerSwap.note, ctx).not.toBe(
@@ -379,10 +379,10 @@ describe('the footer', () => {
      * promise, and both are asserted, because dropping either would make this note one of the other
      * two by accident.
      */
-    expect(note).toContain('nothing stops');
+    expect(note).toContain('Nothing stops');
     expect(note).toContain('watching');
     expect(note).not.toContain('the same day');
-    expect(note).toContain('this visit only');
+    expect(note).toContain('Reload to come back here');
     for (const ctx of RUN_CONTEXTS.filter((context) => context !== 'watch')) {
       expect(railFooter({ screen: 'stage', ctx }).engineerSwap.note, ctx).not.toBe(
         ENGINEER_SWAP_WATCH_NOTE,

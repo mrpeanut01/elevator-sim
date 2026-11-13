@@ -212,7 +212,7 @@ describe.skipIf(!HAS_BROWSER)('a campaign day, filed — issue #223', () => {
      * The career's front page before anything is filed — GitHub issue #536, § D1301: the fresh
      * career's intro with its chimes half, and one card with no day to play and so no colour.
      */
-    expect(await page.textContent('.everyday-towers-intro')).toContain('CHIMES');
+    expect(await page.textContent('.everyday-towers-intro')).toContain('How chimes work');
     expect(await page.locator('.everyday-towers-card').count()).toBe(1);
     expect(await page.getAttribute('.everyday-towers-card', 'data-band')).toBe('none');
     expect(await page.locator('.everyday-towers-card-canvas').count()).toBe(0);

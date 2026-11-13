@@ -289,7 +289,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday campaign screens', () => {
       nodes.map((node) => node.textContent ?? ''),
     );
     expect(notes).toHaveLength(1);
-    expect(notes[0]).toContain('changes nothing about how the lifts run');
+    expect(notes[0]).toContain('For your notes only');
     // Visible, beside a control that still works — refused, never hidden or disabled.
     expect(await page.locator('.everyday-campaign-build').isVisible()).toBe(true);
     expect(await page.locator('.everyday-campaign-build').isDisabled()).toBe(false);

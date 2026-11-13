@@ -245,9 +245,9 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     input.addEventListener('input', () => {
       set({ [row.key]: Number(input.value) } as Partial<TuneState>);
     });
-    const writes = el(doc, 'div', 'everyday-tuner-writes', row.writes);
-    writes.style.cssText = `font:500 10px ${TYPE.mono};color:${C.faint}`;
-    block.append(head, input, writes);
+    /* What the control writes is detail a player reads once: a tooltip, not a line under every row. */
+    block.title = `Sets ${row.writes}`;
+    block.append(head, input);
     parent.append(block);
   }
 
@@ -283,9 +283,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       });
       chips.append(chip);
     }
-    const writesNode = el(doc, 'div', 'everyday-tuner-writes', writes);
-    writesNode.style.cssText = `font:500 10px ${TYPE.mono};color:${C.faint}`;
-    block.append(head, chips, writesNode);
+    block.title = `Sets ${writes}`;
+    block.append(head, chips);
     parent.append(block);
   }
 
@@ -320,14 +319,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       });
       chips.append(button);
     }
-    const writes = el(
-      doc,
-      'div',
-      'everyday-tuner-writes',
-      'every car’s dwellCarCallS / dwellHallCallS',
-    );
-    writes.style.cssText = `font:500 10px ${TYPE.mono};color:${C.faint}`;
-    block.append(head, chips, writes);
+    block.title = 'Sets every car’s dwellCarCallS / dwellHallCallS';
+    block.append(head, chips);
     parent.append(block);
   }
 
@@ -337,6 +330,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     stripNote.textContent = strip_.note;
     stampHead.textContent = movedNow.length > 0 ? COPY.stampMoved : COPY.stampClean;
     stampBody.textContent = movedNow.length > 0 ? COPY.stampMovedBody : COPY.stampCleanBody;
+    /* Untouched, the stamp would only repeat the strip above the cards, so it is drawn once something moved. */
+    stamp.hidden = movedNow.length === 0;
 
     const drawn = buildingWithTune(standingBuilding, tune);
     const machineClass = classOfSpec(classes, drawn);

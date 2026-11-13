@@ -287,7 +287,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     screen: 'menu',
     leave: { label: MODES, inert: true },
     primary: primary(MODE_PICKS.map((pick) => MENU_PRIMARY[pick])),
-    note: 'Pick a floor above, then play it.',
+    note: 'Pick a floor to play.',
     inverted: false,
   }),
   /*
@@ -314,7 +314,6 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
      * thing that is true of both destinations rather than picking one and being wrong half the time.
      */
     primary: primary(['Start playing']),
-    note: 'The button on the page says where it goes. Or take the modes list, if you already know what you came for.',
     inverted: false,
   }),
   /*
@@ -337,7 +336,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     leave: { label: MODES, inert: false },
     primary: primary(['Show me a building losing']),
     /* § D993: this read *"— the day still runs and still gets filed."* Nothing is filed now. */
-    note: 'Or skip the walkthrough. Nothing is filed; your week starts when you play a day.',
+    note: 'Or skip it. Your week starts when you play a day.',
     inverted: false,
   }),
   row({
@@ -347,7 +346,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     back: { label: 'How this works', screen: 'tutorial' },
     primary: primary(['Start playing']),
     /* § D993: this read *"Files the day and opens the main menu."* Nothing is filed now. */
-    note: 'Opens the lobby. Nothing is filed; your week starts when you play a day.',
+    note: 'Opens the lobby.',
     /*
      * **Not inverted, although it is the last step of a sequence.** § 3.3 inverts the *report* and
      * nothing else, and `actionBar.test.ts` holds that as a rule over the data rather than a taste
@@ -450,7 +449,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     back: { label: 'Brief', screen: 'brief' },
     timeline: { flow: 'daily', step: 3 },
     primary: primary(['Close the day']),
-    note: 'Stops the clock and writes the report. A replay is never scored.',
+    note: 'Stops the clock and writes the report. Replays are never scored.',
     inverted: false,
   }),
   row({
@@ -565,7 +564,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     screen: 'rush',
     leave: leave(LEAVE_RUSH),
     primary: primary(['Start the rush']),
-    note: 'Nothing to set up. It ends when it ends.',
+    note: 'Nothing to set up.',
     inverted: false,
   }),
   row({
@@ -593,7 +592,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     screen: 'bench',
     leave: leave(MODES),
     primary: primary(['Run the suite', 'Run the suite again']),
-    note: 'Matched crowds for every dispatcher in the field.',
+    note: 'Every dispatcher gets the same crowds.',
     inverted: false,
   }),
   row({
@@ -630,7 +629,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
   row({
     screen: 'settings',
     leave: leave(MODES),
-    primary: primary(['Back to the modes']),
+    primary: primary(['Back to the lobby']),
     inverted: false,
   }),
   row({
@@ -705,7 +704,7 @@ export function confirmStripFor(ctx: RunContext, attemptStanding = false): Confi
   if (ctx === 'rush') {
     return {
       question: 'Leave the rush?',
-      consequence: 'The climb is not saved, and a stopped rush has no wave to post.',
+      consequence: "The climb isn't saved, and nothing is posted.",
       leaveLabel: 'Leave it',
       stayLabel: 'Stay',
     };
@@ -727,7 +726,7 @@ export function confirmStripFor(ctx: RunContext, attemptStanding = false): Confi
   }
   return {
     question: 'Leave the day unfinished?',
-    consequence: "Today's run will not be scored, and the board keeps whatever you posted before.",
+    consequence: "Today's run won't be scored. The board keeps what you posted before.",
     leaveLabel: 'Leave it',
     stayLabel: 'Stay',
   };
@@ -740,7 +739,7 @@ export function confirmStripFor(ctx: RunContext, attemptStanding = false): Confi
 /** The stage's primary on a test simulation, where a played day reads *Close the day*. */
 export const TEST_SIMULATION_PRIMARY = 'See the results';
 /** The note beside it. */
-export const TEST_SIMULATION_NOTE = 'Stops the clock and shows how the test went. Nothing is filed.';
+export const TEST_SIMULATION_NOTE = 'Stops the clock and shows how the test went.';
 
 /** The left button on a test simulation's stage and report: where it came from, not a day it abandons. */
 export const TEST_SIMULATION_LEAVE = '⤺ Back to the design floor';

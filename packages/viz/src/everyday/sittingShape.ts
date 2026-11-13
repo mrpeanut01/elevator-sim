@@ -455,7 +455,7 @@ const SCENARIO_HUB_SPAN: SittingSpan = unionOf(SITTING_SPANS.contractDay, SITTIN
  * the brief's figure is the middle of three runs a call can leave.
  */
 function typicalDayPhrase(): string {
-  return `${dayFigurePhrase()} on the towers a first week can open on`;
+  return `${dayFigurePhrase()} in a first week`;
 }
 
 /** {@link typicalDayPhrase}'s figure and rung alone — *about 2-4 min a day at 4×*, say. */
@@ -516,14 +516,14 @@ export const SITTING_SHAPES = Object.freeze({
    * and whose later runs are practice (§ D1138 clause 4) — swarm DO's S2, sentence 3, § D1250.
    */
   /* § D1383: the brief's measured day and the fix case's span, never the union's two far ends. */
-  scenarioMode: `${typicalDayPhrase()}, ${sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case')}, skippable · one scored attempt a day, and replays as practice`,
+  scenarioMode: `${typicalDayPhrase()} · ${sittingLengthPhrase(SITTING_SPANS.fixCase, 'a case')} · one scored attempt a day`,
   /** The Career tile. The lose condition is the handoff's and is kept word for word. */
   careerMode: `${sittingLengthPhrase(SITTING_SPANS.careerDay, 'a building-day')} · three lost contracts ends the career`,
   /**
    * The Rush tile. The range **is** the mode, which is what its second clause has always said and
    * has never until now had a figure agreeing with: 95 of the 221 measured cells never hold at all.
    */
-  rushMode: `${sittingLengthPhrase(SITTING_SPANS.rush)} · the run always ends; the question is when`,
+  rushMode: `${sittingLengthPhrase(SITTING_SPANS.rush)} · the run always ends`,
   /**
    * The hub's *Today's scenario* row.
    *

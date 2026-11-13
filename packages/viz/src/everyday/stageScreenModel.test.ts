@@ -587,7 +587,7 @@ describe('§ 7.6 — the intervention control', () => {
     expect(STAGE_INTERVENTIONS.map((arm) => arm.change.kind)).toEqual(['park-cars-lobby', 'spread-cars']);
     for (const arm of STAGE_INTERVENTIONS) {
       expect(arm.label.length).toBeGreaterThan(4);
-      expect(arm.explains).toMatch(/re-simulates/);
+      expect(arm.explains).toMatch(/Takes effect from this moment/);
       expect(arm.refusal).toBeUndefined();
     }
   });
@@ -923,7 +923,7 @@ describe('§ 7.6 — the intervention control', () => {
       stageInterventionsOf({ interventions: [], simTimeS: 0, ...flags }).refusal;
 
     expect(refusalOf({ hasRun: false, dayClosed: false, recomputing: false })).toMatch(
-      /no day is running/,
+      /No day is running/,
     );
     expect(refusalOf({ hasRun: true, dayClosed: true, recomputing: false })).toMatch(/filed/);
     expect(refusalOf({ hasRun: true, dayClosed: false, recomputing: true })).toBe(
@@ -1556,7 +1556,7 @@ describe('what the stage says the day is about to do', () => {
   it('opens on the run’s own hour and what happens next, never on a constant', () => {
     const line = stageOpeningLineOf({ recording: scheduled(), simTimeS: 0, dayStartS: 8.5 * 3600 });
     expect(line).toBe(
-      'Paused at 08:30, the start of the day. Nothing has happened yet — FILLING from 08:35.',
+      'Paused at 08:30, the start of the day. Next: FILLING from 08:35.',
     );
     /* The stale claim this screen carried for two waves: `06:00` is the fallback, not the hour. */
     expect(line).not.toContain('06:00');
@@ -1564,7 +1564,7 @@ describe('what the stage says the day is about to do', () => {
 
   it('still says where the playhead is when the schedule has nothing after it', () => {
     expect(stageOpeningLineOf({ recording: syntheticRecording({}), simTimeS: 0 })).toBe(
-      'Paused at 06:00, the start of the day. Nothing has happened yet.',
+      'Paused at 06:00, the start of the day.',
     );
   });
 
@@ -2198,7 +2198,7 @@ describe('what the stage may adopt — GitHub issue #548', () => {
       recomputing: false,
       dayEnded: false,
     });
-    expect(held.note).toBe('the day has not started yet — there is nothing to file');
+    expect(held.note).toBe('The day hasn’t started yet.');
     expect(held.primary.inert).toBe(held.note);
     /* The negative control: the same row with a run actually on the stage does offer the press. */
     const standing = stageBarModelOf(daily, {
@@ -2397,7 +2397,7 @@ describe('the beat after an answer says what was chosen', () => {
 
   it('puts the line before the beat after an answer, and leaves any other beat as it was', () => {
     expect(stageRecomputingLineOf('Your answer: Park the cars in the lobby')).toBe(
-      'Your answer: Park the cars in the lobby · recomputing the day from the start…',
+      'Your answer: Park the cars in the lobby · Rerunning the day…',
     );
     expect(stageRecomputingLineOf(undefined)).toBe(STAGE_RECOMPUTING);
   });

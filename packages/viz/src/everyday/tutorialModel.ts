@@ -282,12 +282,12 @@ export const TUTORIAL_COPY = Object.freeze({
   eyebrow: 'First session',
   walkthroughTitle: 'How this works',
   walkthroughLede:
-    'Six floors, three lifts, and a resident who keeps missing them. Before anything is asked of you, here is what you can change and where it is.',
+    'Six floors, three lifts, and a resident who keeps missing them. Here is what you can change.',
   figuresHeading: 'The building, today',
   figuresPending:
-    'The day is being simulated now. These are readings from that run, so there is nothing to show until it lands.',
+    'Running the day now. The figures appear when it finishes.',
   figuresLanded:
-    'Every figure here is from the run that just finished on this device — the same engine every mode plays on.',
+    'Counted over the run that just finished.',
   skip: 'Skip the tutorial',
   /*
    * GitHub issue #598, [§ D993](../../../../DECISIONS.md). This read *"The day still runs and still
@@ -296,7 +296,7 @@ export const TUTORIAL_COPY = Object.freeze({
    * mixed-use-high-rise 96 % today* before anybody had played. Leaving files nothing now.
    */
   skipNote:
-    'Nothing is filed and nothing is scored. This is a way past the walkthrough, and the first day on your week is one you play.',
+    'Goes straight to the lobby.',
   collapseTitle: 'Watch it come apart',
   /*
    * *The top three floors*, not *the fourth floor* — the post-AH panel's B.md: a player watched
@@ -308,9 +308,8 @@ export const TUTORIAL_COPY = Object.freeze({
    * Recorded here under [§ D405](../../../../DECISIONS.md): the decision is this sentence's.
    */
   collapseLede:
-    'This is the same building with nothing changed. Watch the three cars, and watch the top three floors, where the letter comes from.',
-  collapsePending:
-    'The day is being simulated now, twice — once as it stands and once with one thing changed. Nothing is shown until both land.',
+    'The same building, with nothing changed. Watch the three cars and the top three floors.',
+  collapsePending: 'Running the day twice: once as it stands, once with one thing changed.',
   /*
    * **Screen two's canvas, and the one press beside it** — the beat the tutorial did not have.
    *
@@ -333,16 +332,16 @@ export const TUTORIAL_COPY = Object.freeze({
    * speed whenever somebody has waited a minute, so the sentence says both halves.
    */
   stageNote:
-    'Playing now. The quiet minutes run fast, and the picture slows to the speed you have set whenever somebody on a landing has waited a minute. Nothing has been changed: this is the building as it stands.',
+    'The building as it stands. Quiet minutes run fast, and it slows to your speed once somebody has waited a minute.',
   stageSkip: 'Stop it there',
-  stageEnded: 'That is the morning as the building runs it today, with nothing changed.',
+  stageEnded: 'That is the morning with nothing changed.',
   stagePending:
-    'The morning is being simulated now. Nothing is drawn until it lands — a picture of a run that has not happened is the one thing a tutorial may not show.',
+    'Running the morning now. The picture appears when it finishes.',
   answeredEyebrow: 'THE SAME MORNING, BOTH WAYS',
   answeredNote:
-    'Both runs at once, at the same minute: the same people arriving at the same landings, in two buildings that differ only in what the idle cars do between calls.',
+    'Both runs at the same minute. Same people, same landings. Only what the idle cars do between calls differs.',
   answeredSkip: 'Skip to the answer',
-  answeredEnded: 'That is the same morning both ways, at the same minute.',
+  answeredEnded: 'That is the same morning, both ways.',
   /*
    * The two panes' captions. Only the pair carries them — a caption over the only canvas on screen
    * is a label on the one thing there, which is `caseStage.ts`'s own rule for the field.
@@ -357,9 +356,9 @@ export const TUTORIAL_COPY = Object.freeze({
    */
   controlHeading: 'CHANGE ONE THING',
   controlWhy:
-    'This is the same control the dispatcher workshop lists under that name, and it is the one this building needs. Press it and the same morning runs again with it on.',
+    'The same control as in the Dispatcher workshop, and the one this building needs. Press it to run the same morning again with it on.',
   controlRefusal:
-    'The second run is still being simulated. Until it lands there is nothing to show you, so this will not press.',
+    'The second run is not ready yet.',
   /*
    * GitHub issue #598, § D992: an assessor playing blind pressed the fix **before seeing anything
    * break**, because the press was live from the first frame. It waits now for the thing the lede
@@ -367,7 +366,7 @@ export const TUTORIAL_COPY = Object.freeze({
    * have played out, and it says so on its own face rather than looking dead.
    */
   controlWatchFirst:
-    'Watch first. This presses once somebody on a landing has waited a minute, or once the morning has finished playing.',
+    'Watch first. You can press this once somebody has waited a minute, or when the morning ends.',
   /*
    * **The non-visual register for the canvas and the press** — `docs/36` `AX-3`, whose policy is
    * that a live region is written *when its sentence changes and at no other time*.
@@ -387,23 +386,23 @@ export const TUTORIAL_COPY = Object.freeze({
   sayAsBuilt:
     'The building is playing as it stands. One control sits under the picture: spread the cars out.',
   sayAsBuiltEnded:
-    'The morning has finished playing, with nothing changed. The one control under it is still there: spread the cars out.',
+    'The morning has finished, with nothing changed. The control under it is still there: spread the cars out.',
   sayAnswered:
-    'The cars have been spread out. The same morning is now playing twice side by side, as it stands and with that one change, and the worked answer is under it.',
+    'The cars are spread out. The same morning is now playing twice, side by side: as it stands, and with that one change. The worked answer is under it.',
   sayAnsweredEnded:
-    'Both mornings have finished playing, side by side. The worked answer is under them.',
+    'Both mornings have finished. The worked answer is under them.',
   complaintHeading: 'The letter',
-  symptomHeading: 'What you are looking at',
+  symptomHeading: 'What to look for',
   /*
    * *"the answer is yours"* was false while every fix case printed its diagnosis before play; it is
    * true since [§ D1120](../../../../DECISIONS.md) clause 1 withheld it, and the sentence now says
    * where the diagnosis went rather than leaving a reader to find it held back.
    */
   workedWhy:
-    'This is a tutorial, so the answer is on the screen. From here on you get the building and the letter, and the answer is yours: the diagnosis waits until you ask for it.',
+    'This is a tutorial, so the answer is shown. From here on you get the building and the letter, and the diagnosis waits until you ask for it.',
   finish: 'Start playing',
   /* § D993: it read *"The day is filed and the main menu is next."* Nothing is filed now. */
-  finishNote: 'Nothing is filed. The lobby is next, and the first day on your week is one you play.',
+  finishNote: 'Next: the lobby.',
 });
 
 /* -------------------------------------------------------------------------- *
@@ -478,7 +477,7 @@ export function tutorialClockOf(input: {
   const clock = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} into the morning`;
   const pace =
     input.simPerRealS > input.watchingSimPerRealS
-      ? `${rungWord(input.simPerRealS)} while nobody on a landing has waited a minute`
+      ? `${rungWord(input.simPerRealS)} while nobody has waited a minute`
       : `${rungWord(input.simPerRealS)}, your speed, while somebody has waited a minute`;
   return Object.freeze({ clock, pace });
 }
@@ -500,11 +499,11 @@ export function tutorialClockOf(input: {
  * the case and the building and holds both sentences to it.
  */
 export const TUTORIAL_FIGURE_NOTES: Readonly<Record<FigureSpec['kind'], string>> = Object.freeze({
-  complaint: 'What the resident keeps running into, counted over this morning on the top three floors.',
-  'scope-long-waits': 'Journeys starting on the top three floors that waited over a minute for a car.',
-  'scope-mean-wait': 'The wait for a car on the top three floors, taken over the journeys that boarded.',
-  'scope-worst-wait': 'The longest anybody on the top three floors waited for a car.',
-  'rest-away-pct': 'Every other journey in the building, for comparison with the top three floors.',
+  complaint: 'What the resident keeps running into, counted this morning on the top three floors.',
+  'scope-long-waits': 'Journeys from the top three floors that waited over a minute.',
+  'scope-mean-wait': 'Wait for a car on the top three floors, over the journeys that boarded.',
+  'scope-worst-wait': 'Longest wait for a car on the top three floors.',
+  'rest-away-pct': 'Every other journey in the building, to compare with the top three floors.',
 });
 
 /**
@@ -520,7 +519,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = Object.freeze([
     id: 'levers',
     control: 'Dispatcher workshop · the four levers',
     title: 'Change how the lifts decide',
-    body: 'Four plain levers sit over the dispatcher: how long anyone should wait, keep a car downstairs, spread the cars out, and how much room to leave in a car. Moving one changes the next run and nothing about the one you are watching.',
+    body: 'Four levers: how long anyone should wait, keep a car downstairs, spread the cars out, and how much room to leave in a car. A change applies to the next run, not the one you are watching.',
   }),
   Object.freeze({
     /*
@@ -533,13 +532,13 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = Object.freeze([
     id: 'spread',
     control: 'Spread the cars out',
     title: 'The one this building needs',
-    body: 'It decides where an idle car waits: huddled together, or one to a stretch of the tower. On a quiet building with three lifts and six floors, where the cars stand matters more than which one gets picked.',
+    body: 'Sets where idle cars wait: together, or one to each stretch of the tower. On a quiet building like this one, where the cars stand matters more than which one gets picked.',
   }),
   Object.freeze({
     id: 'run',
     control: 'The day · run, watch, close',
     title: 'Run it and read it',
-    body: 'A day is simulated end to end and then played back, so you can move the clock, change speed, and go back over a moment. Closing the day writes the sheet and files it into your week.',
+    body: 'A day is simulated, then played back. Move the clock, change speed, or go back over a moment. Closing the day files it into your week.',
   }),
 ]);
 

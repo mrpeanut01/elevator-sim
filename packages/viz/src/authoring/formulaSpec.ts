@@ -211,11 +211,10 @@ export function formulaIssueOf(formulas: readonly FormulaSpec[]): string | undef
 export const FORMULA_COPY = Object.freeze({
   heading: 'A PRIORITY OF YOUR OWN',
   hint:
-    'A weight says how much one thing matters. A priority of your own combines several into a ' +
-    'new thing to weigh, which no setting of the sliders above can do. It is added to the car’s ' +
-    'cost like any other row.',
-  empty: 'None written. The priorities above are the whole of what this dispatcher weighs.',
-  add: 'write a priority',
+    'Combine several things into one new thing to weigh. It is added to the car’s cost like any ' +
+    'other row.',
+  empty: 'None written. The priorities above are all this dispatcher weighs.',
+  add: 'Write a priority',
   full: 'A dispatcher carries at most four priorities of its own.',
   nameLabel: 'Name',
   weightLabel: 'How much it counts',
@@ -224,7 +223,7 @@ export const FORMULA_COPY = Object.freeze({
   dropTerm: 'drop',
   remove: 'remove',
   handWritten:
-    'This one was written outside this editor and is more involved than its controls can show. ' +
-    'It still runs. You can rename it, weigh it or remove it here.',
+    'This one was written outside this editor, and its controls cannot show all of it. It still ' +
+    'runs. You can rename it, weigh it or remove it here.',
   unweighted: 'At zero it changes nothing.',
 } as const);

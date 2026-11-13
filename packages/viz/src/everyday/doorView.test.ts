@@ -512,7 +512,7 @@ describe('the rest of § 6.1', () => {
      * standing order until the call is answered, so *the dispatcher is yours to bring* was too.
      */
     const pinned = sameForEveryoneLine(false, true);
-    expect(pinned).toContain('the crowd its day was measured on rather than the day’s');
+    expect(pinned).toContain('the crowd it was measured on, not today’s');
     expect(pinned).not.toContain('nobody else');
     expect(pinned).not.toContain('yours to bring');
     // No arm says the tower is shared, because it is not — on any of them.

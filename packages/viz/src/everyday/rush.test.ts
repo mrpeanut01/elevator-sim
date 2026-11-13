@@ -141,7 +141,7 @@ describe('the hold line â€” forty past two minutes at once, read at the streamâ€
       for (const text of [view.eyebrow, view.head, view.lede, ...view.account, ...view.figures.flatMap((f) => [f.label, f.value, f.note ?? '']), view.footer, view.disclosure ?? '']) expect(text).not.toMatch(/\bbetter\b|\bworse\b|\bbeats?\b/iu);
     }
     const brokeView = rushResultViewOf(broke, undefined);
-    expect(brokeView.head).toBe(`Wave ${String(broke.wave)} is where it stopped draining`);
+    expect(brokeView.head).toBe(`It stopped draining in wave ${String(broke.wave)}`);
     /* Four beats since the hold is located: comfortable, the trend, it broke, and **where**. */
     expect(brokeView.account).toHaveLength(4);
     /* The trend test is quoted from the recording, never computed here. */
@@ -157,10 +157,10 @@ describe('the hold line â€” forty past two minutes at once, read at the streamâ€
     expect(window.windowEndS).toBeGreaterThan(broke.atS);
     expect(brokeView.account[1]).toContain(`the ${heldClock(broke.heldS)} this rush held`);
     expect(brokeView.account[1]).toContain('whole generated climb');
-    expect(brokeView.account[1]).not.toMatch(/over the [\d:]+ the sheet's trend test measures/u);
+    expect(brokeView.account[1]).not.toMatch(/Over the [\d:]+ the trend test covers/u);
     /* Where the window ends inside the rush, the one horizon it names is inside the run. */
     const inside = { ...broke, saturation: { ...window, windowEndS: broke.atS } };
-    expect(rushResultViewOf(inside, undefined).account[1]).toMatch(/over the [\d:]+ the sheet's trend test measures/u);
+    expect(rushResultViewOf(inside, undefined).account[1]).toMatch(/Over the [\d:]+ the trend test covers/u);
     expect(rushResultViewOf(inside, undefined).account[1]).not.toContain('generated climb');
     /* And the quiet verdict, fitted past the rush, says the same about its window. */
     const quiet = { ...broke, saturation: { ...window, verdict: 'stable' as const } };
@@ -169,7 +169,7 @@ describe('the hold line â€” forty past two minutes at once, read at the streamâ€
     const stoppedView = rushResultViewOf(stopped, undefined);
     expect(stoppedView.account).toHaveLength(2);
     expect(stoppedView.footer).toContain('not posted');
-    expect(stoppedView.lede).toContain('does not have a breaking point');
+    expect(stoppedView.lede).toContain('no breaking point');
   });
 
   it('places the hold on landings, which coreâ€™s own reader has none to give', () => {

@@ -217,7 +217,7 @@ export interface EverydayOnwardStep {
  */
 export const WEEK_SHEET_STEP: EverydayOnwardStep = Object.freeze({
   label: 'See the week against the house',
-  note: 'Opens this week’s sheet: your counted days beside the tower’s standing order on the same crowds. The next week starts from there.',
+  note: 'Your counted days beside the tower’s standing order on the same crowds. The next week starts from there.',
   goes: 'week-sheet',
 });
 
@@ -227,7 +227,7 @@ export const WEEK_SHEET_STEP: EverydayOnwardStep = Object.freeze({
  */
 export const UNMEASURED_WEEK_SHEET_STEP: EverydayOnwardStep = Object.freeze({
   label: 'See the week’s sheet',
-  note: 'Opens this week’s sheet: your seven days against its target. The next week starts from there.',
+  note: 'Your seven days against the week’s target. The next week starts from there.',
   goes: 'week-sheet',
 });
 
@@ -337,9 +337,8 @@ export interface EverydayReportView {
 export const REPORT_PRACTICE_AGAIN = Object.freeze({
   label: 'Play today again, as practice',
   note:
-    'The same crowd from the start, under the driver the day began with and with nothing pressed, ' +
-    'and the day asks its calls again as it reaches them. It banks nothing: your week keeps the day ' +
-    'as you closed it.',
+    'Same crowd, same starting driver, nothing pressed. The day asks its calls again as it reaches ' +
+    'them. It banks nothing: your week keeps the day as you closed it.',
 });
 
 /** The close's two secondary presses — {@link EverydayReportView.secondary}. */
@@ -489,7 +488,7 @@ export interface EverydayReportCareer {
  * difference between *we did not wire it* and a blank card.
  */
 const NO_SURFACE_NOTE =
-  'No button here yet: this build does not know which screen carries this advice out.';
+  'No shortcut for this one yet.';
 
 /**
  * The honesty a dispatcher lever's card keeps beside its button — GitHub issue #213.
@@ -499,8 +498,8 @@ const NO_SURFACE_NOTE =
  * is better. `docs/10` R2 forbids the comparative claim, not the door.
  */
 const DISPATCHER_LEVER_CAVEAT =
-  'One day is not evidence that a different dispatcher is better. Try it, run tomorrow, and this ' +
-  'sheet will say what it did; the bench is where the comparison gets settled properly.';
+  'One day is not evidence that a different dispatcher is better. Try it tomorrow and this ' +
+  'sheet will say what it did. The test bench settles the comparison.';
 
 /**
  * Where each of `shift/report.ts`'s four levers goes — {@link LeverRoute}'s reasoning, as data.
@@ -522,8 +521,7 @@ const EVERYDAY_ROUTE_LABELS: Readonly<Record<'tuner' | 'workshop', string>> = Ob
 
 /** The Everyday empty state. Names no Engineer control — § 16 rule 11's neighbouring rule. */
 const EMPTY_LEDE =
-  'No day has been closed yet, so there is nothing to report. Set up a day at the front door, ' +
-  'watch it, and press Close the day — that is the only thing that writes this sheet.';
+  'Play a day and press Close the day. Its report shows here.';
 
 /* -------------------------------------------------------------------------- *
  * The closing block, layered — GitHub issue #211
@@ -785,7 +783,7 @@ function onwardStepOf(
     if (career.contractLost !== undefined) {
       return {
         label: `Open the desk at ${career.buildingName}`,
-        note: `${career.contractLost} No more of its days run. This opens the building’s desk, where the month can be started again. You stay in the career.`,
+        note: `${career.contractLost} No more of its days run. You can start the month again at the building’s desk. You stay in the career.`,
         goes: 'career-desk',
       };
     }
@@ -793,9 +791,8 @@ function onwardStepOf(
       return {
         label: `Answer the renewal at ${career.buildingName}`,
         note:
-          'Day 20 has closed and the contract is up for renewal. The next month’s first day does not ' +
-          'run until it is answered. This opens the building’s desk, where the offer is. You stay in ' +
-          'the career.',
+          'Day 20 has closed and the contract is up for renewal. The next month’s first day won’t ' +
+          'run until you answer. The offer is at the building’s desk. You stay in the career.',
         goes: 'career-desk',
       };
     }
@@ -826,7 +823,7 @@ function onwardStepOf(
   return canAdvance
     ? {
         label: nextDayLabel,
-        note: 'Opens tomorrow’s brief, where you set the day up and start it. Today stays in your week exactly as it is.',
+        note: 'Opens tomorrow’s brief, where you set up and start the day. Today stays in your week as it is.',
         goes: 'daily-tomorrow',
       }
     : undefined;
@@ -916,8 +913,8 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       input.week !== undefined && weekDealOf(input.week) === undefined ? UNMEASURED_WEEK_SHEET_STEP : WEEK_SHEET_STEP,
     ),
     staleNote: input.newerRunOnStage
-      ? 'A newer run is standing on the stage and has not been closed. This sheet is the last day ' +
-        'you closed, not that run — close the day to replace it.'
+      ? 'A newer run is on the stage and isn’t closed yet. This sheet shows the last day you ' +
+        'closed. Close the day to replace it.'
       : undefined,
     practiceNote: framing.kind === 'week-day' ? framing.practiceNote : undefined,
     sandboxLines: framing.kind === 'week-day' && framing.practiceNote !== undefined ? (input.sandbox ?? []) : [],

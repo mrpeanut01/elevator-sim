@@ -138,9 +138,11 @@ export interface WeekTally {
 /** § 14's two structural board rules, stated where the board is not. */
 export interface BoardRelationView {
   readonly heading: string;
-  /** Why the board is not here, in `screens.ts`'s own words. */
+  /** Where the board is, in one line. */
   readonly refusal: string;
-  /** The rules a board would have to keep, so a reader knows what is being withheld. */
+  /** The words on the link that opens {@link rules}. */
+  readonly link: string;
+  /** What may share a board, read behind {@link link}. */
   readonly rules: readonly { readonly title: string; readonly body: string }[];
 }
 
@@ -154,8 +156,12 @@ export interface WeekScreenView {
   readonly tally: WeekTally;
   readonly percentile: { readonly heading: string; readonly line: string };
   readonly world: WorldBandView;
-  /** § 14's caption, kept verbatim because it is the sentence that makes a split honest. */
+  /** § 14's caption: a style split is a share of players and never a ranking. */
   readonly splitCaption: string;
+  /** The link on the world band that opens the list of what is absent. */
+  readonly worldLink: string;
+  /** The link over the watchable runs that opens how watching works. */
+  readonly watchLink: string;
   /** What the strip's one openable card does, or why none is open. Never a bare clickable card. */
   readonly readNote: string;
   readonly board: BoardRelationView;
@@ -313,15 +319,14 @@ export interface WeekTopRush {
 export const WEEK_TOP_RUSH_COPY = Object.freeze({
   label: 'Play this tower’s Rush',
   what:
-    'This tower also has a Rush: one climbing day until the building stops draining, which ends when forty ' +
-    'people have waited over two minutes at once.',
+    'This tower has a Rush too: one climbing day that ends when forty people have waited over two ' +
+    'minutes at once.',
   best: (held: string, rounds: number): string =>
-    `Your best sitting here on this device, replayed now from its last round, held ${held} over ${String(rounds)} ` +
-    `${rounds === 1 ? 'round' : 'rounds'}.`,
-  none: 'This device keeps no sitting of it yet.',
+    `Your best here on this device held ${held} over ${String(rounds)} ${rounds === 1 ? 'round' : 'rounds'}.`,
+  none: 'No Rush is kept on this device yet.',
   chimes:
-    'Chimes buy a Rush its pre-fit and a wider purse, from the chimes panel; bought on this device, a sitting ' +
-    'started with them is kept here and never posted.',
+    'Chimes buy a Rush its pre-fit and a wider purse, from the chimes panel. A Rush started with them ' +
+    'stays on this device and is never posted.',
 });
 
 /**
@@ -492,7 +497,7 @@ function tallyOf(cards: readonly WeekDayCard[]): WeekTally {
     ungraded,
     line:
       closed === 0
-        ? 'No day of this week has been closed yet.'
+        ? 'No days closed yet this week.'
         : `${parts.join(' · ')}, over ${String(closed)} ${closed === 1 ? 'day' : 'days'} closed.`,
   };
 }
@@ -533,37 +538,26 @@ function streakLineOf(week: WeekState, closed: number): string {
  * server answered today, and a line saying where the board is. The heading changed with it — a
  * section called *why it is not here* cannot introduce a signpost.
  */
-const DAILY_BOARD_POINTER =
-  'Today’s board lives on Boards & ladder, where it is read from the server and every row on it ' +
-  'was replayed and re-measured before it appeared. Two rules decide what may share a board at ' +
-  'all, and they are the reason a ranking means anything.';
+const DAILY_BOARD_POINTER = 'Today’s board is on Boards & ladder.';
 
 /** § 14's two board rules, quoted close enough that a reader can check them against the guide. */
 const BOARD_RULES: readonly { readonly title: string; readonly body: string }[] = Object.freeze([
   Object.freeze({
-    title: 'One board a day, and nothing you configure enters its key',
+    title: 'One board a day',
     /*
-     * GitHub issue #595, § D973. The first sentence read *"One tower, one crowd, one seed,
-     * everybody"* — true of the **board**, which the server keys on one fixture tower and the day's
-     * seed (`packages/server/src/leaderboard/boardKey.ts#DAILY_FIXTURE_CONFIG`), and read on this
-     * screen as a claim about the player's own week, which since the front door's picker (§ D912)
-     * may be on any tower. A day run on another tower goes to the player's own record, not the
-     * board, so the sentence now says so rather than letting *everybody* stand for *you*.
+     * GitHub issue #595, § D973: true of the **board**, which the server keys on one fixture tower
+     * and the day's crowd, and not of the player's own week, which since the front door's picker
+     * (§ D912) may be on any tower. So the rule says the tower need not be the week's.
      */
-    body:
-      'The board is one tower and one crowd for everybody, and it need not be the tower your week ' +
-      'is on — a day joins it only when it ran that tower on that crowd, and anything else goes to ' +
-      'your own record. A board keyed by building and dispatcher and ' +
-      'traffic and arrival rate fragments into thousands of one-entry boards where everyone is ' +
-      'permanently first and nobody ever meets. Arbitrary configurations are a personal record, ' +
-      'not a board.',
+    body: 'One tower and one crowd, the same for everyone. It need not be the tower your week is on.',
   }),
   Object.freeze({
-    title: 'Rows must be comparable',
-    body:
-      'Every row on a daily board ran the identical crowd, and every row on the ladder ran the ' +
-      'identical forty cases scored as a mean. Sorting runs that met different passengers is a ' +
-      'ranking of luck.',
+    title: 'What joins it',
+    body: 'Only a day that ran that tower on that crowd. Any other day goes to your own record.',
+  }),
+  Object.freeze({
+    title: 'Every row is checked',
+    body: 'Each row was re-run and checked before it appeared.',
   }),
 ]);
 
@@ -593,7 +587,7 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
     cards,
     tally,
     percentile: {
-      heading: 'WHERE YOU LANDED TODAY',
+      heading: 'YOUR PLACE TODAY',
       line: percentileLine(todayClosed),
     },
     world: {
@@ -601,18 +595,20 @@ export function weekScreenViewOf(input: WeekScreenInput): WeekScreenView {
       reason: WORLD_FIGURES_REASON,
       absent: WORLD_FIGURES_ABSENT,
     },
-    splitCaption:
-      'Share of today’s players, not a ranking. A popular style is not a proven one.',
+    splitCaption: 'Share of today’s players, not a ranking.',
     readNote: cards.some((card) => card.readable)
-      ? 'Today’s card opens the account of it.'
+      ? 'Today’s card opens “How it went”.'
       : todayClosed
-        ? 'Today is closed, and the week keeps it. Its account is no longer standing — a reload or a later run takes the sheet.'
-        : 'A day opens its own account once it has been closed.',
+        ? 'Today is closed and kept. “How it went” is gone after a reload or a later run.'
+        : 'Close today to see how it went.',
     board: {
-      heading: 'TODAY’S BOARD, AND WHAT MAY SHARE ONE',
+      heading: 'TODAY’S BOARD',
       refusal: DAILY_BOARD_POINTER,
+      link: 'How boards work',
       rules: BOARD_RULES,
     },
+    worldLink: 'What’s missing',
+    watchLink: 'How watching works',
     stake: weekStakeLineOf(input.week),
     notCounted: notCountedOf(input.week, cards),
     sheet,

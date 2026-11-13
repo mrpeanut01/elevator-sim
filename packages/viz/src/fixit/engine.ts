@@ -401,13 +401,13 @@ export function spendOf(
  */
 export function budgetNoteOf(entry: FixitCase, spend: FixitSpend): string {
   if (spend.totalUnits > entry.budgetUnits) {
-    return 'Over the budget, and this is where the owner stops reading and asks what you can do without buying anything.';
+    return 'Over the budget. See what you can do without buying anything.';
   }
   if (spend.machineryUnits > 0) {
-    return 'You are buying machinery — compare it against the free change first.';
+    return 'You are buying machinery. Compare it against the free change first.';
   }
   if (spend.totalUnits > 0) {
-    return 'No machinery in that, and none of it free either — committed budget is committed, whatever it buys.';
+    return 'No machinery in that, but not free either: committed budget is committed, whatever it buys.';
   }
   return 'Everything you changed is a setting, and settings are free.';
 }
@@ -1040,7 +1040,7 @@ export function fixedBadgeAfter(outcome: FixitOutcome, fixedBefore = false): boo
  * [§ D1157](../../../../DECISIONS.md). The card is the run's result; the fix is the player's.
  */
 export const FIX_KEPT_LINE =
-  'This case stays fixed: an order of yours fixed it, and a run that does not clear takes nothing away. The result below is about the order you just ran.';
+  'This case stays fixed: a run that does not clear takes nothing away. The result below is about the order you just ran.';
 
 /** {@link FIX_KEPT_LINE} where it applies — a fixed case, and a run that did not fix it — or `undefined`. */
 export function fixKeptLineOf(fixedBefore: boolean, outcome: FixitOutcome): string | undefined {

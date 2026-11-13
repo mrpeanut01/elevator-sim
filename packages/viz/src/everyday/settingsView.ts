@@ -318,8 +318,7 @@ export const SIGN_IN_COPY = Object.freeze({
    * The booting window, worded like the Motion row's own — same shape, same cause, one screen. A
    * second wording for one window is how two sentences about one fact start disagreeing.
    */
-  booting:
-    'Signing in is the simulator’s own, and the simulator is still loading — this appears when it has.',
+  booting: 'The game is still loading. Sign-in appears here when it’s done.',
   /*
    * Said in this screen's words rather than carried from `dev/main.ts`'s `NO_SERVER_SIGN_IN`,
    * which is the Engineer menu's sentence about the same fact. `everyday/world.ts` already sets
@@ -327,14 +326,12 @@ export const SIGN_IN_COPY = Object.freeze({
    * and the alternative is worse: the Engineer sentence is cleared from the shared state by any
    * commit in that panel's form, so carrying it would give this arm a blank half the time.
    */
-  noServer:
-    'This page has no account server behind it, so there is nowhere to sign in. Nothing typed here would be sent anywhere, and every other part of the game is unaffected.',
+  noServer: 'Sign-in isn’t available on this page. Everything else works.',
   signedOut:
-    'An account is only for putting a run on a board. The day, the week, the towers, the fix-it cases and the ladder all work signed out, and stay on this device. There is no password: a link is emailed to you, and opening it signs you in.',
+    'You only need an account to post a run to a board. Everything else works signed out and stays on this device. No password: we email you a sign-in link.',
   emailLabel: 'EMAIL ADDRESS',
   request: 'Email me a link',
-  linkSent:
-    'Open the link on this device and it signs you in here. Nothing else has to happen on this screen.',
+  linkSent: 'Open the link on this device to sign in here.',
   otherAddress: 'Use a different address',
   /*
    * § D241 § 7's *why now*, said where the question is asked. The Engineer panel's `NAMING_NOTE`
@@ -342,10 +339,9 @@ export const SIGN_IN_COPY = Object.freeze({
    * a name field two centimetres above, so what it owes the reader is the *offer* — § D490's
    * adoption — rather than the argument.
    */
-  naming:
-    'The name above is this device’s own, offered as it stands rather than the one the server minted for you. Change it if you would rather, then save it to your account.',
+  naming: 'Signed in. Check the name above, change it if you like, then save it to your account.',
   saveName: 'Save this name',
-  signedIn: 'Signed in. Your progress is still kept on this device, and only a run you post leaves it.',
+  signedIn: 'Signed in. Your progress stays on this device. Only a run you post leaves it.',
   signOut: 'Sign out',
 } as const);
 
@@ -354,10 +350,9 @@ export const SIGN_IN_COPY = Object.freeze({
  * different names — [§ D490](../../../../DECISIONS.md). See {@link SettingsYouView.note}.
  */
 export const NAME_NOTE = Object.freeze({
-  device:
-    'This name is kept on this device and drawn on the rail beside you. It reaches no board, and nothing sends it anywhere.',
+  device: 'This name stays on this device. It reaches no board.',
   account:
-    'This is your account’s name. It is what a board row carries, and changing it here changes it everywhere you are signed in.',
+    'Your account name. Boards show it, and changing it here changes it everywhere you’re signed in.',
 } as const);
 
 /**
@@ -459,11 +454,17 @@ export interface SettingsClearView {
   readonly button?: string | undefined;
 }
 
+/** An explanation kept behind a link: the link's words, the popover's heading and its paragraphs. */
+export interface SettingsExplainerView {
+  readonly link: string;
+  readonly title: string;
+  readonly body: readonly string[];
+}
+
 /** Every word the clear row authors, in one table — swept through the settings surface. */
 export const CLEAR_PROGRESS_COPY = Object.freeze({
   label: 'Clear saved progress',
-  booting:
-    'Clearing reaches the simulator’s own saved week, and the simulator is still loading — this row appears when it has.',
+  booting: 'The game is still loading. This appears when it’s done.',
   /*
    * **The enumeration and the summary two states below must name the same set**, and for three
    * days they did not — GitHub issue #229's follow-up.
@@ -480,10 +481,9 @@ export const CLEAR_PROGRESS_COPY = Object.freeze({
    * this.
    */
   ready:
-    'Forgets everything this device keeps: the week and its banked days, the career and the towers you hold, the saved dispatchers, buildings and patterns, the solved cases and the ratings, the name and picture above, and your answer to the counting question. Press twice.',
-  armed: 'Press again and it is gone. There is no undo, and nothing is sent anywhere first.',
-  cleared:
-    'Cleared. Nothing this device kept survives. The day on screen finishes as it stands and is not saved; the page reloads to start fresh.',
+    'Deletes everything saved on this device: your week and its banked days, your career and towers, saved dispatchers, buildings and patterns, solved cases and ratings, your name and picture, and your usage data choice. Press twice.',
+  armed: 'Press again to delete it all. There is no undo.',
+  cleared: 'Cleared. The page reloads to start fresh.',
   buttonReady: 'Clear',
   buttonArmed: 'Press again to clear',
   buttonCleared: 'Cleared',
@@ -492,7 +492,7 @@ export const CLEAR_PROGRESS_COPY = Object.freeze({
 /** § 4.6's *Default speed* row, its one sentence, and the ladder's label per rung. */
 export const DEFAULT_SPEED_ROW_COPY = Object.freeze({
   label: 'Default speed',
-  note: 'the speed every run opens at — the chips on the stage still change it for the day',
+  note: 'the speed each run starts at',
 } as const);
 
 /** The whole screen, as data. */
@@ -521,6 +521,8 @@ export interface SettingsScreenView {
      * and is corrected where it stands in `settingsScreen.ts`.
      */
     readonly telemetry: SettingsToggleView;
+    /** The detail behind the consent row's *What we record* link: what is and is not recorded. */
+    readonly telemetryDetail: SettingsExplainerView;
     /** The clear row — GitHub issue #229. Always present; its stage says whether it can act. */
     readonly clear: SettingsClearView;
   };
@@ -596,7 +598,7 @@ export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
    * a player presses, and a switch to stop runs posting would have nothing to stop. The labels are
    * the buttons' own, and `settingsView.test.ts` reads them from their copy.
    */
-  'Post runs to the board — a run goes to a board only when you press Post this run, or Post this sitting after a rush, so nothing posts on its own for a switch to turn off',
+  'Post runs to the board: there is no switch for this, because a run only posts when you press Post this run, or Post this sitting after a rush.',
   /*
    * **`Sign out` was the fourth entry and it is deleted, not reworded** — GitHub issue #332,
    * [§ D489](../../../../DECISIONS.md).
@@ -813,9 +815,7 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
   return {
     eyebrow: 'ELEVATOR SIM · EVERYDAY MODE',
     title: 'Settings',
-    lede:
-      'Your name and picture travel with every run you post, so somebody watching your Friday ' +
-      'sees them. Everything else here only changes how the game looks and sounds to you.',
+    lede: 'Your name and account, and how the game looks and sounds.',
     you: {
       heading: 'YOU',
       nameLabel: 'DISPLAY NAME',
@@ -866,8 +866,7 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
       signIn: signInViewOf(input),
       saveNotice:
         input.durable === false
-          ? 'This device is not keeping storage, so the name, the picture and the Units choice ' +
-            'below last until this tab closes.'
+          ? 'This browser isn’t saving, so your name, picture and Units choice last until this tab closes.'
           : undefined,
     },
     playing: {
@@ -925,28 +924,35 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
         },
       ],
       absentNote: bridgeAbsent
-        ? 'The Motion switch is the simulator’s own, and the simulator is still loading — the row appears when it has.'
+        ? 'The game is still loading. Motion appears here when it’s done.'
         : undefined,
     },
     device: {
       heading: 'THIS DEVICE',
       facts: [
         {
-          label: 'Where your progress lives',
-          value: 'this device',
+          label: 'Your progress',
+          value: 'on this device',
           note:
-            'Days, dispatchers, saved buildings and this screen’s name and picture are stored ' +
-            'locally. Playing on another device starts a separate career, and signing in does not ' +
-            'bring this one with you — an account carries who you are, not what you have done.',
+            'Days, dispatchers, saved buildings, and your name and picture are saved here. ' +
+            'Another device starts a separate career, and signing in doesn’t bring this one along.',
         },
         {
-          label: 'Replay verification',
-          value: 'always on',
-          note:
-            'Every run you post is re-simulated by the server before it appears on a board. It ' +
-            'cannot be turned off, and it is why the boards are worth reading.',
+          label: 'Posted runs',
+          value: 'always checked',
+          note: 'Every run you post is re-simulated by the server before it appears on a board.',
         },
       ],
+      telemetryDetail: {
+        link: 'What we record',
+        title: 'What we record',
+        body: [
+          'With this on, we record which screens you reach, how long you play, and which building and settings each run used. It stays on our own server and goes nowhere else.',
+          'We never record anything you type, your name, your email address, where you are, or what you do on any other site.',
+          'Turning it off stops recording straight away and asks us to delete what was already recorded.',
+          'The game works exactly the same either way.',
+        ],
+      },
       telemetry: {
         id: 'telemetry',
         ...consentRowViewOf(input.telemetryConsent ?? 'unasked', input.telemetryDurable ?? true),

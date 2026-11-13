@@ -111,9 +111,9 @@ export const WORKED_ANSWER_COPY = Object.freeze({
   heading: 'What would have fixed it',
   changeHeading: 'The change',
   basisSameCrowd:
-    'Two runs of the same day, same crowd, same seed — one as it was built, one with that change and nothing else.',
+    'Same day, same crowd. Only that change differs.',
   basisDifferentCrowd:
-    'Two runs of the same day. The change moves who arrives as well as how they are carried, so the two crowds are not the same one and the counts are not paired.',
+    'Same day, but this change also moves who arrives. The two crowds differ, so the counts are not like for like.',
   /*
    * What stands here before the pair lands, and it belongs to the component rather than to either
    * screen: both entry points draw the same two runs, so a pending line owned by the tutorial would
@@ -121,8 +121,7 @@ export const WORKED_ANSWER_COPY = Object.freeze({
    * showing a zero, which is § D529's *real runs* obligation in the state where it is easiest to
    * break.
    */
-  pending:
-    'The day is being simulated now, twice — once as it stands and once with one thing changed. Nothing is shown until both land.',
+  pending: 'Running the day twice: once as it stands, once with one thing changed.',
   /*
    * The post-AH panel's H1. It read *"This is the only place the game answers for you. In a
    * scenario you get the building, the letter and the whole editor, and no suggested fix"* — drawn
@@ -134,7 +133,7 @@ export const WORKED_ANSWER_COPY = Object.freeze({
    * is untouched — this sentence stopped claiming the product already meets it.
    */
   boundary:
-    'This worked answer — in the tutorial and again before the rush — is the only one the game gives. In a scenario the change is yours to choose.',
+    'This worked answer, in the tutorial and before the rush, is the only one the game gives. In a scenario you choose the change.',
 });
 
 /** `7 waits over a minute starting at the upper flats`, with the count read off a run. */
@@ -159,8 +158,8 @@ function movementOf(before: number, after: number): string {
     return `That change made this count worse on this day, ${String(before)} to ${String(after)}.`;
   }
   const gone = before <= 0 ? null : Math.round(((before - after) / before) * 100);
-  const share = gone === null ? '' : ` — ${String(gone)} % of it`;
-  return `${String(before)} to ${String(after)}${share}, on the same day, with nothing bought.`;
+  const share = gone === null ? '' : `, down ${String(gone)} %`;
+  return `${String(before)} to ${String(after)}${share}, on the same day with nothing bought.`;
 }
 
 /**

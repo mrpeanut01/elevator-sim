@@ -45,8 +45,7 @@ export const TEST_BED_RUN_S = 1800;
 export const TEST_BED_COPY = Object.freeze({
   heading: 'TEST BED',
   hint:
-    'Runs what you have here, saved or not, against another dispatcher on the same riders, in a ' +
-    'shipped building or one you designed.',
+    'Run this dispatcher, saved or not, against another on the same riders.',
   buildingLabel: 'Building',
   crowdLabel: 'How busy',
   rivalLabel: 'Against',
@@ -54,7 +53,7 @@ export const TEST_BED_COPY = Object.freeze({
   run: 'Prove it',
   stop: 'Stop',
   /** What a run is, said beside the count so *50* is 50 of something. */
-  runLine: 'Each run is half an hour of the building, and both dispatchers meet the same riders.',
+  runLine: 'Each run is half an hour of the building.',
   running: 'Running',
   /** Drawn over a result once the dispatcher it was about has been changed. */
   stale: 'This result is for an earlier version of the dispatcher. Run it again to test what you have now.',
@@ -62,7 +61,7 @@ export const TEST_BED_COPY = Object.freeze({
   noFigure:
     'A line with no figure means the runs did not settle at this flow: too few riders to measure, ' +
     'or more than the building can clear. Try a lighter or heavier flow, or another building.',
-  detailSummary: 'what each line means',
+  detailSummary: 'What each line means',
   watchNote: 'To watch it work for a day, use “Test simulation” below. One day is a look, not proof.',
   benchNote:
     'This tests one building at one flow. The Test bench runs up to four saved dispatchers over ' +

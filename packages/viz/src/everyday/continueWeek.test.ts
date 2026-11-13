@@ -109,7 +109,7 @@ describe('continue your week — § D1228', () => {
     }
     expect(continueWeekEntryOf(week, 'Midtown Office')).toEqual({
       title: CONTINUE_WEEK_TITLE,
-      line: 'Midtown Office, week 1: the week has closed, and its sheet beside the house is standing',
+      line: 'Midtown Office, week 1: the week has closed. Its sheet beside the house is ready',
       goes: 'week',
     });
     /* A closed week's sheet outranks an attempt, which cannot stand on a filed day anyway. */

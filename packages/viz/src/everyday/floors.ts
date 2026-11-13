@@ -87,7 +87,7 @@ export const GAME_FLOORS: readonly GameFloor[] = Object.freeze([
     key: 'M' as const,
     name: 'Records',
     group: 'RECORDS' as const,
-    body: "Your last seven days, today's board and the season ladder. Watch anyone's run from here.",
+    body: "Your last seven days, today's board and the season ladder.",
     status: '',
     screen: 'week' as const,
     rooms: Object.freeze([
@@ -99,7 +99,7 @@ export const GAME_FLOORS: readonly GameFloor[] = Object.freeze([
     key: 'L' as const,
     name: 'Lobby',
     group: 'LOBBY' as const,
-    body: 'The front desk. Every floor starts here, with the walkthrough and what this game is.',
+    body: 'The front desk. Find the walkthrough here.',
     status: '',
     screen: 'menu' as const,
     rooms: Object.freeze([
@@ -111,9 +111,7 @@ export const GAME_FLOORS: readonly GameFloor[] = Object.freeze([
     key: 'B' as const,
     name: 'Design',
     group: 'DESIGN' as const,
-    body:
-      'Build a dispatcher, draw a building, and try either in a test simulation. Nothing down here ' +
-      'is scored: a building is played on the floors above the lobby.',
+    body: 'Build a dispatcher or draw a building, then try it in a test simulation. Nothing here is scored.',
     status: '',
     screen: 'workshop' as const,
     rooms: Object.freeze([

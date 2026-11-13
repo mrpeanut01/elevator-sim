@@ -707,7 +707,7 @@ export const DEVICE_SPEND_COPY = Object.freeze({
  * was played on.
  */
 export const RUSH_DEVICE_HELD_THROUGH =
-  'its last round, replayed on this build, held to the end of the waves, so this build’s rush is not the one it was played on';
+  'its last round, replayed now, held to the end of the waves, so this version of rush is not the one it was played on';
 
 /** The account bridge has not answered, so whose tally would pay is not yet known. Nothing is sent. */
 export const CHIME_HOME_BOOTING =
@@ -759,12 +759,11 @@ export type EverydayRushPostOutcome =
  * screen cannot draw, since the menu is only on a rush's result. GitHub issue #372, § D1295.
  */
 export const RUSH_REBUILD_NOT_YET =
-  'There is nothing to rebuild with yet. A rebuild is bought between rounds, from what the rounds of ' +
-  'this sitting have earned, so play a round of the rush first.';
+  'Nothing to rebuild with yet. Play a round first: a rebuild is bought between rounds, from what ' +
+  'this sitting’s rounds have earned.';
 
 export const RUSH_NOT_STANDING =
-  'There is no rush sitting to post. Open Endless rush and play a round out — a sitting is every ' +
-  'round you have played since the building was as shipped.';
+  'No rush sitting to post. Open Rush and play a round out.';
 
 /**
  * What a read of today's challenge came back with — GitHub issue #221's third acceptance criterion,

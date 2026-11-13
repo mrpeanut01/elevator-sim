@@ -107,17 +107,17 @@ export const GHOST_OPTIONS: readonly GhostOption[] = Object.freeze([
   Object.freeze({
     id: 'none' as const,
     label: 'nobody',
-    note: 'no second run, no rival line, no score — just your day.',
+    note: 'just your day, with no rival.',
   }),
   Object.freeze({
     id: 'plain-baseline' as const,
     label: 'the plain baseline',
-    note: 'the shipped everyday dispatcher — the one a fresh shift opens on.',
+    note: 'the dispatcher a fresh shift opens on.',
   }),
   Object.freeze({
     id: 'latest-saved' as const,
     label: 'your latest saved',
-    note: 'the dispatcher you saved most recently. There is no rating yet, so latest is what best honestly means here.',
+    note: 'the dispatcher you saved most recently.',
   }),
 ]);
 
@@ -155,10 +155,10 @@ export const SAME_CROWD_NOTE = 'same crowd both runs — the gap is your change,
  * of learning it late is a second simulation that had to run to be compared anyway.
  */
 export const SAME_RUN_NOTE =
-  'the rival drove the same way you did — one day, drawn twice, so the two lines are one line';
+  'the rival drove the same way you did, so the two lines are one line';
 
 /** The strip while the rival's day is still in the worker. A state, not an error. */
-export const RACE_PENDING = 'waiting for the rival’s day to finish simulating';
+export const RACE_PENDING = 'running the rival’s day…';
 
 /**
  * A rival is picked and no rival run exists — a cancelled second run, or a pick made over a
@@ -196,7 +196,7 @@ export const RACE_NOT_RUN = 'no rival run yet — the next Run this shift races 
  * away on the same screen.
  */
 export const RACE_WATCHING =
-  'no rival while this is somebody else’s day — a spectator who commissioned a second run would be playing, not watching';
+  'no rival while this is somebody else’s day: a spectator watches and runs nothing';
 
 /**
  * {@link RACE_WATCHING} on a replay of the player's **own** filed day — wave AL, lane AL-A,
@@ -204,7 +204,7 @@ export const RACE_WATCHING =
  * The rule it states is unchanged: a replay is the record as it was filed and runs no second day.
  */
 export const RACE_WATCHING_OWN =
-  'no rival on a replay of your own filed day — the record is replayed as it was closed, and a replay runs no second day';
+  'no rival on a replay of your own day: a replay runs no second day';
 
 /* -------------------------------------------------------------------------- *
  * The samples

@@ -53,13 +53,13 @@ import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import { actionBarFor } from './actionBar.js';
 import { OWN_BUILDING_NAME_MAX } from './host.js';
-import { SCENARIO_COPY, ownBuildingsViewOf, scenarioHubViewOf } from './scenarioModel.js';
+import { SCENARIO_ABSENCES, SCENARIO_COPY, ownBuildingsViewOf, scenarioHubViewOf } from './scenarioModel.js';
 import { onScenarioLadderProvided, scenarioLadder } from './scenarioLadderPort.js';
 import { everydayDeviceChimeStore } from './chimeStore.js';
 import { fixSpentUnitsOf } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import { closeStageInFixit, openStageInFixit } from './stagePlayScreen.js';
-import { el } from './screenDom.js';
+import { el, explainer } from './screenDom.js';
 import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from './tokens.js';
 
 /**
@@ -67,6 +67,11 @@ import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from
  * the record the pay line itself writes to, so the hub's mark and the award are one fact.
  */
 /** The hub as this device has it now: the provided path, its clears and their kept costs. */
+/** The links the hub's register sits behind: two to five words each, naming what is explained. */
+const PATH_PAYS_LINK = 'How the path pays';
+const PATH_HELD_LINK = 'Why some stages are closed';
+const LEFT_OUT_LINK = 'What this list leaves out';
+
 function hubNow(): ReturnType<typeof scenarioHubViewOf> {
   const progress = everydayProfileStore().progress();
   return scenarioHubViewOf(scenarioLadder(), clearedStageIds(), (stageId) => fixSpentUnitsOf(progress, stageId));
@@ -309,23 +314,43 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     next.append(ownBuildingsBlock(doc, context));
 
     /* ---------------------------------------------------------------- path */
-    if (view.path !== undefined) next.append(pathBlock(doc, context, view.path, view.startHere));
-
-    /* ------------------------------------------------------------ absences */
-    const note = el(doc, 'p', 'everyday-scenario-note', view.note);
-    note.style.cssText = `font-size:13.5px;line-height:1.55;color:${C.inkSoft};margin:24px 0 0;max-width:60ch;text-wrap:pretty`;
-    next.append(note);
-
-    if (view.absences.length > 0) {
-      const absences = el(doc, 'ul', 'everyday-scenario-absences');
-      absences.style.cssText = `list-style:none;margin:12px 0 0;padding:14px 0 0;border-top:1px solid ${C.rule};max-width:60ch;display:grid;gap:9px`;
-      for (const absence of view.absences) {
-        const row = el(doc, 'li', 'everyday-scenario-absence', absence);
-        row.style.cssText = `color:${C.inkSoft};font-size:13.5px;line-height:1.5;min-width:0`;
-        absences.append(row);
-      }
-      next.append(absences);
+    /*
+     * ------------------------------------------------------------ absences
+     * The register is read once, so each row sits behind a link beside the thing it explains: how
+     * a clear pays and why a stage is closed go under the path's count, and the rest under the
+     * list. Only the path's own absence stays in the flow, because it is a state of this load.
+     */
+    const [paysRow] = SCENARIO_ABSENCES;
+    const heldRow = view.absences.find(
+      (absence) => !SCENARIO_ABSENCES.includes(absence) && absence !== SCENARIO_COPY.pathAbsent,
+    );
+    const restRows = SCENARIO_ABSENCES.filter((absence) => absence !== paysRow && view.absences.includes(absence));
+    const linkRow = (className: string): HTMLElement => {
+      const row = el(doc, 'div', className);
+      row.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px 18px;margin:10px 0 0';
+      return row;
+    };
+    const pathLinks = linkRow('everyday-scenario-path-links');
+    if (paysRow !== undefined && view.absences.includes(paysRow)) {
+      pathLinks.append(explainer(doc, { link: PATH_PAYS_LINK, title: PATH_PAYS_LINK, body: [paysRow] }).root);
     }
+    if (heldRow !== undefined) {
+      pathLinks.append(explainer(doc, { link: PATH_HELD_LINK, title: PATH_HELD_LINK, body: [heldRow] }).root);
+    }
+
+    if (view.path !== undefined) {
+      next.append(pathBlock(doc, context, view.path, view.startHere, pathLinks));
+    } else {
+      const absent = el(doc, 'p', 'everyday-scenario-absence', SCENARIO_COPY.pathAbsent);
+      absent.style.cssText = `color:${C.inkSoft};font-size:13.5px;line-height:1.5;margin:24px 0 0;max-width:60ch`;
+      next.append(absent);
+      if (pathLinks.childElementCount > 0) next.append(pathLinks);
+    }
+
+    const rest = linkRow('everyday-scenario-absences');
+    rest.style.margin = '24px 0 0';
+    rest.append(explainer(doc, { link: LEFT_OUT_LINK, title: LEFT_OUT_LINK, body: [view.note, ...restRows] }).root);
+    next.append(rest);
 
     root?.remove();
     root = next;
@@ -388,6 +413,7 @@ function pathBlock(
   context: EverydayScreenShellContext,
   path: NonNullable<ReturnType<typeof scenarioHubViewOf>['path']>,
   startHere: string | undefined,
+  links: HTMLElement,
 ): HTMLElement {
   const block = el(doc, 'section', 'everyday-scenario-path');
   block.style.cssText = `margin:30px 0 0;padding:22px 0 0;border-top:1px solid ${C.rule};max-width:760px;min-width:0`;
@@ -399,6 +425,7 @@ function pathBlock(
   const offer = el(doc, 'p', 'everyday-scenario-path-offer', path.offerLine);
   offer.style.cssText = `font:500 11px ${TYPE.mono};letter-spacing:.04em;color:${C.label};margin:10px 0 0`;
   block.append(heading, lede, offer);
+  if (links.childElementCount > 0) block.append(links);
 
   const rows = el(doc, 'ol', 'everyday-scenario-path-rows');
   rows.style.cssText = 'list-style:none;margin:16px 0 0;padding:0;display:grid;gap:12px';

@@ -371,7 +371,7 @@ describe('the switching block says when it is inert, rather than hiding', () => 
   it('draws the whole block under `off`, and states why nothing in it reaches the run', () => {
     const spec = { ...defaultSelectorSpec(CONTEXT), policy: 'off' as const };
     const view = switchingBlockOf(spec, CONTEXT);
-    expect(view.inertNote).toMatch(/never builds the detector/);
+    expect(view.inertNote).toMatch(/Nothing below this line reaches the run/);
     expect(view.controls.length).toBeGreaterThan(0);
     expect(view.controls.every((control) => control.inert)).toBe(true);
     expect(view.patterns.length).toBeGreaterThan(0);
@@ -440,7 +440,7 @@ describe('§11.1 — the nameplate counts against where the style put it', () =>
     expect(plate.unchanged).toMatch(/Steady hand, unchanged/);
     expect(plate.leversMoved).toBe('levers moved 0 of 4');
     expect(plate.rules).toBe('rules 0');
-    expect(plate.provedOnTheBench).toMatch(/keeps no bench record/);
+    expect(plate.provedOnTheBench).toMatch(/no record is kept/);
   });
 
   it('counts one lever, and never claims the bench has seen the change', () => {

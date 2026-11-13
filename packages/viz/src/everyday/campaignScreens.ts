@@ -45,6 +45,7 @@ import {
   type TowersView,
 } from './campaignModel.js';
 import type { EverydayScreenContext, EverydayScreenModule } from './screens.js';
+import { explainer } from './screenDom.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
   EVERYDAY_COLORS as C,
@@ -79,7 +80,6 @@ import {
   dayCensusAllClear,
   censusVerdictOf,
   type CareerDayCensus,
-  type CareerIntroView,
   type CensusVerdict,
   type FiledDayRecord,
   type TowerCardView,
@@ -131,6 +131,31 @@ function note(doc: Document, text: string, className?: string): HTMLElement {
   const node = el(doc, 'p', className, text);
   node.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.warmGrey};margin:6px 0 0;max-width:74ch;text-wrap:pretty`;
   return node;
+}
+
+/**
+ * An explanation behind a link: `screenDom.ts#explainer`, with the link's words as the popover's
+ * title. Every word is the model's; this only places it.
+ */
+function helpLink(
+  doc: Document,
+  className: string,
+  help: { readonly link: string; readonly body: readonly (string | Node)[] },
+): HTMLElement {
+  const made = explainer(doc, { link: help.link, title: help.link, body: help.body });
+  made.root.classList.add(className);
+  return made.root;
+}
+
+/**
+ * An eyebrow with links beside it. The links sit **beside** the eyebrow rather than inside it, so a
+ * popover does not inherit the eyebrow's capitals and letter-spacing.
+ */
+function eyebrowRow(doc: Document, text: string, extras: readonly HTMLElement[], margin = '26px 0 10px'): HTMLElement {
+  const row = el(doc, 'div');
+  row.style.cssText = `display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:${margin}`;
+  row.append(eyebrow(doc, text, '0'), ...extras);
+  return row;
 }
 
 /**
@@ -518,7 +543,7 @@ function standingOrderControls(
   const build = select(
     doc,
     'everyday-campaign-build',
-    'Standing order: what to buy',
+    'Standing order: build shape, for your notes only',
     view.builds.map((entry) => ({ value: entry.id, label: entry.label })),
     view.buildId,
     (next) => {
@@ -574,33 +599,43 @@ function testRows(doc: Document, rows: readonly CampaignTestRow[]): HTMLElement 
      */
     item.append(head);
     if (row.beside !== '') item.append(note(doc, row.beside, 'everyday-campaign-beside'));
-    item.append(note(doc, row.tension));
     list.append(item);
   }
   return list;
+}
+
+/**
+ * *How a day clears*: the rule that decides a day, then each test's tension, then anything the
+ * screen adds. They were a paragraph under every row; the rows are the bars now and this is one press away.
+ */
+function testsHelp(
+  doc: Document,
+  className: string,
+  tests: { readonly helpLink: string; readonly note: string; readonly rows: readonly CampaignTestRow[] },
+  more: readonly string[] = [],
+): HTMLElement {
+  return helpLink(doc, className, {
+    link: tests.helpLink,
+    body: [tests.note, ...tests.rows.map((row) => `${row.label}: ${row.tension}`), ...more],
+  });
 }
 
 /* -------------------------------------------------------------------------- *
  * The career's front page — GitHub issue #536's permitted half, § D1301
  * -------------------------------------------------------------------------- */
 
-/** The fresh career's intro, every word `campaignModel.ts#CAREER_INTRO_COPY`'s. */
-function introBlock(doc: Document, intro: CareerIntroView): HTMLElement {
-  const block = el(doc, 'section', 'everyday-towers-intro');
-  block.style.cssText = `${CARD};padding:16px 18px;margin-top:18px;max-width:80ch;background:${C.cardSunk}`;
-  block.append(eyebrow(doc, intro.heading, '0 0 8px'));
-  for (const text of intro.paragraphs) {
-    const para = el(doc, 'p', 'everyday-towers-intro-para', text);
-    para.style.cssText = `font-size:14px;line-height:1.55;color:${C.inkSoft};margin:0 0 8px;text-wrap:pretty`;
-    block.append(para);
-  }
-  block.append(eyebrow(doc, intro.chimesHeading, '12px 0 8px'));
-  for (const text of intro.chimes) {
-    const para = el(doc, 'p', 'everyday-towers-intro-chimes', text);
-    para.style.cssText = `font-size:14px;line-height:1.55;color:${C.inkSoft};margin:0 0 8px;text-wrap:pretty`;
-    block.append(para);
-  }
-  return block;
+/**
+ * The career's and the chimes' rules, as two links. Drawn as a row of its own under the lede on a
+ * fresh career (`view.intro`), and beside the title once a day has been filed.
+ */
+function helpLinks(doc: Document, className: string, help: TowersView['help']): HTMLElement {
+  const row = el(doc, className === 'everyday-towers-intro' ? 'section' : 'span', className);
+  row.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;align-items:baseline';
+  row.append(
+    helpLink(doc, 'everyday-towers-help-career', help.career),
+    helpLink(doc, 'everyday-towers-help-chimes', help.chimes),
+  );
+  return row;
 }
 
 /**
@@ -723,7 +758,7 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
     root.replaceChildren();
     painted = [];
 
-    /* ---- header ---- */
+    /* ---- header: the title, one status line, one sentence ---- */
     const header = el(doc, 'div');
     header.style.cssText = 'display:flex;align-items:baseline;gap:12px;flex-wrap:wrap';
     const title = el(doc, 'h1', undefined, view.title);
@@ -736,6 +771,17 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
     const lede = el(doc, 'p', undefined, view.lede);
     lede.style.cssText = `font-size:16.5px;line-height:1.55;color:${C.inkSoft};margin:12px 0 0;max-width:74ch;text-wrap:pretty`;
     root.append(header, lede);
+    /*
+     * The career's rules are two links, never paragraphs in the page. A fresh career draws them as a
+     * row of its own under the lede, where a first visit looks; after that they sit beside the title.
+     */
+    if (view.intro !== undefined) {
+      const intro = helpLinks(doc, 'everyday-towers-intro', view.help);
+      intro.style.marginTop = '10px';
+      root.append(intro);
+    } else {
+      header.append(helpLinks(doc, 'everyday-towers-help', view.help));
+    }
 
     /*
      * The career-load refusal, drawn where the career is — GitHub issue #375. Present only when the
@@ -748,135 +794,20 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
       root.append(notice);
     }
 
-    /* ---- the fresh career's intro, then the tower cards — #536, § D1301 ---- */
-    if (view.intro !== undefined) root.append(introBlock(doc, view.intro));
-    root.append(eyebrow(doc, view.cards.heading), note(doc, view.cards.sub));
-    const cards = el(doc, 'div', 'everyday-towers-cards');
-    cards.style.cssText = `display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:${String(GAP.row)}px;margin-top:10px`;
-    for (const card of view.cards.rows) {
-      const drawn = towerCard(doc, card, () => {
-        host.campaignAct({ kind: 'open-tower', towerId: card.towerId });
-        context.go('building');
-      });
-      const loop = drawn.canvas === undefined ? undefined : loopFor(card.towerId);
-      if (drawn.canvas !== undefined && loop !== undefined) painted.push({ canvas: drawn.canvas, loop });
-      cards.append(drawn.node);
-    }
-    root.append(cards);
-    if (painted.length > 0 && paintHandle === undefined) {
-      paintHandle = doc.defaultView?.requestAnimationFrame(paint);
-    }
-
-    /* ---- standing and the slots ---- */
-    root.append(eyebrow(doc, view.standing.heading));
-    const standingCard = el(doc, 'div', 'everyday-towers-standing');
-    standingCard.style.cssText = `${CARD};padding:16px 18px`;
-    const standingValue = el(doc, 'div', 'everyday-towers-standing-value', view.standing.value);
-    standingValue.style.cssText = `font-family:${TYPE.heading};font-size:30px;font-weight:700`;
-    const bar = el(doc, 'div');
-    bar.style.cssText = `height:6px;border-radius:3px;background:${C.cardSunkDeep};margin:8px 0 0;overflow:hidden`;
-    const fill = el(doc, 'div');
-    fill.style.cssText = `height:100%;width:${String(view.standing.pct)}%;background:${C.sun}`;
-    bar.append(fill);
-    standingCard.append(standingValue, bar, note(doc, view.standing.note));
-    const slots = el(doc, 'div');
-    slots.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:${String(GAP.row)}px;margin-top:14px`;
-    for (const slot of view.standing.slots) {
-      const card = el(doc, 'div', 'everyday-towers-slot');
-      card.style.cssText = `border:1px solid ${C.ruleLight};border-radius:${String(R.row)}px;background:${C.cardSunk};padding:9px 11px`;
-      const heading = el(doc, 'div', undefined, slot.heading);
-      heading.style.cssText = `${EYEBROW}`;
-      const tag = el(doc, 'div', undefined, slot.tag);
-      tag.style.cssText = `${MONO};color:${slot.inHand ? C.moss : C.warmGrey};margin-top:3px`;
-      const body = el(doc, 'div', undefined, slot.note);
-      body.style.cssText = `font-size:11.5px;color:${C.warmGrey};line-height:1.4;margin-top:4px`;
-      card.append(heading, tag, body);
-      slots.append(card);
-    }
-    standingCard.append(slots);
-    root.append(standingCard);
-
-    /* ---- the five career figures ---- */
-    const stats = el(doc, 'div', 'everyday-towers-stats');
-    stats.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:${String(GAP.row)}px;margin-top:${String(GAP.section)}px`;
-    for (const stat of view.stats) {
-      const card = el(doc, 'div', 'everyday-towers-stat');
-      card.style.cssText = `${CARD};padding:12px 14px`;
-      const value = el(doc, 'div', undefined, stat.value);
-      value.style.cssText = `font-family:${TYPE.heading};font-size:21px;font-weight:700`;
-      const label = el(doc, 'div', undefined, stat.label);
-      label.style.cssText = `font-size:12.5px;font-weight:600;color:${C.inkSoft};margin-top:2px`;
-      const body = el(doc, 'div', undefined, stat.note);
-      body.style.cssText = `font-size:11.5px;color:${C.warmGrey};line-height:1.4;margin-top:4px`;
-      card.append(value, label, body);
-      stats.append(card);
-    }
-    root.append(stats);
-
-    /* ---- the rolling calendar ---- */
-    root.append(eyebrow(doc, view.calendar.heading), note(doc, view.calendar.note));
-    const grid = el(doc, 'div', 'everyday-towers-calendar');
-    /*
-     * § 8.7: *"Emit the column count from the same value as the cells or they drift."* The template
-     * below counts `view.calendar.columns`, and every row's cells come from that same array through
-     * `campaign/economy.ts#calendarRow`. There is no `30` in this file.
-     */
-    const columns = view.calendar.columns.length;
-    grid.style.cssText = `display:grid;grid-template-columns:132px repeat(${String(columns)},minmax(0,1fr));gap:2px;margin-top:8px;overflow-x:auto`;
-    const corner = el(doc, 'div');
-    grid.append(corner);
-    for (const day of view.calendar.columns) {
-      const head = el(doc, 'div', 'everyday-towers-calendar-col', String(day));
-      head.style.cssText = `font:500 9px ${TYPE.mono};color:${C.fainter};text-align:center`;
-      grid.append(head);
-    }
-    for (const row of view.calendar.rows) {
-      const name = el(doc, 'div', 'everyday-towers-calendar-row', row.name);
-      name.style.cssText = `font-size:11.5px;color:${C.inkSoft};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`;
-      grid.append(name);
-      for (const cell of row.cells) {
-        const box = el(doc, 'div', `everyday-towers-cell everyday-towers-cell-${cell.mark}`, cell.glyph);
-        box.title = cell.tip;
-        box.style.cssText = [
-          `font:500 10px ${TYPE.mono}`,
-          'text-align:center',
-          'padding:2px 0',
-          `border-radius:${String(R.tight)}px`,
-          `background:${
-            cell.mark === 'blank'
-              ? 'transparent'
-              : cell.mark === 'today'
-                ? C.amberWash
-                : cell.mark === 'missed'
-                  ? '#F6DED6'
-                  : cell.mark === 'cleared'
-                    ? '#E2EFE3'
-                    : C.cardSunk
-          }`,
-          `color:${cell.mark === 'missed' ? C.alarm : cell.mark === 'cleared' ? C.moss : C.warmGrey}`,
-        ].join(';');
-        grid.append(box);
-      }
-    }
-    root.append(grid);
-    const legend = el(doc, 'div', 'everyday-towers-legend');
-    legend.style.cssText = `display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:11px;color:${C.warmGrey}`;
-    for (const entry of view.calendar.legend) {
-      legend.append(
-        el(doc, 'span', undefined, entry.glyph === '' ? entry.label : `${entry.glyph} ${entry.label}`),
-      );
-    }
-    root.append(legend);
-
-    /* ---- the triage list ---- */
+    /* ---- the triage list: how many want a decision, then those buildings first ---- */
+    const footer = el(doc, 'div', 'everyday-towers-footer', view.footer);
+    footer.style.cssText = `${MONO};color:${C.warmGrey};margin-top:${String(GAP.section)}px`;
+    root.append(footer);
     const table = el(doc, 'div', 'everyday-towers-table');
-    table.style.cssText = `margin-top:${String(GAP.section)}px;display:grid;gap:${String(GAP.row)}px`;
+    table.style.cssText = `margin-top:10px;display:grid;gap:${String(GAP.row)}px`;
     const headRow = el(doc, 'div');
     headRow.style.cssText = `display:grid;grid-template-columns:minmax(0,1.6fr) 96px minmax(0,1.1fr) minmax(0,1.2fr) 104px;gap:12px;${EYEBROW};margin:0 0 2px;padding:0 14px`;
     for (const heading of view.headings) headRow.append(el(doc, 'div', undefined, heading));
     table.append(headRow);
 
-    for (const row of view.rows) {
+    /* A stable sort: the buildings that want a decision keep their order and come first. */
+    const triage = [...view.rows.filter((row) => row.needsDecision), ...view.rows.filter((row) => !row.needsDecision)];
+    for (const row of triage) {
       const card = el(doc, 'div', 'everyday-towers-row');
       card.style.cssText = [
         'display:grid',
@@ -935,24 +866,112 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
       table.append(card);
     }
     root.append(table);
+    /* Why a lift fails, beside the rows that print each building's wear. */
+    const failures = el(doc, 'div');
+    failures.style.cssText = 'margin-top:10px';
+    failures.append(helpLink(doc, 'everyday-towers-help-failures', view.help.failures));
+    root.append(failures);
 
-    const footer = el(doc, 'div', 'everyday-towers-footer', view.footer);
-    footer.style.cssText = `${MONO};color:${C.warmGrey};margin-top:12px`;
-    root.append(footer);
+    /* ---- the tower cards: each building's last filed day, replayed — #536, § D1301 ---- */
+    root.append(eyebrow(doc, view.cards.heading), note(doc, view.cards.sub));
+    const cards = el(doc, 'div', 'everyday-towers-cards');
+    cards.style.cssText = `display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:${String(GAP.row)}px;margin-top:10px`;
+    for (const card of view.cards.rows) {
+      const drawn = towerCard(doc, card, () => {
+        host.campaignAct({ kind: 'open-tower', towerId: card.towerId });
+        context.go('building');
+      });
+      const loop = drawn.canvas === undefined ? undefined : loopFor(card.towerId);
+      if (drawn.canvas !== undefined && loop !== undefined) painted.push({ canvas: drawn.canvas, loop });
+      cards.append(drawn.node);
+    }
+    root.append(cards);
+    if (painted.length > 0 && paintHandle === undefined) {
+      paintHandle = doc.defaultView?.requestAnimationFrame(paint);
+    }
 
-    /* ---- the two panels this build refuses, and the register ---- */
-    const panels = el(doc, 'div');
-    panels.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:${String(GAP.row)}px;margin-top:${String(GAP.section)}px`;
-    /* § 8.8's offers — GitHub issue #169 item 3, § D510. Every word is `campaignModel.ts#offersView`'s. */
+    /* ---- the rolling calendar ---- */
+    root.append(eyebrow(doc, view.calendar.heading), note(doc, view.calendar.note));
+    const grid = el(doc, 'div', 'everyday-towers-calendar');
+    /*
+     * § 8.7: *"Emit the column count from the same value as the cells or they drift."* The template
+     * below counts `view.calendar.columns`, and every row's cells come from that same array through
+     * `campaign/economy.ts#calendarRow`. There is no `30` in this file.
+     */
+    const columns = view.calendar.columns.length;
+    grid.style.cssText = `display:grid;grid-template-columns:132px repeat(${String(columns)},minmax(0,1fr));gap:2px;margin-top:8px;overflow-x:auto`;
+    const corner = el(doc, 'div');
+    grid.append(corner);
+    for (const day of view.calendar.columns) {
+      const head = el(doc, 'div', 'everyday-towers-calendar-col', String(day));
+      head.style.cssText = `font:500 9px ${TYPE.mono};color:${C.fainter};text-align:center`;
+      grid.append(head);
+    }
+    for (const row of view.calendar.rows) {
+      const name = el(doc, 'div', 'everyday-towers-calendar-row', row.name);
+      name.style.cssText = `font-size:11.5px;color:${C.inkSoft};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`;
+      grid.append(name);
+      for (const cell of row.cells) {
+        const box = el(doc, 'div', `everyday-towers-cell everyday-towers-cell-${cell.mark}`, cell.glyph);
+        box.title = cell.tip;
+        box.style.cssText = [
+          `font:500 10px ${TYPE.mono}`,
+          'text-align:center',
+          'padding:2px 0',
+          `border-radius:${String(R.tight)}px`,
+          `background:${
+            cell.mark === 'blank'
+              ? 'transparent'
+              : cell.mark === 'today'
+                ? C.amberWash
+                : cell.mark === 'missed'
+                  ? '#F6DED6'
+                  : cell.mark === 'cleared'
+                    ? '#E2EFE3'
+                    : C.cardSunk
+          }`,
+          `color:${cell.mark === 'missed' ? C.alarm : cell.mark === 'cleared' ? C.moss : C.warmGrey}`,
+        ].join(';');
+        grid.append(box);
+      }
+    }
+    root.append(grid);
+    const legend = el(doc, 'div', 'everyday-towers-legend');
+    legend.style.cssText = `display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:11px;color:${C.warmGrey}`;
+    for (const entry of view.calendar.legend) {
+      legend.append(
+        el(doc, 'span', undefined, entry.glyph === '' ? entry.label : `${entry.glyph} ${entry.label}`),
+      );
+    }
+    root.append(legend);
+
+    /* ---- § 8.8's offers — GitHub issue #169 item 3, § D510. Every word is `campaignModel.ts#offersView`'s. ---- */
     {
       const card = el(doc, 'div', 'everyday-towers-offers');
-      card.style.cssText = `${CARD};padding:14px 16px;background:${C.cardSunk}`;
+      card.style.cssText = `${CARD};padding:14px 16px;background:${C.cardSunk};margin-top:${String(GAP.section)}px`;
       card.append(eyebrow(doc, `${view.offers.heading} · ${view.offers.caption}`, '0 0 6px'));
       if (view.offers.empty !== undefined) {
         const none = el(doc, 'div', 'everyday-towers-offers-empty', view.offers.empty);
         none.style.cssText = `font-size:12px;color:${C.warmGrey};line-height:1.5`;
         card.append(none);
       }
+      /*
+       * **One refusal, said once.** When every offer that cannot be taken is refused for the same
+       * reason, the reason is drawn once above the list and every dead button is described by it
+       * (GitHub issue #262: a dead control says why on the control). Rows refused for different
+       * reasons each keep their own line.
+       */
+      const refusals = new Set(view.offers.rows.flatMap((offer) => (offer.refusal === undefined ? [] : [offer.refusal])));
+      const [shared] = refusals.size === 1 ? [...refusals] : [];
+      const sharedId = 'everyday-towers-offer-refusal-shared';
+      if (shared !== undefined) {
+        const why = el(doc, 'div', 'everyday-towers-offer-refusal', shared);
+        why.style.cssText = `font-size:12.5px;color:${C.terracotta};line-height:1.5;margin-bottom:6px`;
+        why.id = sharedId;
+        card.append(why);
+      }
+      const list = el(doc, 'div', 'everyday-towers-offer-list');
+      list.style.cssText = `display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:0 ${String(GAP.wide)}px`;
       for (const offer of view.offers.rows) {
         const row = el(doc, 'div', 'everyday-towers-offer');
         row.dataset['contract'] = offer.contractId;
@@ -967,8 +986,11 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
           host.campaignAct({ kind: 'take-offer', contractId: offer.contractId });
           context.go('building');
         });
+        take.style.alignSelf = 'flex-start';
         row.append(name, terms, quirk, take);
-        if (offer.refusal !== undefined) {
+        if (offer.refusal !== undefined && shared !== undefined) {
+          take.setAttribute('aria-describedby', sharedId);
+        } else if (offer.refusal !== undefined) {
           const why = el(doc, 'div', 'everyday-towers-offer-refusal', offer.refusal);
           why.style.cssText = `font-size:12px;color:${C.terracotta};line-height:1.5`;
           /* A dead control says why on the control (GitHub issue #262): the refusal is the button's description. */
@@ -976,40 +998,79 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
           take.setAttribute('aria-describedby', why.id);
           row.append(why);
         }
-        card.append(row);
+        list.append(row);
       }
+      card.append(list);
       const offersNote = el(doc, 'div', 'everyday-towers-offers-note', view.offers.note);
       offersNote.style.cssText = `font-size:11.5px;color:${C.faint};margin-top:6px;line-height:1.4`;
       card.append(offersNote);
-      panels.append(card);
+      root.append(card);
     }
-    for (const [heading, sub, refusal, className] of [
-      [view.lately.heading, view.lately.sub, view.lately.refusal, 'everyday-towers-lately'],
-    ] as const) {
-      const card = el(doc, 'div', className);
-      card.style.cssText = `${CARD};padding:14px 16px;background:${C.cardSunk}`;
-      card.append(eyebrow(doc, heading, '0 0 6px'));
-      if (sub !== undefined) {
-        const subLine = el(doc, 'div', undefined, sub);
-        subLine.style.cssText = `font-size:11.5px;color:${C.faint};margin-bottom:6px`;
-        card.append(subLine);
-      }
-      const why = el(doc, 'div', undefined, refusal);
-      why.style.cssText = `font-size:12px;color:${C.terracotta};line-height:1.5`;
-      card.append(why);
-      panels.append(card);
+
+    /* ---- standing, the slots and the career figures, with the rule behind a link ---- */
+    root.append(
+      eyebrowRow(doc, view.standing.heading, [helpLink(doc, 'everyday-towers-help-standing', view.help.standing)]),
+    );
+    const standingCard = el(doc, 'div', 'everyday-towers-standing');
+    standingCard.style.cssText = `${CARD};padding:14px 16px`;
+    const standingHead = el(doc, 'div');
+    standingHead.style.cssText = 'display:flex;align-items:baseline;gap:12px;flex-wrap:wrap';
+    const standingValue = el(doc, 'div', 'everyday-towers-standing-value', view.standing.value);
+    standingValue.style.cssText = `font-family:${TYPE.heading};font-size:26px;font-weight:700`;
+    const standingNote = note(doc, view.standing.note);
+    standingNote.style.margin = '0';
+    standingHead.append(standingValue, standingNote);
+    const bar = el(doc, 'div');
+    bar.style.cssText = `height:6px;border-radius:3px;background:${C.cardSunkDeep};margin:8px 0 0;overflow:hidden`;
+    const fill = el(doc, 'div');
+    fill.style.cssText = `height:100%;width:${String(view.standing.pct)}%;background:${C.sun}`;
+    bar.append(fill);
+    standingCard.append(standingHead, bar);
+    const slots = el(doc, 'div');
+    slots.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:${String(GAP.tight)}px;margin-top:12px`;
+    for (const slot of view.standing.slots) {
+      const card = el(doc, 'div', 'everyday-towers-slot');
+      /* The slot's own note is its tooltip: the tile is the slot and where it stands, nothing more. */
+      card.title = slot.note;
+      card.style.cssText = `border:1px solid ${C.ruleLight};border-radius:${String(R.row)}px;background:${C.cardSunk};padding:7px 10px`;
+      const heading = el(doc, 'div', undefined, slot.heading);
+      heading.style.cssText = `${EYEBROW}`;
+      const tag = el(doc, 'div', undefined, slot.tag);
+      tag.style.cssText = `${MONO};color:${slot.inHand ? C.moss : C.warmGrey};margin-top:3px`;
+      card.append(heading, tag);
+      slots.append(card);
     }
-    root.append(panels);
-    root.append(note(doc, view.oddsFootnote));
+    standingCard.append(slots);
+    root.append(standingCard);
+
+    const stats = el(doc, 'div', 'everyday-towers-stats');
+    stats.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:${String(GAP.row)}px;margin-top:${String(GAP.row)}px`;
+    for (const stat of view.stats) {
+      const card = el(doc, 'div', 'everyday-towers-stat');
+      card.style.cssText = `${CARD};padding:10px 12px`;
+      const value = el(doc, 'div', undefined, stat.value);
+      value.style.cssText = `font-family:${TYPE.heading};font-size:19px;font-weight:700`;
+      const label = el(doc, 'div', undefined, stat.label);
+      label.style.cssText = `font-size:12.5px;font-weight:600;color:${C.inkSoft};margin-top:2px`;
+      const body = el(doc, 'div', undefined, stat.note);
+      body.style.cssText = `font-size:11.5px;color:${C.warmGrey};line-height:1.4;margin-top:3px`;
+      card.append(value, label, body);
+      stats.append(card);
+    }
+    root.append(stats);
 
     /*
-     * **The campaign's register of absences is on the settings screen now**, with the other five
-     * (`everyday/buildNotes.ts`, GitHub issue #207). `CAMPAIGN_ABSENCES` is unchanged — it was
-     * already three sentences of plain English with no notation in them, which is the
-     * counter-example that showed the fix was a rewrite of the other five rather than a change to
-     * the mechanism. What a player still meets here is the per-control refusal above: the offers
-     * panel says on its own face why it has no offers.
+     * ---- what has happened lately: one line ----
+     * There is no feed to draw, so the section is its heading and one sentence rather than a card.
+     * The campaign's register of absences is on the settings screen (`everyday/buildNotes.ts`,
+     * GitHub issue #207).
      */
+    const lately = el(doc, 'div', 'everyday-towers-lately');
+    lately.style.cssText = `display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:${String(GAP.section)}px`;
+    const latelyLine = el(doc, 'span', undefined, view.lately.refusal);
+    latelyLine.style.cssText = `font-size:12.5px;color:${C.warmGrey}`;
+    lately.append(eyebrow(doc, `${view.lately.heading} ${view.lately.sub}`, '0'), latelyLine);
+    root.append(lately);
 
     shell.refreshBar?.();
   };
@@ -1280,14 +1341,14 @@ function mountBuilding(hostEl: HTMLElement, context: EverydayScreenContext): Mou
      * have any other.
      */
     left.append(eyebrow(doc, view.tests.eyebrow));
-    left.append(note(doc, view.tests.decides, 'everyday-building-tests-decides'));
     const testsMeta = el(doc, 'div');
-    testsMeta.style.cssText = `display:flex;justify-content:space-between;gap:12px;${MONO};color:${C.warmGrey};margin-bottom:8px`;
-    testsMeta.append(
-      el(doc, 'span', undefined, view.tests.note),
-      el(doc, 'span', 'everyday-building-tests-held', view.tests.held),
-    );
-    left.append(testsMeta, testRows(doc, view.tests.rows));
+    testsMeta.style.cssText = `display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 8px`;
+    const testsHeld = el(doc, 'span', 'everyday-building-tests-held', view.tests.held);
+    testsHeld.style.cssText = `${MONO};color:${C.warmGrey}`;
+    testsMeta.append(testsHelp(doc, 'everyday-building-tests-help', view.tests), testsHeld);
+    const testsDecides = note(doc, view.tests.decides, 'everyday-building-tests-decides');
+    testsDecides.style.margin = '0 0 8px';
+    left.append(testsDecides, testsMeta, testRows(doc, view.tests.rows));
 
     /* ---- the right rail ---- */
     const railCard = (heading: string, className: string): HTMLElement => {
@@ -1430,12 +1491,10 @@ function mountBuilding(hostEl: HTMLElement, context: EverydayScreenContext): Mou
 const NO_CAMPAIGN = 'No career is open.';
 
 /** Why *Send your answer* is dead until one of the desk's options is picked (§ 8.2). */
-const NO_ANSWER_PICKED =
-  'the options above are the answer — pick one, and this sends it';
+const NO_ANSWER_PICKED = 'Pick an option above. This sends it.';
 
 /** Drawn when the career holds no open tower — a sentence, never a blank region. */
-const NO_TOWER =
-  'no building is open — pick one on All buildings, and this desk is about that one until you pick another';
+const NO_TOWER = 'No building is open. Pick one on All buildings.';
 
 /**
  * § 3.3's `building` row. The guide gives five primary variants and two notes; which one is live is
@@ -1675,11 +1734,16 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
     after.style.cssText = `font-size:15px;color:${C.moss}`;
     oddsLine.append(now, el(doc, 'span', undefined, '→'), after);
     purseCard.append(oddsLine, note(doc, view.purse.oddsNote));
-    purseCard.append(
-      note(doc, view.purse.totalNote),
-      note(doc, view.purse.carryNote),
-      note(doc, view.purse.kitNote),
+    purseCard.append(note(doc, view.purse.totalNote));
+    const purseHelp = el(doc, 'div');
+    purseHelp.style.cssText = 'margin-top:8px';
+    purseHelp.append(
+      helpLink(doc, 'everyday-contract-purse-help', {
+        link: view.purse.helpLink,
+        body: [view.purse.carryNote, view.purse.kitNote],
+      }),
     );
+    purseCard.append(purseHelp);
 
     pair.append(monthCard, purseCard);
     root.append(pair);
@@ -1687,17 +1751,15 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
     /* ---- the four tests and the conflict ---- */
     /* GitHub issue #567, as on the desk — the same sentence, because it is the same two sets. */
     root.append(eyebrow(doc, view.tests.eyebrow));
-    root.append(note(doc, view.tests.decides, 'everyday-contract-tests-decides'));
     const testsMeta = el(doc, 'div');
-    testsMeta.style.cssText = `display:flex;justify-content:space-between;gap:12px;${MONO};color:${C.warmGrey};margin-bottom:8px`;
-    testsMeta.append(
-      el(doc, 'span', undefined, view.tests.note),
-      el(doc, 'span', 'everyday-contract-tests-held', view.tests.held),
-    );
-    root.append(testsMeta, testRows(doc, view.tests.rows));
-    const conflict = el(doc, 'p', 'everyday-contract-conflict', view.tests.conflict);
-    conflict.style.cssText = `font-size:13px;line-height:1.55;color:${C.inkSoft};margin:12px 0 0;max-width:80ch;padding:12px 14px;border-left:3px solid ${C.sun};background:${C.cardSunk}`;
-    root.append(conflict);
+    testsMeta.style.cssText = `display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 8px`;
+    const testsHeld = el(doc, 'span', 'everyday-contract-tests-held', view.tests.held);
+    testsHeld.style.cssText = `${MONO};color:${C.warmGrey}`;
+    /* The conflict between the queue cap and the wear budget is the popover's last paragraph. */
+    testsMeta.append(testsHelp(doc, 'everyday-contract-tests-help', view.tests, [view.tests.conflict]), testsHeld);
+    const testsDecides = note(doc, view.tests.decides, 'everyday-contract-tests-decides');
+    testsDecides.style.margin = '0 0 8px';
+    root.append(testsDecides, testsMeta, testRows(doc, view.tests.rows));
 
     /* ---- the shop ---- */
     root.append(eyebrow(doc, view.shop.eyebrow), note(doc, view.shop.sub));
@@ -1783,28 +1845,31 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
     const bottom = el(doc, 'div');
     bottom.style.cssText = `display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:${String(GAP.block)}px;margin-top:${String(GAP.section)}px`;
     /*
-     * **The contract, set out as a document** — GitHub issue #536, § D1301. Numbered clauses on a
-     * paper sheet, the service levels as a list with where their bars come from said beneath them,
-     * and the month's standing as the document's schedule. Every word is
-     * `campaignModel.ts#contractDocumentOf`'s; the class is kept so the journey test's read of the
-     * terms still finds them.
+     * **This month's standing, and the contract behind a link** — GitHub issue #536, § D1301. The
+     * card is the four rows a player checks before running the day; the document itself (numbered
+     * clauses, the service levels as a list with where their bars come from said beneath them) opens
+     * in a popover from *Read the contract*. Every word is `campaignModel.ts#contractDocumentOf`'s;
+     * the classes are kept so the journey test's read of the terms still finds them.
      */
-    const termsCard = el(doc, 'div', 'everyday-contract-terms everyday-contract-document');
-    termsCard.style.cssText = [
-      `border:1px solid ${C.rule}`,
-      `border-radius:${String(R.card)}px`,
-      `background:${C.paper}`,
-      'padding:20px 22px',
-      'grid-column:1 / -1',
-      'max-width:78ch',
-    ].join(';');
+    const termsCard = el(doc, 'div', 'everyday-contract-terms');
+    termsCard.style.cssText = `${CARD};padding:14px 16px`;
+    const termsHeading = el(doc, 'h2', undefined, view.terms.heading);
+    termsHeading.style.cssText = `font-family:${TYPE.heading};font-size:16px;font-weight:600;margin:0 0 6px`;
+    termsCard.append(termsHeading);
+    for (const row of view.terms.rows) {
+      const line = el(doc, 'div', 'everyday-contract-term');
+      line.style.cssText = `display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:5px 0;border-top:1px solid ${C.ruleLight}`;
+      const got = el(doc, 'span', undefined, row.got);
+      got.style.cssText = `${MONO};color:${C.warmGrey}`;
+      line.append(el(doc, 'span', undefined, row.label), got);
+      termsCard.append(line);
+    }
     /* Read through a local: `pageTitle.test.ts` refuses the global's title spelled anywhere in the viewer. */
     const contractDoc = view.document;
-    const docTitle = el(doc, 'h2', 'everyday-contract-document-title', contractDoc.title);
-    docTitle.style.cssText = `font:600 13px ${TYPE.mono};letter-spacing:.2em;text-align:center;margin:0;color:${C.ink}`;
+    const sheet = el(doc, 'div', 'everyday-contract-document');
     const parties = el(doc, 'p', 'everyday-contract-document-parties', contractDoc.parties);
-    parties.style.cssText = `font-size:13px;text-align:center;color:${C.warmGrey};margin:6px 0 14px;padding-bottom:12px;border-bottom:1px solid ${C.ruleLight}`;
-    termsCard.append(docTitle, parties);
+    parties.style.cssText = `font-size:13px;color:${C.warmGrey};margin:0 0 14px;padding-bottom:12px;border-bottom:1px solid ${C.ruleLight}`;
+    sheet.append(parties);
     for (const clause of contractDoc.clauses) {
       const block = el(doc, 'div', 'everyday-contract-clause');
       block.style.cssText = 'display:grid;grid-template-columns:2.2em minmax(0,1fr);gap:4px 8px;margin:0 0 12px';
@@ -1812,7 +1877,7 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
       number.style.cssText = `${MONO};color:${C.label}`;
       const body = el(doc, 'div');
       const heading = el(doc, 'div', 'everyday-contract-clause-heading', clause.heading);
-      heading.style.cssText = 'font-size:13.5px;font-weight:600';
+      heading.style.cssText = `font-size:13.5px;font-weight:600;color:${C.ink}`;
       const text = el(doc, 'p', 'everyday-contract-clause-body', clause.body);
       text.style.cssText = `font-size:13px;line-height:1.55;color:${C.inkSoft};margin:2px 0 0;text-wrap:pretty`;
       body.append(heading, text);
@@ -1828,19 +1893,14 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
         body.append(basis);
       }
       block.append(number, body);
-      termsCard.append(block);
+      sheet.append(block);
     }
-    const termsHeading = el(doc, 'h3', undefined, view.terms.heading);
-    termsHeading.style.cssText = `font-family:${TYPE.heading};font-size:14px;font-weight:600;margin:14px 0 6px;padding-top:12px;border-top:1px solid ${C.ruleLight}`;
-    termsCard.append(termsHeading);
-    for (const row of view.terms.rows) {
-      const line = el(doc, 'div', 'everyday-contract-term');
-      line.style.cssText = `display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:5px 0;border-top:1px solid ${C.ruleLight}`;
-      const got = el(doc, 'span', undefined, row.got);
-      got.style.cssText = `${MONO};color:${C.warmGrey}`;
-      line.append(el(doc, 'span', undefined, row.label), got);
-      termsCard.append(line);
-    }
+    const documentLink = el(doc, 'div');
+    documentLink.style.cssText = 'margin-top:10px';
+    const documentHelp = explainer(doc, { link: contractDoc.link, title: contractDoc.title, body: [sheet] });
+    documentHelp.root.classList.add('everyday-contract-document-link');
+    documentLink.append(documentHelp.root);
+    termsCard.append(documentLink);
     const shaftCard = el(doc, 'div', 'everyday-contract-shaft');
     shaftCard.style.cssText = `${CARD};padding:14px 16px;background:${C.cardSunk}`;
     const shaftHeading = el(doc, 'h2', undefined, view.shaft.heading);
@@ -1944,7 +2004,7 @@ function contractBar(state: EverydayState): ActionBarModel {
     },
     note:
       nights === 0
-        ? 'Nothing under works. Run it as the building stands.'
+        ? 'No works booked. Run it as the building stands.'
         : (nightsNote ?? `${String(nights)} nights of works ahead, and those days still have to clear.`),
   };
 }

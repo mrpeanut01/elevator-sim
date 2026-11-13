@@ -507,7 +507,7 @@ describe('what this screen adds on top of the sheet', () => {
     expect(due?.label).not.toContain('Open the doors');
     // It names the day that waits on the answer.
     expect(due?.note).toContain('Day 20 has closed and the contract is up for renewal');
-    expect(due?.note).toContain('The next month’s first day does not run until it is answered');
+    expect(due?.note).toContain('The next month’s first day won’t run until you answer');
     expect(due?.note).toContain('You stay in the career');
     // The other polarity: a day with no renewal standing still opens the next day.
     expect(viewOf({ career: { ...CAREER, day: 18 } }).tomorrow?.goes).toBe('career-day');
@@ -846,7 +846,7 @@ describe('every lever routes, and a dispatcher lever keeps its honesty on the ca
     });
     expect(view.levers[0]?.route).toBeUndefined();
     expect(view.levers[0]?.goLabel).toBeUndefined();
-    expect(view.levers[0]?.noSurfaceNote).toContain('does not know');
+    expect(view.levers[0]?.noSurfaceNote).toContain('No shortcut');
   });
 });
 

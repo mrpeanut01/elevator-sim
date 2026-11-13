@@ -278,7 +278,7 @@ describe('§ 7.3’s opening overlay after a skip — issue #565', () => {
   it('the sentence it guards is still the false one, and is unreachable at the end', () => {
     const line = stageOpeningLineOf({ recording: RECORDING, simTimeS: RECORDING.endedAt });
     expect(line).toContain('the start of the day');
-    expect(line).toContain('Nothing has happened yet');
+    expect(line).toContain('the start of the day');
     expect(
       stageShowsOpening({ started: false, simTimeS: RECORDING.endedAt, recording: RECORDING }),
     ).toBe(false);

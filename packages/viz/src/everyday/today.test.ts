@@ -481,7 +481,7 @@ describe('the load reading', () => {
     const held = event.effect.carsOutOfService + (event.effect.derate?.cars ?? 0);
     const perCar = Math.round(midtown.totalPopulation / (cars - held));
     expect(record.load?.word).toBe(`${String(perCar).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} per working car`);
-    expect(record.load?.note).toContain(`${String(cars - held)} working cars today, as the building is configured`);
+    expect(record.load?.note).toContain(`${String(cars - held)} working cars today. The day will show`);
     /* The verdict words are gone: a plate at t = 0 has no day to grade. */
     for (const text of [record.load?.word ?? '', record.load?.note ?? '']) {
       expect(text).not.toMatch(/comfortable is around|\bBusy\b/u);

@@ -202,6 +202,7 @@ import {
   EVERYDAY_RADII as R,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
+import { explainer } from './screenDom.js';
 import type { EverydayState, RunContext } from './types.js';
 import {
   playThisCrowdRefusalFor,
@@ -1967,9 +1968,10 @@ function mountStage(
     body.append(heading);
     /* Wave AP, lane DT-2: the caveat once, under the heading, rather than under every row. */
     if (caveat !== undefined) {
+      /* The copy edit: how the rows were measured is read once, so it sits behind a link under the heading. */
       const said = el(doc, 'p', 'everyday-stage-call-rows-caveat', caveat);
-      said.style.cssText = `margin:0;font-size:12px;line-height:1.45;color:${C.inkSoft}`;
-      body.append(said);
+      said.style.cssText = `margin:0 0 10px;font-size:13.5px;line-height:1.5;color:${C.inkSoft}`;
+      body.append(explainer(doc, { link: 'How to read these', title: 'How to read these', body: [said] }).root);
     }
     for (const row of rows) {
       const item = el(doc, 'div', 'everyday-stage-call-row');

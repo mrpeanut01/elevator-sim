@@ -101,7 +101,8 @@ describe('the challenge tab', () => {
   it('says this build has no server, and says what a challenge is', () => {
     const view = challengeTabViewOf({ kind: 'no-server' });
     expect(view.lines[0]?.text).toBe(BOARD_SCREEN_COPY.challengeAbsence);
-    expect(textOf(view)).toContain('needs a server');
+    expect(textOf(view)).toContain('isn’t available here');
+    expect(textOf(view)).toContain('A challenge is a fixed set of crowds');
   });
 
   it('keeps “could not ask” and “nobody has posted” apart', () => {

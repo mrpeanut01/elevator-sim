@@ -228,7 +228,7 @@ describe('the host keeps and answers it only where there is no rush board — §
     expect(drawn.yours[0]?.tag).toBe(RUSH_DEVICE_COPY.tag);
     expect(drawn.yours[0]?.name).toBe(RUSH_DEVICE_COPY.name);
     expect(drawn.yoursLine).toBe(RUSH_DEVICE_COPY.note);
-    expect(drawn.yoursLine).toMatch(/posted nowhere, no server checked it, and it is ranked against nobody/u);
+    expect(drawn.yoursLine).toMatch(/isn’t posted, checked by a server or ranked/u);
     /* A build with a board draws § D1359's line and never this device's row. */
     const served = rushStandingsOf(BUILDING, () => undefined, RUSH_HOUSE_TABLE, undefined, { kind: 'signed-out' }, device);
     if (served.kind !== 'rows') throw new Error(served.kind);

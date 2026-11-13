@@ -220,7 +220,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
       // § 3.5: the front door is not overridable, and a deep link is what would override it. The
       // load above carries two query parameters and still lands here.
       /* § D1628: the front door is the lobby, and its welcome is the menu's lede now. */
-      expect(front.lede).toContain('Every floor is a way to play');
+      expect(front.lede).toContain('Each floor is a way to play');
       expect(front.engineerMenuHidden).toBe(true);
     } finally {
       await page.close();
@@ -322,7 +322,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
       expect(swap?.label).toContain('Switch to Engineer');
       expect(swap?.label).not.toContain('not built');
       // The note is words on the row, on the mode tiles' argument: a `title` is not a sentence.
-      expect(swap?.label).toContain('nothing stops');
+      expect(swap?.label).toContain('Nothing stops');
       expect(swap?.title).toBe('');
     } finally {
       await page.close();
@@ -353,7 +353,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
       expect(bar.leave).toEqual({ label: '⌂ Lobby', disabled: true });
       // § D525: the menu row follows the selected card, and the first card is Scenario.
       expect(bar.primary).toEqual({ label: 'Pick a scenario', disabled: false });
-      expect(bar.note).toBe('Pick a floor above, then play it.');
+      expect(bar.note).toBe('Pick a floor to play.');
     } finally {
       await page.close();
     }

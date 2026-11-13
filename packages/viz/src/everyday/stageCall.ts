@@ -75,19 +75,19 @@ export const STAGE_CALL_COPY = Object.freeze({
   minute: 'Somebody on a landing has waited a minute.',
   /* One label for both kinds of call and the ordinary call's report row — `shift/dayCalls.ts`. */
   leave: DAY_CALL_LEAVE_LABEL,
-  held: 'held until the stage stops for this day’s call',
+  held: 'held until today’s call',
   /*
    * Wave AM, lane AM-B, § D1239, the post-AL panel's seats B and D: *held until the stage stops for
    * this day's call* stood beside the strip with the stage already stopped at a call and the card
    * up. While a card is up the presses are its answers.
    */
-  heldAtCall: 'held while the call is up: its answers are on the card',
+  heldAtCall: 'answer on the call card',
   /*
    * § D1138: the pace note while the stage waits at an ordinary candidate whose two runs have not
    * landed. It names what the stage is doing and nothing about the call, which may not be raised:
    * the same words whether the answers will turn out to matter or not.
    */
-  waiting: 'stopped while the day is run ahead from here',
+  waiting: 'paused while the day runs ahead',
   /*
    * Wave AL, lane AL-A, the post-AK panel's seat B (D1): *Close the day* pressed with the card up
    * filed the scored day on the spot, unanswered, with nothing asked (on a phone it is the big
@@ -95,7 +95,7 @@ export const STAGE_CALL_COPY = Object.freeze({
    */
   closeAsk: 'Close the day without answering this call?',
   closeConsequence:
-    'The rest of the day plays out with nothing answered, and the report is written from that.',
+    'The rest of the day plays out unanswered, and the report is written from that.',
   closeFile: 'Close the day as it stands',
   closeBack: 'Back to the call',
   /*
@@ -106,8 +106,7 @@ export const STAGE_CALL_COPY = Object.freeze({
    */
   skipAsk: 'Skip to the end without answering this call?',
   skipConsequence:
-    'The call is recorded as skipped, no more calls are asked, and the rest of the day plays out with ' +
-    'nothing more pressed.',
+    'The call is recorded as skipped. No more calls are asked, and nothing more is pressed today.',
   skipGo: 'Skip to the end',
 });
 
@@ -197,11 +196,11 @@ export interface StageCallOption {
  * no effect on the crowd, no *will*, nothing the three runs differ in.
  */
 export const STAGE_CALL_ANSWER_LINES: Readonly<Record<'park-cars-lobby' | 'spread-cars' | 'leave', string>> = Object.freeze({
-  'park-cars-lobby': `${PARK_CARS_LOBBY_LABEL}: from the call, each car that falls idle heads for the lobby and waits there.`,
+  'park-cars-lobby': `${PARK_CARS_LOBBY_LABEL}: from the call, idle cars head for the lobby and wait there.`,
   'spread-cars':
-    `${SPREAD_CARS_LABEL}: from the call, idle cars wait spread across the tower, and which car takes ` +
-    'which call stays the driver’s own choice.',
-  leave: `${DAY_CALL_LEAVE_LABEL}: nothing is pressed, and the cars go on as the driver runs them.`,
+    `${SPREAD_CARS_LABEL}: from the call, idle cars wait spread across the tower. The dispatcher still picks ` +
+    'which car takes which call.',
+  leave: `${DAY_CALL_LEAVE_LABEL}: nothing is pressed. The cars go on as the dispatcher runs them.`,
 });
 
 /** How many of a profile's terms a driver's line names by name before it counts the rest. */
@@ -546,7 +545,7 @@ export const STAGE_END_DAY_COPY = Object.freeze({
   label: 'End the day',
   note: (goal: string): string =>
     `${goal.charAt(0).toUpperCase()}${goal.slice(1)} is already past its bar, and it cannot come back ` +
-    'under it today. Ending now files the whole day as it runs from here, with nothing more pressed.',
+    'under it today. Ending now files the whole day as it runs from here.',
 });
 
 /** The *End the day* control's words, or `undefined` while the day can still clear. */
@@ -572,8 +571,8 @@ export const STAGE_LOST_COPY = Object.freeze({
   end: 'End the day',
   watch: 'Watch the rest',
   choices:
-    'End the day files it as it runs from here, with nothing more pressed, and every figure on the sheet ' +
-    'is the whole day’s. Watch the rest plays it on at 30×.',
+    'End the day files it as it runs from here, and the report covers the whole day. ' +
+    'Watch the rest plays it on at 30×.',
 });
 
 /** The card's words for the readings at the playhead, or `undefined` while the day can still clear. */
@@ -589,7 +588,7 @@ export function stageLostCardOf(
     heading: STAGE_LOST_COPY.heading,
     fact:
       `${what} reached ${String(lost.observed)}${unit} by ${clock}, past its bar of ${String(lost.goal.bar)}${unit}. ` +
-      'A maximum past its bar stays past it, and the stage asks nothing more today.',
+      'It can’t come back under it, so no more calls are asked today.',
     choices: STAGE_LOST_COPY.choices,
   });
 }

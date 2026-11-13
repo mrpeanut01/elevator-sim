@@ -181,13 +181,23 @@ describe('the standings are the house’s runs on the standing building', () => 
    * that measurement establishes and claims nothing about the size of a gap, which is one cell's.
    */
   it('says the rows drove from the first second, and what a handover part-way cannot be', () => {
-    expect(RUSH_HOUSE_COPY.note).toContain('first second');
-    expect(RUSH_HOUSE_COPY.note).toContain('handed over part-way through');
-    expect(RUSH_HOUSE_COPY.note).toContain('until the handover');
-    expect(RUSH_HOUSE_COPY.note).toContain('door timing or call forecast');
-    expect(RUSH_HOUSE_COPY.note).not.toContain('weight vector');
+    /* The caption stays above the rows; the two mechanisms are behind its link, *About the house runs*. */
+    expect(RUSH_HOUSE_COPY.note).toContain('does not rank the dispatchers');
+    expect(RUSH_HOUSE_COPY.aboutStart).toContain('first second');
+    expect(RUSH_HOUSE_COPY.aboutHandover).toContain('handed over part-way through');
+    expect(RUSH_HOUSE_COPY.aboutHandover).toContain('until the handover');
+    expect(RUSH_HOUSE_COPY.aboutHandover).toContain('door timing or call forecast');
+    expect(RUSH_HOUSE_COPY.aboutHandover).toContain('is not what these rows measured');
+    const account = [
+      RUSH_HOUSE_COPY.note,
+      RUSH_HOUSE_COPY.aboutRuns,
+      RUSH_HOUSE_COPY.aboutOrder,
+      RUSH_HOUSE_COPY.aboutStart,
+      RUSH_HOUSE_COPY.aboutHandover,
+    ].join(' ');
+    expect(account).not.toContain('weight vector');
     /* No figure: the gap is one building's and the note is drawn on every building. */
-    expect(RUSH_HOUSE_COPY.note).not.toMatch(/\d/u);
+    expect(account).not.toMatch(/\d/u);
   });
 
   it('publishes no mean on any row', () => {
@@ -337,11 +347,11 @@ describe('the house run beside the player’s round — wave AR, lane AR-1', () 
   it('states both figures on the same crowd, and no verdict', () => {
     const line = rushHouseLineOf({ ...midtown, outcome: { kind: 'broke', heldS: 1538, wave: 9 } });
     expect(line).toBe(
-      'This round held 25:38, into wave 9. The house run on the same crowd, Conventional collective with no changes, ' +
+      'This round held 25:38, into wave 9. On the same waves, the house run with Conventional collective (no changes) ' +
         'held 27:20, into wave 10. One run of each.',
     );
     const stopped = rushHouseLineOf({ ...midtown, outcome: { kind: 'stopped', heldS: 200, wave: 2 } });
-    expect(stopped).toMatch(/^This round was ended by hand at 3:20, in wave 2\. /u);
+    expect(stopped).toMatch(/^You ended this round at 3:20, in wave 2\. /u);
     for (const text of [line, stopped]) expect(text).not.toMatch(/\b(better|worse|cost|helped|beat|lost|improv|win|won)/iu);
   });
 
@@ -367,7 +377,7 @@ describe('the line to beat on the setup page — wave AS, lane AS-1, § D1545 (G
   it('states the house run from the same row the result reads, and claims nothing about a choice', () => {
     const line = rushHouseToBeatLineOf(midtown);
     expect(line).toBe(
-      'The house run on this crowd, Conventional collective with no changes, holds to 27:20, into wave 10. That is the time to pass.',
+      'Time to pass: 27:20, into wave 10. That’s the house run with Conventional collective (no changes) on these waves.',
     );
     /* The same row as the result's line: its house half carries the same figures. */
     const after = rushHouseLineOf({ ...midtown, outcome: { kind: 'broke', heldS: 600, wave: 4 } }) ?? '';

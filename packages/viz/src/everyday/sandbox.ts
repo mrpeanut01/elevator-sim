@@ -241,15 +241,15 @@ export function sandboxCarriedLineOf(day: SandboxDayMakeup, sandbox: SandboxDayM
   if (wrinkle === undefined && dayCars.length === 0) return undefined;
   const kept = [
     ...(wrinkleKept ? [`the day’s wrinkle (${wrinkle})`] : []),
-    ...(keptCars.length === 0 ? [] : [`${carListOf(keptCars)} booked out of passenger service as the day had`]),
+    ...(keptCars.length === 0 ? [] : [`${carListOf(keptCars)} booked out`]),
   ];
   const left = [
     ...(wrinkle !== undefined && !wrinkleKept ? [`the day’s wrinkle (${wrinkle})`] : []),
     ...(lostCars.length === 0 ? [] : [`the booking of ${carListOf(lostCars)}`]),
   ];
   const why = plain
-    ? 'because you left the day’s wrinkle and bookings out'
-    : `because the tower you changed has no ${carListOf(lostCars)}`;
+    ? 'because you left them out'
+    : `because the changed tower has no ${carListOf(lostCars)}`;
   const keeps = kept.length === 0 ? '' : `This sandbox day keeps ${listOf(kept)}.`;
   const leaves = left.length === 0 ? '' : `${kept.length === 0 ? 'This sandbox day leaves out' : 'It leaves out'} ${listOf(left)}, ${why}.`;
   return [keeps, leaves].filter((part) => part !== '').join(' ');
@@ -262,9 +262,9 @@ export function sandboxCarriedLineOf(day: SandboxDayMakeup, sandbox: SandboxDayM
  */
 export function sandboxWeekLineOf(week: WeekState): string {
   const weekday = weekdayOf(week.dayIdx);
-  if (weekHasClosed(week)) return 'Your week is where you left it: it has closed, and its sheet is as you left it.';
+  if (weekHasClosed(week)) return 'Your week is where you left it: closed.';
   if (week.closedDay === week.day) {
-    return `Your week is where you left it: ${weekday} is closed as you closed it, and ${weekdayOf((week.dayIdx + 1) % 7)} is next.`;
+    return `Your week is where you left it: ${weekday} is closed, and ${weekdayOf((week.dayIdx + 1) % 7)} is next.`;
   }
-  return `Your week is where you left it, on ${weekday}, which you have not closed.`;
+  return `Your week is where you left it: ${weekday}, not yet closed.`;
 }

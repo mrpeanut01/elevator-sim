@@ -119,7 +119,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     primary: ['Pick a scenario', 'Play the career', 'Play the rush'],
     notes: ['Pick a mode above, then play it.'],
     /* § D1628: the menu is the lobby, and its landings are floors. */
-    shipsInstead: 'Pick a floor above, then play it.',
+    shipsInstead: 'Pick a floor to play.',
     inverted: false,
   },
   {
@@ -262,6 +262,8 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     timeline: null,
     primary: ['Start the rush'],
     notes: ['Nothing to set up. It ends when it ends.'],
+    /* The copy edit: the second sentence said nothing the button does not. */
+    shipsInstead: 'Nothing to set up.',
     inverted: false,
   },
   {
@@ -294,6 +296,8 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     timeline: null,
     primary: ['Run the suite', 'Run the suite again'],
     notes: ['Matched crowds for every dispatcher in the field.'],
+    /* The copy edit: the same claim in plainer words. */
+    shipsInstead: 'Every dispatcher gets the same crowds.',
     inverted: false,
   },
   {
@@ -346,6 +350,8 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     back: null,
     timeline: null,
     primary: ['Back to the modes'],
+    /* § D1628 and the copy edit: the screen it goes to is the lobby. */
+    primaryShipsInstead: ['Back to the lobby'],
     notes: null,
     inverted: false,
   },
@@ -705,13 +711,13 @@ describe('§ 3.4 — leaving a mode has friction, and a watched run never warns'
       const strip = confirmStripFor(ctx);
       expect(strip?.question).toBe('Leave the day unfinished?');
       expect(strip?.consequence).toBe(
-        "Today's run will not be scored, and the board keeps whatever you posted before.",
+        "Today's run won't be scored. The board keeps what you posted before.",
       );
     }
     const rush = confirmStripFor('rush');
     expect(rush?.question).toBe('Leave the rush?');
     expect(rush?.consequence).toBe(
-      'The climb is not saved, and a stopped rush has no wave to post.',
+      "The climb isn't saved, and nothing is posted.",
     );
   });
 

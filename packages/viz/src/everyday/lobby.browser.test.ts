@@ -291,7 +291,8 @@ describe.skipIf(!HAS_BROWSER)('§ D1628 — the lobby is the main menu', () => {
     { width: 320, height: 320 },
     { width: 844, height: 390 },
   ] as const;
-  const ASK_PARTS = ['heading', 'body', 'not', 'later'] as const;
+  /* The copy edit: the last two paragraphs sit behind the *What we record* link, so the link is what must be in reach. */
+  const ASK_PARTS = ['heading', 'body', 'more'] as const;
 
   /** Whether a point at the centre of `selector` lands on it, so a pointer there would press it. */
   const landsOn = (page: Page, selector: string): Promise<boolean> =>

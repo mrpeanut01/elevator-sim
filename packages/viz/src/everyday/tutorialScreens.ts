@@ -77,7 +77,7 @@ import type { FixitCase, FixitCases } from '../fixit/types.js';
 import type { PriceSchedule } from '../pricing/types.js';
 import { everydayProfileStore } from './profileStore.js';
 import { PACE_HOLD_WAIT_S } from './stagePace.js';
-import { el, EYEBROW, CARD } from './screenDom.js';
+import { el, explainer, EYEBROW, CARD } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from './tokens.js';
@@ -123,7 +123,8 @@ const session: TutorialSession = {};
  * **Whether the pair screen two's footer is about is genuinely still coming** — GitHub issue
  * **#569** item 1, recorded here under [§ D405](../../../../DECISIONS.md).
  *
- * The footer reads *“The day is being simulated now, twice … Nothing is shown until both land.”* A
+ * The footer read *“The day is being simulated now, twice … Nothing is shown until both land”*, and
+ * reads *“Running the day twice …”* now. A
  * playability assessor read it under a screen showing **both runs side by side**, which is § D227's
  * first direction on the one screen the same report called the best thing in the product: a correct
  * sentence about the waiting state, still drawn in the settled one.
@@ -302,8 +303,12 @@ export function mountWorkedAnswer(
     why.style.cssText = `margin:0;font-size:14px;line-height:1.5;color:${C.inkSoft};text-wrap:pretty`;
     const diagnosis = el(doc, 'p', 'everyday-worked-answer-diagnosis', view.diagnosis);
     diagnosis.style.cssText = `margin:0;font-family:${TYPE.heading};font-size:19px;line-height:1.3;font-weight:650;letter-spacing:-.02em;color:${C.ink};text-wrap:pretty`;
-    const reasoning = el(doc, 'p', 'everyday-worked-answer-reasoning', view.reasoning);
-    reasoning.style.cssText = `margin:0;font-size:14px;line-height:1.55;color:${C.inkSoft};text-wrap:pretty`;
+    /* The long account of the diagnosis is read once, so it sits behind a link beside it. */
+    const reasoning = el(doc, 'div', 'everyday-worked-answer-reasoning');
+    reasoning.append(
+      explainer(doc, { link: 'Why it went wrong', title: 'Why it went wrong', body: [view.reasoning] })
+        .root,
+    );
 
     const changeHeading = el(doc, 'div', 'everyday-worked-answer-change-heading', view.changeHeading);
     changeHeading.style.cssText = `${EYEBROW};margin:6px 0 0`;
@@ -331,7 +336,6 @@ export function mountWorkedAnswer(
 
     root.append(
       heading,
-      why,
       diagnosis,
       reasoning,
       changeHeading,
@@ -339,6 +343,7 @@ export function mountWorkedAnswer(
       effect,
       counts,
       basis,
+      why,
       boundary,
     );
   }

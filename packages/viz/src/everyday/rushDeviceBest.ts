@@ -102,10 +102,10 @@ export function rushDeviceSittingOf(record: RushDeviceBestRecord, buildingId: st
 
 /** Why a kept sitting could not be replayed here, as a sentence the row's line can say. */
 export const RUSH_DEVICE_REPLAY_REFUSAL = Object.freeze({
-  empty: 'the kept sitting has no rounds',
-  building: 'this build does not ship the tower it was played on',
-  dispatcher: 'this build does not ship a dispatcher one of its rounds used',
-  rebuild: 'this build’s rush menu does not sell what one of its rounds bought',
+  empty: 'the saved sitting has no rounds',
+  building: 'its tower isn’t in this version of the game',
+  dispatcher: 'a dispatcher it used isn’t in this version of the game',
+  rebuild: 'something it bought isn’t sold in this version of rush',
 });
 
 /**
@@ -182,22 +182,21 @@ export type RushDeviceStanding =
 /** Every sentence the device row says. One object, for `honesty/surfaces.ts`' generic sweep. */
 export const RUSH_DEVICE_COPY = Object.freeze({
   tag: 'yours, on this device',
-  name: 'Your best sitting on this device',
+  name: 'Your best sitting',
   /** Drawn under the rows whenever the device row is. */
   note:
-    'The row marked yours, on this device is your best sitting on this tower, kept on this device. It was ' +
-    'posted nowhere, no server checked it, and it is ranked against nobody: this site has no rush board. Its ' +
-    'hold is replayed here from the sitting’s own last round, on the same waves the house’s rows met.',
+    'Your best sitting on this tower is kept on this device only. It isn’t posted, checked by a server or ' +
+    'ranked. Its time is replayed from the sitting’s last round, on the same waves as the house rows.',
   /*
    * § D1515: this said *"once you have played one to its line"*, which a player who ended rounds by
    * hand read as a promise the page then broke. It now says what earns the row, and that a round
    * ended by hand is kept in the facts above rather than here.
    */
   none:
-    'This site has no rush board. Your best sitting on this tower shows here once a round of yours runs until ' +
-    'forty people have waited over two minutes at once. A round you end by hand is kept in your furthest above, not here.',
+    'Your best sitting on this tower shows here once you play a round out. A round you end by hand ' +
+    'counts toward your furthest, not here.',
   unreplayable: (reason: string): string =>
-    `Your best sitting on this tower is kept on this device, and it is not drawn because ${reason}.`,
+    `Your best sitting on this tower is kept on this device but can’t be shown: ${reason}.`,
 });
 
 /** Read a stored record, quarantining one this build cannot read — `deviceChimes.ts`' rule. */

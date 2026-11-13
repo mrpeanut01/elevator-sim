@@ -333,14 +333,16 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
       await page.waitForSelector('.everyday-week', { timeout: 15_000 });
       const week = await page.evaluate(() => ({
         label: document.querySelector('.everyday-world-label')?.textContent ?? '',
-        // The board's own refusal, in `screens.ts`' words, beside the two rules it would keep.
+        // Where the board is, beside the link that opens the three rules it keeps.
         refusal: document.querySelector('.everyday-week-board-refusal')?.textContent ?? '',
-        rules: document.querySelectorAll('.everyday-week-board > div').length,
+        link: document.querySelector('.everyday-week-board .everyday-explainer-link')?.textContent ?? '',
+        rules: document.querySelectorAll('.everyday-week-board .everyday-week-board-rule').length,
       }));
       // One wording, two screens — the defect the shared module exists to prevent.
       expect(week.label).toBe(door.label);
-      expect(week.refusal).toContain('server');
-      expect(week.rules).toBe(2);
+      expect(week.refusal).toContain('Boards & ladder');
+      expect(week.link).toBe('How boards work');
+      expect(week.rules).toBe(3);
     } finally {
       await page.close();
     }

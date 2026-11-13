@@ -384,7 +384,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
     const fairness = '.everyday-workshop-industry[data-profile-id="fairness-first"]';
     await page.click(`${fairness} .everyday-workshop-open`);
     expect(await page.textContent(`${fairness} .everyday-workshop-question`)).toContain(
-      'changes that are not saved',
+      'has unsaved changes',
     );
     await page.click(`${fairness} .everyday-workshop-discard`);
     await page.waitForFunction(
@@ -527,7 +527,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
   it('draws the switching block inert under one-setting-all-shift, and says why', async () => {
     const page = await openWorkshop();
     expect(await page.textContent('.everyday-workshop-switching-inert')).toContain(
-      'never builds the detector',
+      'Nothing below this line reaches the run',
     );
     const disabled = await page.$$eval('.everyday-workshop-detector input', (nodes) =>
       nodes.every((node) => (node as HTMLInputElement).disabled),

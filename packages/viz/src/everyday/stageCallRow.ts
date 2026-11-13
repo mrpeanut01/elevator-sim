@@ -110,9 +110,9 @@ export const STAGE_CALL_ROWS_HEADING = 'WHAT THE CALLS DID';
  * verdict is the report's. No figure.
  */
 export const STAGE_CALL_ROWS_CAVEAT =
-  'Each call’s answers were run on this crowd from the call, with every press before it kept and nothing ' +
-  'pressed after it. A landing’s deepest stack and the longest wait cannot come back under a bar once past ' +
-  'it. Whether the day cleared is on the report when the day closes.';
+  'Each call’s answers were run on this crowd from the call, keeping every press before it and none after. ' +
+  'Once the deepest landing or the longest wait is past its bar, it stays past. ' +
+  'Whether the day cleared is on the report when the day closes.';
 
 /**
  * The caveat for `rows`, or `undefined` where none of them is a call's. Where a row still prints counts (a
@@ -382,7 +382,7 @@ export function stageCallFailedRowsOf(input: {
 
 /** The failed row's clause: the rule, which costs one moment and not the day. No figure, no forecast. */
 export const STAGE_CALL_FAILED_NOTE =
-  'A run that cannot be made costs the stage that one moment, not the rest of the day’s calls.';
+  'Only this moment is lost. The rest of the day’s calls still come.';
 
 /**
  * **When a wrinkle that raised no call may say so** — wave AN, lane DQ-1,

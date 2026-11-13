@@ -293,10 +293,10 @@ describe('a sandbox day runs the day it copies, its wrinkle and its bookings —
     expect(cars(plain)).toEqual([]);
     expect(legsOf(plain)).not.toBe(legsOf(during));
     expect(sandboxCarriedLineOf(day, shiftRunConfigOf(RESOURCES, during), false)).toBe(
-      'This sandbox day keeps the day’s wrinkle (Move-in day) and car D booked out of passenger service as the day had.',
+      'This sandbox day keeps the day’s wrinkle (Move-in day) and car D booked out.',
     );
     expect(sandboxCarriedLineOf(day, shiftRunConfigOf(RESOURCES, plain), true)).toBe(
-      'This sandbox day leaves out the day’s wrinkle (Move-in day) and the booking of car D, because you left the day’s wrinkle and bookings out.',
+      'This sandbox day leaves out the day’s wrinkle (Move-in day) and the booking of car D, because you left them out.',
     );
   });
 
@@ -325,14 +325,14 @@ describe('a sandbox day runs the day it copies, its wrinkle and its bookings —
     expect(() => recordRun(plan.config, { recordDecisions: false, outOfServiceCarIds: plan.outOfServiceCarIds })).not.toThrow();
     expect(sandboxCarriedLineOf(shiftRunConfigOf(RESOURCES, TUESDAY), plan, false)).toBe(
       'This sandbox day keeps the day’s wrinkle (Move-in day). ' +
-        'It leaves out the booking of car D, because the tower you changed has no car D.',
+        'It leaves out the booking of car D, because the changed tower has no car D.',
     );
   });
 
   it('says where the week it stood over is, closed day or not', () => {
-    expect(sandboxWeekLineOf(TUESDAY.week)).toBe('Your week is where you left it, on Tuesday, which you have not closed.');
+    expect(sandboxWeekLineOf(TUESDAY.week)).toBe('Your week is where you left it: Tuesday, not yet closed.');
     expect(sandboxWeekLineOf({ ...TUESDAY.week, closedDay: 2 })).toBe(
-      'Your week is where you left it: Tuesday is closed as you closed it, and Wednesday is next.',
+      'Your week is where you left it: Tuesday is closed, and Wednesday is next.',
     );
   });
 });

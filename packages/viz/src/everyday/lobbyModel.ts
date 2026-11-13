@@ -93,8 +93,8 @@ export const LOBBY_COPY = Object.freeze({
   building: 'Elevator Sim',
   welcomeKicker: 'WELCOME',
   welcomeTitle: 'Choose a floor',
-  welcomeBody: 'Every floor is a way to play. Press one and you are there.',
-  firstVisit: 'First time here? The walkthrough is two short screens.',
+  welcomeBody: 'Each floor is a way to play.',
+  firstVisit: 'New here? The walkthrough is two short screens.',
   /** The first visit's own button, beside the sentence above. */
   walkthrough: 'Start with the walkthrough',
   /** The lobby's landing, where a press would go nowhere. */

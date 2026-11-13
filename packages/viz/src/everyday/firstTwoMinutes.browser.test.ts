@@ -175,7 +175,7 @@ describe.skipIf(!HAS_BROWSER)('§ 569 — what a first-time player meets in thei
       await press.click();
       await page.waitForSelector('.everyday-worked-answer-movement', { timeout: 180_000 });
 
-      const PENDING = 'Nothing is shown until both land';
+      const PENDING = 'Running the day twice';
       expect(await page.textContent('body')).not.toContain(PENDING);
     } finally {
       await page.close();

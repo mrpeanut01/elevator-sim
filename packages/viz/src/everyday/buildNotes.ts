@@ -254,10 +254,8 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * what this now says — nothing draws a tower a day for a returning player, nothing names which
    * tower today's draw would have been, and a week does not move unless the player moves it.
    */
-  'The tower is the day’s draw on your first day and your week’s after that. The crowd turns over ' +
-    'every day and everybody meets the same one, but no tower is drawn for you after the first ' +
-    'day, and nothing names the tower today’s draw would have picked. The picker on the door moves ' +
-    'your week to any tower you choose; the door says which is which rather than claiming both.',
+  'Everybody meets the same crowd each day, but after your first day the tower is your week’s ' +
+    'own rather than the day’s draw, and nothing names the tower today’s draw would have picked.',
 ]);
 
 /**
@@ -271,7 +269,7 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
  * unchecked.
  */
 export const BUILD_NOTES_POINTER =
-  'This game is being built in the open. Settings has the list of what it does not do yet.';
+  'This game is still being built. Settings lists what it doesn’t do yet.';
 
 /** One register, as the panel draws it: a heading a player can place, and its entries. */
 export interface BuildNotesSection {
@@ -291,7 +289,7 @@ export interface BuildNotesSection {
 
 /** {@link BuildNotesSection.empty}'s sentence, one for every register that has emptied. */
 export const REGISTER_EMPTY_LINE =
-  'Nothing missing here any more — every absence this part of the game ever named has been built.';
+  'Nothing is missing here.';
 
 /** The whole panel. Total — every register the build keeps, in the order a reader meets them. */
 export interface BuildNotesView {
@@ -319,8 +317,8 @@ export interface BuildNotesView {
 export function buildNotesViewOf(): BuildNotesView {
   const sections: readonly BuildNotesSection[] = [
     {
-      heading: 'Across the whole build',
-      note: 'Things missing from the game as a whole rather than from one screen.',
+      heading: 'The whole game',
+      note: 'Missing from the game as a whole.',
       entries: EVERYDAY_SHELL_ABSENCES,
       /*
        * **This arm was written when the register emptied** — GitHub issue #221. It had never been
@@ -339,20 +337,20 @@ export function buildNotesViewOf(): BuildNotesView {
       ...(STAGE_ABSENCES.length === 0 ? { empty: REGISTER_EMPTY_LINE } : {}),
     },
     {
-      heading: 'Endless rush',
+      heading: 'The rush',
       /*
        * The note used to read *"The setup screen draws; what it would start does not exist yet"* —
        * stale since GitHub issue #220 built the engine (§ D515), and kept alive by the one entry
        * under it. GitHub issue #418 made that entry false as well: the standings are the house's
        * measured runs now (§ D547), so the register is empty and the arm below draws the empty line.
        */
-      note: 'The rush and its standings, which are the house’s own measured runs on each shipped tower.',
+      note: 'The rush and its standings.',
       entries: RUSH_ABSENCES,
       ...(RUSH_ABSENCES.length === 0 ? { empty: REGISTER_EMPTY_LINE } : {}),
     },
     {
-      heading: 'The first session',
-      note: 'The two-screen tutorial, and the one thing about it that is not settled.',
+      heading: 'The tutorial',
+      note: 'Your first two screens.',
       entries: TUTORIAL_ABSENCES,
       ...(TUTORIAL_ABSENCES.length === 0 ? { empty: REGISTER_EMPTY_LINE } : {}),
     },
@@ -365,12 +363,12 @@ export function buildNotesViewOf(): BuildNotesView {
        * they wait on is a runner, which is what the entries below now say. § D227 in the polarity
        * that bites after a lane lands, on a panel whose whole job is to be current.
        */
-      note: 'The ten stages on the path and the fix cases are listed; what a listed scenario still cannot do is said on its own row.',
+      note: 'The stages and the fix-a-building cases.',
       entries: SCENARIO_ABSENCES,
     },
     {
-      heading: 'The drawing board',
-      note: 'Designing a building. Nothing there is scored.',
+      heading: 'Design',
+      note: 'Designing a building.',
       entries: DESIGNER_ABSENCES,
       /*
        * **Emptied by GitHub issue #420**, which built the field first and the pickers over it —
@@ -381,22 +379,19 @@ export function buildNotesViewOf(): BuildNotesView {
       ...(DESIGNER_ABSENCES.length === 0 ? { empty: REGISTER_EMPTY_LINE } : {}),
     },
     {
-      heading: 'Running a tower over a season',
-      note: 'Your career — contracts, months and the things that happen to you.',
+      heading: 'Career',
+      note: 'Contracts, months and what happens along the way.',
       entries: CAMPAIGN_ABSENCES,
     },
     {
       heading: 'Settings',
-      note: 'Rows the settings screen does not draw, and why each one is not there.',
+      note: 'Settings this screen doesn’t offer, and why.',
       entries: SETTINGS_ABSENCES,
     },
   ];
   return {
-    heading: 'What this build does not do yet',
-    lede:
-      'This game is being built in the open, and this is the list of what is missing. Every line ' +
-      'here is written in the code rather than in a document, so a thing that gets built leaves ' +
-      'this list on the day it works rather than whenever somebody remembers.',
+    heading: 'What the game doesn’t do yet',
+    lede: 'The game is still being built. This is what’s missing, by part of the game.',
     build: buildVersionLineOf(BUILD_VERSION),
     sections,
     entryCount: sections.reduce((total, section) => total + section.entries.length, 0),
@@ -410,5 +405,5 @@ export function buildNotesViewOf(): BuildNotesView {
  * typed beside a list is a number that is wrong one merge later.
  */
 export function buildNotesSummaryOf(view: BuildNotesView): string {
-  return `${view.heading} — ${String(view.entryCount)} notes`;
+  return `${view.heading} (${String(view.entryCount)})`;
 }

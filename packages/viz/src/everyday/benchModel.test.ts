@@ -82,10 +82,10 @@ const CELL = { id: 'midtown-up-peak', label: 'Midtown Office, up-peak 1 %' };
 describe('§12.1 — the field is two at least and four at most', () => {
   it('refuses under two and over four, in two different sentences', () => {
     expect(benchFieldRefusal([])).toMatch(/at least 2/);
-    expect(benchFieldRefusal(['collective'])).toMatch(/nothing to be compared with/);
+    expect(benchFieldRefusal(['collective'])).toMatch(/at least 2/);
     expect(benchFieldRefusal(['a', 'b'])).toBeUndefined();
     expect(benchFieldRefusal(['a', 'b', 'c', 'd'])).toBeUndefined();
-    expect(benchFieldRefusal(['a', 'b', 'c', 'd', 'e'])).toMatch(/At most 4/);
+    expect(benchFieldRefusal(['a', 'b', 'c', 'd', 'e'])).toMatch(/at most 4/);
   });
 
   it('stops offering unpicked toggles at the ceiling, and never the picked ones', () => {
@@ -94,7 +94,7 @@ describe('§12.1 — the field is two at least and four at most', () => {
     for (const entrant of entrants) {
       // A picked entrant must stay pressable or a full field has no way back out.
       if (entrant.picked) expect(entrant.refusal).toBeUndefined();
-      else expect(entrant.refusal).toMatch(/The field is full at 4/);
+      else expect(entrant.refusal).toMatch(/Full at 4/);
     }
     // Under the ceiling nothing is refused.
     expect(benchEntrantsOf(SHELF, ['collective']).every((e) => e.refusal === undefined)).toBe(true);
@@ -148,7 +148,7 @@ describe('§12.3 — the tests are the forty, and this reader derives every one 
   });
 
   it('refuses an empty tick list in §12.1’s own words', () => {
-    expect(benchTestsRefusal([], 40)).toBe('No tests ticked. Pick at least one.');
+    expect(benchTestsRefusal([], 40)).toBe('Tick at least one test.');
     expect(benchTestsRefusal([first.id], 40)).toBeUndefined();
   });
 
@@ -228,7 +228,7 @@ describe('§1 — the bench runs the ladder’s cases and not the ladder’s cro
     expect(at([])).toThrow(SuiteError);
     expect(at([first.id, first.id])).toThrow(/ticked twice/);
     expect(at([first.id], [FIELD[0]] as unknown as typeof FIELD)).toThrow(/at least two/);
-    expect(at(['no-such-tower/no-such-crowd'])).toThrow(/no proof case/);
+    expect(at(['no-such-tower/no-such-crowd'])).toThrow(/not one of the forty/);
   });
 });
 
@@ -291,7 +291,7 @@ describe('§12.2 — the pairwise verdict draws only for a field of two', () => 
     expect(view.verdictShown).toBe(true);
     expect(view.verdictRefusal).toBeNull();
     expect(view.rows.length).toBeGreaterThan(0);
-    expect(benchVerdictNoteOf(2)).toMatch(/pairwise answer/);
+    expect(benchVerdictNoteOf(2)).toMatch(/difference between them/);
   });
 
   it('draws none at three, refuses in the cell’s own words, and says so at the top', () => {
@@ -306,8 +306,8 @@ describe('§12.2 — the pairwise verdict draws only for a field of two', () => 
     expect(view.arms).toHaveLength(3);
 
     const note = benchVerdictNoteOf(3);
-    expect(note).toMatch(/no single pairwise answer/);
-    expect(note).not.toMatch(/pairwise answer below each test/);
+    expect(note).toMatch(/no single head-to-head answer/);
+    expect(note).not.toMatch(/difference between them/);
   });
 
   it('carries the three-arm refusal into the index as the line’s note, with no marks', () => {

@@ -145,15 +145,15 @@ export interface LandingViewInput {
 export const LANDING_COPY = Object.freeze({
   eyebrow: 'Elevator Sim',
   headline: 'Run the lifts and find out whether it helped.',
-  lede: 'A building full of people trying to get somewhere. Watch it struggle, change something, and see whether the people got there.',
+  lede: 'Watch a building struggle, change something, and see whether people got where they were going.',
   /** The owner's own statement of the game, and the reason the page can make the claims below. */
-  hook: 'The engine underneath is a real lift simulator. It does not round in your favour. It will not give you an average for a queue that never cleared, and it will not call a fix a win from one lucky run. When this game tells you your change worked, it worked.',
-  claimsHeading: 'It plays like a game and it measures like an instrument.',
-  closing: 'That is the whole of the pitch. What this build cannot do yet is written down in full and checked for staleness, and it lives in Settings rather than here.',
+  hook: 'The engine underneath is a real lift simulator. It does not round in your favour. When this game tells you your change worked, it worked.',
+  claimsHeading: 'How it keeps score honestly',
+  closing: 'What the game cannot do yet is listed in Settings.',
   motionPendingEyebrow: 'Starting a building',
-  motionPendingNote: 'Working out a morning, one person at a time. Nothing here is a recording, so it takes a moment to arrive.',
+  motionPendingNote: 'Working out a morning, one person at a time.',
   motionUnavailableEyebrow: 'Nothing running',
-  motionUnavailableNote: 'The building would not start on this device, so there is nothing to watch here. It is the only thing on this page that needs one, and everything else is unaffected.',
+  motionUnavailableNote: 'The building would not start, so there is nothing to watch here. Everything else works.',
   motionPlayingEyebrow: 'Running now',
 });
 
@@ -164,7 +164,7 @@ export const LANDING_COPY = Object.freeze({
  * that could disagree with what is on screen cannot.
  */
 function playingNote(buildingName: string): string {
-  return `One morning at ${buildingName}, simulated here and played back at speed. It is the same engine every mode runs, and every person on it is going somewhere.`;
+  return `One morning at ${buildingName}, simulated here and played back at speed.`;
 }
 
 /**
@@ -181,33 +181,33 @@ function playingNote(buildingName: string): string {
 export const LANDING_CLAIMS: readonly LandingClaim[] = Object.freeze([
   Object.freeze({
     id: 'refuses',
-    claim: 'It will not print an average for a queue that never cleared.',
+    claim: 'No average for a queue that never cleared.',
     because:
-      'A building the lifts never caught up with still has an average waiting time, arithmetically. That number tells you when you stopped watching, not how the building performs. There are five separate grounds on which the average is withheld, and when one of them bites the screen prints the reason where the number would have been.',
+      'A building the lifts never caught up with still has an average wait, but that number tells you when you stopped watching, not how the building performs. When the average is withheld, the screen prints the reason in its place.',
   }),
   Object.freeze({
     id: 'same-crowd',
-    claim: 'Two ways of running the building race the same crowd, to the second.',
+    claim: 'Two ways of running a building race the same crowd, to the second.',
     because:
-      'The same people arriving at the same second on the same floors wanting the same destinations, so a difference in the result is the change you made and not the luck of the draw. The pairing is checked on every run rather than assumed, and a race whose pairing has broken reports nothing at all.',
+      'The same people arrive at the same second, on the same floors, going to the same places. So a difference in the result is the change you made and not the luck of the draw. The pairing is checked on every run, and a race whose pairing has broken reports nothing.',
   }),
   Object.freeze({
     id: 'too-small',
-    claim: 'Some differences are too small to see, and it tells you which.',
+    claim: 'It tells you when a difference is too small to see.',
     because:
-      'Below some size a difference cannot be told apart from noise at any sensible number of runs. That floor is measured rather than assumed, and it is measured again for each thing being compared. Anything underneath it is reported as too small to resolve — never as a win.',
+      'Below some size, a difference cannot be told apart from noise. That floor is measured for each thing being compared, and anything under it is reported as too small to resolve, never as a win.',
   }),
   Object.freeze({
     id: 'closed-form',
-    claim: 'The physics is checked against the answer a lift engineer would work out by hand.',
+    claim: 'The physics is checked against a lift engineer’s hand calculation.',
     because:
-      'Under a morning rush the round trip, the interval and the handling capacity are checked against the standard hand calculation on every building that ships. Where the two disagree, the working assumption is that the simulator is wrong until somebody proves otherwise.',
+      'Under a morning rush, the round trip, the interval and the handling capacity are checked against the standard hand calculation on every building that ships. Where the two disagree, the simulator is assumed wrong until somebody proves otherwise.',
   }),
   Object.freeze({
     id: 'replay',
-    claim: 'Every run keeps the number it was drawn from, so any day can be run again exactly.',
+    claim: 'Any day can be run again, exactly.',
     because:
-      'Nothing in a run comes from the clock or from a shared source of randomness, so the same day replays the same way on any machine. A result you cannot reproduce is a result nobody has to take seriously, including us.',
+      'Every run keeps the number it was drawn from, and nothing in it comes from the clock or from a shared source of randomness. So the same day replays the same way on any machine.',
   }),
 ]);
 
@@ -220,7 +220,7 @@ export const LANDING_CLAIMS: readonly LandingClaim[] = Object.freeze([
  */
 export const LANDING_CALL_TO_ACTION: LandingCallToAction = Object.freeze({
   label: 'Play a scenario',
-  note: 'A building with something wrong with it, a budget, and a verdict on whether you fixed it.',
+  note: 'A building with a problem, a budget, and a verdict on your fix.',
   screen: 'scenario',
 });
 
@@ -236,7 +236,7 @@ export const LANDING_CALL_TO_ACTION: LandingCallToAction = Object.freeze({
  */
 export const LANDING_FIRST_SESSION_CALL_TO_ACTION: LandingCallToAction = Object.freeze({
   label: 'Show me how it plays',
-  note: 'Two screens on how a building fails and what to change, and then you are into it.',
+  note: 'Two short screens, then you play.',
   screen: 'tutorial',
 });
 

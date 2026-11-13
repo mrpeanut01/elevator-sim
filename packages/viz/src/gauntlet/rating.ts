@@ -66,14 +66,13 @@ export const RATING_METRIC: BatchMetric = 'pctOverLongWait';
  * stated-mechanism defect with a denominator.
  */
 export const RATING_BASIS =
-  'the share of rides that waited a minute or less, averaged over the forty proof cases — one run ' +
-  'of each, every entrant on the identical crowd';
+  'The share of rides that waited a minute or less, averaged over the forty proof cases. One run ' +
+  'of each, every entrant on the identical crowd.';
 
 /** The limitation drawn wherever a rating is. See the module docstring for why it is not optional. */
 export const RATING_CAVEAT =
-  'A rating orders this table; a gap between two rows is not a measured difference. Each case is ' +
-  'one run, so forty pairs sit behind a gap and this project does not name a winner below fifty. ' +
-  'The bench is where two dispatchers are compared on matched crowds with an interval.';
+  'A rating orders this table. A gap between two rows is not a measured difference: each case is ' +
+  'one run. To compare two dispatchers, use the Test bench.';
 
 /** One of the forty, folded: the case, the seed it ran under, and its score. */
 export interface RatedCase {

@@ -281,7 +281,7 @@ export const EVERYDAY_SCREEN_REGION_ID = 'everyday-screen-region';
  * half, because it tells a reader not to press a control that works.
  */
 export const ENGINEER_SWAP_NOTE =
-  'the same day on the full instrument panel — nothing stops, and this visit only: reloading opens Everyday Mode again';
+  'The full instrument panel. Nothing stops. Reload to come back here.';
 
 /**
  * **The swap's note while a rush stands** — GitHub issue #523, item 1, § D548 clause 7.
@@ -293,7 +293,7 @@ export const ENGINEER_SWAP_NOTE =
  * constant's reason: a word in this module cannot be caught in an import cycle.
  */
 export const ENGINEER_SWAP_RUSH_NOTE =
-  'ends the rush first, because a rush runs as shipped and the full panel can change that — and this visit only: reloading opens Everyday Mode again';
+  'Ends the rush first. Reload to come back here.';
 
 /**
  * **The swap's note while a replay stands** — GitHub issue #533 item 1, [§ D563](../../../../DECISIONS.md).
@@ -309,7 +309,7 @@ export const ENGINEER_SWAP_RUSH_NOTE =
  * cannot be caught in an import cycle.
  */
 export const ENGINEER_SWAP_REPLAY_NOTE =
-  'ends the replay first, because a replay is the day exactly as it was and the full panel can change it — and this visit only: reloading opens Everyday Mode again';
+  'Ends the replay first. Reload to come back here.';
 
 /**
  * **The swap's note while somebody else's run is on the stage** — GitHub issue #533 item 1.
@@ -322,7 +322,7 @@ export const ENGINEER_SWAP_REPLAY_NOTE =
  * day the player does not have on screen.
  */
 export const ENGINEER_SWAP_WATCH_NOTE =
-  'the run you are watching, on the full instrument panel — nothing stops and the watch is still standing when you come back, and this visit only: reloading opens Everyday Mode again';
+  "The run you're watching, on the full instrument panel. Nothing stops. Reload to come back here.";
 
 /**
  * The Engineer header's way back, as a label — `dev/main.ts#wireHeaderAndFooter` writes it onto
@@ -344,7 +344,7 @@ export const ENGINEER_RETURN_LABEL = '‹ Everyday Mode';
  * `everyday/shell.browser.test.ts`'s round trip rather than by its own plausibility.
  */
 export const ENGINEER_RETURN_TITLE =
-  'Back to Everyday Mode, on the screen you left. Nothing here stops — this surface keeps running behind it.';
+  'Back to Everyday Mode, on the screen you left. This panel keeps running.';
 
 /**
  * The class on the Everyday shell's own root element.

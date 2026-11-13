@@ -202,8 +202,8 @@ const CASUAL_LEAD_BY_CELL: Readonly<Record<string, string>> = Object.freeze({
    * conditional (*even on days*), which is the fix rather than a hedge.
    */
   minute:
-    'A head count of people, not an estimate — so it stays on this sheet even on days the ' +
-    'average below it is refused.',
+    'A head count of people, not an estimate, so it stays on this sheet even on days the ' +
+    'average below it is withheld.',
   /*
    * Window-independent, where the old sentence was not — GitHub issue
    * [#291](https://github.com/mrpeanut01/elevator-sim/issues/291), and it is the entry directly

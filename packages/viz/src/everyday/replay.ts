@@ -172,16 +172,16 @@ export function replayRestorePatchOf(state: ViewerState, before: ReplayBefore): 
 export const REPLAY_COPY = Object.freeze({
   /** Under *Set up the replay*, on a day the strip can hand back. */
   doorNote: (day: number): string =>
-    `Day ${String(day)} again, on the crowd it had. A replay never counts: the board keeps what you posted, and your week stays where it is.`,
+    `Day ${String(day)} again, on the crowd it had. A replay never counts: the board and your week stay as they are.`,
   /**
    * Under the same button, on a day filed without the record of what it ran — § D1094. The replay
    * then meets the crowd standing now, and the door says so rather than {@link doorNote}'s promise.
    */
   doorNoteNoRecord: (day: number): string =>
-    `Day ${String(day)} again, on the crowd standing now: this day was filed without a record of the one it had. ` +
-    'A replay never counts: the board keeps what you posted, and your week stays where it is.',
+    `Day ${String(day)} again, on the crowd standing now: the one it had was not recorded. ` +
+    'A replay never counts: the board and your week stay as they are.',
   /** Under the same button, on a chip from before this week began. */
-  beforeTheWeek: 'That day is from before this week began, so there is no day here to hand back.',
+  beforeTheWeek: 'That day is from before this week began, so it can’t be replayed.',
   /** The rail's subline on the stage and the report. */
   subline: 'REPLAYING',
   /** The § 3.4 strip, which has nothing of the player's to lose. */

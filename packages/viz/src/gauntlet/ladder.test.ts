@@ -167,7 +167,7 @@ describe('the ladder’s rows — § 14', () => {
 
   it('draws the caveat and the world absence, so neither is optional', () => {
     expect(LADDER_CAVEAT).toContain('not a measured difference');
-    expect(LADDER_WORLD_ABSENCE).toContain('needs a server');
+    expect(LADDER_WORLD_ABSENCE).toContain('aren’t available here');
     expect(LADDER_WORLD_ABSENCE).toContain('measured on this device');
   });
 });
@@ -188,8 +188,8 @@ describe('the disclosure — § 14.2', () => {
 
   it('closes with the arithmetic, the basis and the caveat', () => {
     expect(view.arithmetic).toContain('2 buildings × 2 crowd shapes = 4 runs');
-    expect(view.arithmetic).toContain('The cases never move');
-    expect(view.arithmetic).toContain('wins one shape and loses four sits mid-table');
+    expect(view.arithmetic).toContain('The cases never change');
+    expect(view.arithmetic).toContain('two ratings a month apart are still comparable');
     expect(view.basis).toContain('averaged over the forty proof cases');
     expect(view.caveat).toBe(LADDER_CAVEAT);
   });

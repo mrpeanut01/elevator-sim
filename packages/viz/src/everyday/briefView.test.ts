@@ -399,8 +399,8 @@ describe('which driver the day opens on, and why — wave AO, lane AO-4', () => 
   it('names the driver the day opens on, the handover the day before made, and how to drive with it today', () => {
     expect(brief({ yesterday: HANDED }).drivers.carried).toBe(
       'Wednesday opens on Steady hand, the driver Tuesday started with. Tuesday’s handover to Estimated time ' +
-        'at 12:20 kept to Tuesday: a handover on the stage lasts the rest of its own day, and only the driver ' +
-        'picked on this brief carries over. To drive with Estimated time today, pick it here.',
+        'at 12:20 lasted only that day. Only the driver you pick here carries over. ' +
+        'To drive with Estimated time today, pick it here.',
     );
     /* Picked something else since: the line names the driver and claims no history for it. */
     expect(brief({ selectedId: 'nearest-car', yesterday: HANDED }).drivers.carried).toMatch(/^Wednesday opens on Steady hand\. /u);

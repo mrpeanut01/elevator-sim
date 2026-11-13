@@ -1134,7 +1134,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       doc,
       'div',
       'everyday-designer-travel',
-      `${planFloorId(plan, first.bottom)} to ${planFloorId(plan, first.top)} · ${lengthFigure(shaftRiseM(plan, first), unitsNow())} of travel · the lobby is floor 0 here, and a floor below it is negative`,
+      `${planFloorId(plan, first.bottom)} to ${planFloorId(plan, first.top)} · ${lengthFigure(shaftRiseM(plan, first), unitsNow())} of travel · the lobby is floor 0, and floors below it are negative`,
     );
     travel.style.cssText = `font:500 11px ${TYPE.mono};color:${C.faint};line-height:1.5`;
     shafts.append(travel);
@@ -1235,7 +1235,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
           const suggest = button(
             machines,
             'everyday-designer-auto-class',
-            `A shaft this tall is ordinarily built with ${automatic.name} — use it`,
+            `Use ${automatic.name}, the usual class for a shaft this tall`,
             'auto-class',
             () => {
               edit(withPlanMachineClass(plan, keys, automatic));

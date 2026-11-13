@@ -242,13 +242,13 @@ describe.skipIf(!HAS_BROWSER)('a sandbox day runs and cannot touch the week — 
       await page
         .waitForFunction(
           (lines) => lines.every((line) => (document.querySelector('.everyday-screen')?.textContent ?? '').includes(line)),
-          ['Car D booked out 10:30–13:00', 'This sandbox day keeps car D booked out of passenger service as the day had.'],
+          ['Car D booked out 10:30–13:00', 'This sandbox day keeps car D booked out.'],
           { timeout: 15_000 },
         )
         .catch(() => undefined);
       const stage = await textOf(page, '.everyday-screen');
       expect(stage).toContain('Car D booked out 10:30–13:00');
-      expect(stage).toContain('This sandbox day keeps car D booked out of passenger service as the day had.');
+      expect(stage).toContain('This sandbox day keeps car D booked out.');
 
       await page.locator('.everyday-bar-primary').click();
       const asStands = page.getByText('Close the day as it stands');
@@ -256,8 +256,8 @@ describe.skipIf(!HAS_BROWSER)('a sandbox day runs and cannot touch the week — 
       await page.waitForSelector('.everyday-report', { timeout: 90_000 });
       expect(await textOf(page, '.everyday-report')).toContain('car D · out of passenger service 10:30–13:00');
       expect(await page.locator('.everyday-report-sandbox').allTextContents()).toEqual([
-        'This sandbox day keeps car D booked out of passenger service as the day had.',
-        'Your week is where you left it, on Monday, which you have not closed.',
+        'This sandbox day keeps car D booked out.',
+        'Your week is where you left it: Monday, not yet closed.',
       ]);
       expect((await storedWeeks(page)).week?.history ?? []).toEqual([]);
     } finally {

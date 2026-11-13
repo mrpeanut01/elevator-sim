@@ -540,7 +540,7 @@ export const TEST_SIMULATION_SUBLINE = TEST_SIMULATION_LABEL.toUpperCase();
  * `everyday/rail.ts` for `honesty/derive.ts` to classify, for a string the sweep already reaches
  * through {@link railFooter}.
  */
-const NO_CAREER_YET = 'no days saved yet — close a day and it lands here';
+const NO_CAREER_YET = 'no days saved yet · close a day to see it here';
 
 /**
  * The card's third line **before the host has answered** — issue #214's last surviving path.
@@ -565,7 +565,7 @@ const NO_CAREER_YET = 'no days saved yet — close a day and it lands here';
  * would be § 20.11's fixture presented as a player, and *"0 days running"* is the exact shape of
  * that. Module-private for {@link NO_CAREER_YET}'s reason as well.
  */
-const CAREER_PENDING = 'reading your saved days…';
+const CAREER_PENDING = 'loading your days…';
 
 /**
  * The `PLAYING AS` card's third line — the week's own two figures, or the absence.
@@ -674,7 +674,7 @@ function bankedLineOf(
      * and are deleted — see {@link BankedAnswer} for what they said and what stopped being true.
      */
     case 'unreachable':
-      return `${turn} · the tally did not answer`;
+      return `${turn} · balance unavailable`;
   }
 }
 
