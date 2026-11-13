@@ -65,7 +65,7 @@ export function withParking(
  * overflow to be attributable to capacity rather than to allocation. With a single car there
  * is no allocation: whatever is left on the landing was left there because the car was full.
  */
-export function tinyBuilding(config: LoadedConfig, ratedLoadLb = 1000): ResolvedBuilding {
+export function tinyBuilding(config: LoadedConfig, ratedLoadLb = 1000, ratedSpeedMps = 0.63): ResolvedBuilding {
   const authored = {
     id: 'one-car-walkup',
     name: 'One-car walkup',
@@ -81,7 +81,7 @@ export function tinyBuilding(config: LoadedConfig, ratedLoadLb = 1000): Resolved
       {
         id: 'main',
         servesFloors: ['G', '2', '3'],
-        cars: [{ id: 'A', spec: 'hydraulic', ratedSpeedMps: 0.63, ratedLoadLb, doorType: 'sideOpening' }],
+        cars: [{ id: 'A', spec: 'hydraulic', ratedSpeedMps, ratedLoadLb, doorType: 'sideOpening' }],
       },
     ],
     accessZones: [],

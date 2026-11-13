@@ -7,12 +7,18 @@ Machine-readable form: [`data/elevator-specs.json`](../data/elevator-specs.json)
 
 | Class | Rated speed | Max rise | Typical capacity | Application |
 |---|---|---|---|---|
-| Hydraulic | 0.5–0.75 m/s (100–150 fpm) | ~5–6 floors | 1,600–3,500 lb | Low-rise, low duty, freight |
+| Hydraulic | 0.25–0.75 m/s (50–150 fpm) | ~5–6 floors | 1,600–3,500 lb | Low-rise, low duty, freight |
 | MRL gearless (low) | 1.0–1.75 m/s (200–350 fpm) | ~76 m / 250 ft | 2,000–3,500 lb | Mid-rise residential & office |
 | Geared traction | 1.75–2.5 m/s (350–500 fpm) | ~76 m / 250 ft | 2,500–4,000 lb | Mid-rise |
 | Gearless traction | 2.5–7 m/s (500–1,400 fpm) | up to ~600 m | 3,000–4,000 lb | High-rise local |
 | High-speed gearless | 7–10 m/s (1,400–2,000 fpm) | supertall | 3,500–5,000 lb | Express / shuttle |
 | Ultra high-speed | 10–20.5 m/s | shuttle only | double-deck, 12–14/deck | Supertall shuttle, observation |
+
+**The hydraulic band's floor is 0.25 m/s by the owner's direction (2026-11-12), not by a source.**
+It was 0.5 m/s, the bottom of the passenger range the sources below give. 0.25 m/s was added so a
+very slow hydraulic can be drawn, as a freight or platform-style lift would run. No published
+figure for it was read, so treat any run at 0.25 m/s as an assumption about the machine. The
+typical speed, 0.63 m/s, is unchanged.
 
 ### Real-world anchors
 
@@ -476,6 +482,15 @@ shape of the escalator's, add the entry to § Sources, and say which of the two 
 `transportModes` at all, and all four of them omit `kind`, which is `escalator`. The routing and
 uptake code is exercised from test fixtures. So this is a gap in front of the first author, not
 underneath a published number.
+
+**Since then (2026-11-12): one stair is shipped and the designer suggests one.**
+`st-jude-hospital` declares a `stairs` mode and cites Fruin's stair-flow work for its two walking
+speeds, 0.155 m/s up and 0.21 m/s down. The Everyday building designer fills a new stair's times
+from those same two speeds over the building's floor height (`authoring/buildingSpec.ts`'s
+`stairSecondsFor`), and the saved document says so. No further source was read for the designer,
+so its speeds rest on the hospital's citation. Its `use` pair, 0.35 up and 0.55 down, is the
+hospital's stated assumption and is written as one. The four steps above still bind anyone who
+changes either.
 
 ### Escalator carrying capacity
 

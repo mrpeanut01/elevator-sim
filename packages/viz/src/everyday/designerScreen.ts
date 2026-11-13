@@ -69,6 +69,9 @@ import {
   withDecks,
   stairsAbove,
   stairsAreValid,
+  stairsSuggestionFor,
+  planHasTraction,
+  HYDRAULIC_CLASS_ID,
   withAccessZoneAdded,
   withAccessZoneRemoved,
   withDescentSpeed,
@@ -241,6 +244,12 @@ function yOf(g: Geometry, floor: number): number {
  */
 let designerHost: EverydayScreenShellContext['host'] | undefined;
 
+/** The drawing each host's board was last left on, and the standing building it was drawn over. */
+const designerDrafts = new WeakMap<
+  object,
+  { readonly openedKey: string; readonly plan: TowerPlan; readonly lossLine: string }
+>();
+
 function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedEverydayScreen {
   const doc = host.ownerDocument;
   designerHost = context.host;
@@ -254,14 +263,29 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    * the header are the controls that say otherwise.
    */
   const opened = context.host.buildingPlan();
-  let plan: TowerPlan = opened?.plan ?? blankPlan();
-  let lossLine = opened === undefined ? '' : designerLossLine(opened.plan.name, opened.notCarried);
+  /*
+   * A drawing in progress outlives the screen. A test simulation leaves the board and comes back to
+   * a fresh mount, and the standing building is the week's again by then, so without this the
+   * drawing was replaced by it. The draft is dropped once the standing building is a different one
+   * from the building it was drawn over.
+   */
+  const openedKey = JSON.stringify(opened?.plan ?? null);
+  const kept = designerDrafts.get(context.host);
+  const resumed = kept !== undefined && kept.openedKey === openedKey ? kept : undefined;
+  let plan: TowerPlan = resumed?.plan ?? opened?.plan ?? blankPlan();
+  let lossLine =
+    resumed?.lossLine ?? (opened === undefined ? '' : designerLossLine(opened.plan.name, opened.notCarried));
+  const keepDraft = (): void => {
+    designerDrafts.set(context.host, { openedKey, plan, lossLine });
+  };
   let savedLine: string = COPY.savedNothing;
   let step: DesignerStep['id'] = 'shape';
   let pickedShafts: readonly string[] = [];
   let pickedFloors: readonly [number, number] | undefined;
   /* What is typed and not yet committed. Kept here so a redraw does not empty a half-filled form. */
   const stairsDraft = { upS: '', downS: '', up: '', down: '' };
+  /* Until the reader types in it, the stair form follows the suggestion for the plan as it stands. */
+  let stairsTouched = false;
   let groupDraft = '';
   let analysis: PlanAnalysis = planAnalysisOf(plan, specs);
   let documentOpen = false;
@@ -1296,7 +1320,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
         'pressure',
         [
           { value: 'open', label: 'Ordinary' },
-          { value: 'held', label: 'Holds its pressure' },
+          { value: 'held', label: 'Pressurised' },
         ],
         shared((shaft) => (shaft.pressurised ? 'held' : 'open')),
         (next) => {
@@ -1327,6 +1351,10 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 
     const wide = block(side, 'everyday-designer-equipment');
     sectionLabel(wide, 'THE WHOLE BUILDING');
+    if (!planHasTraction(plan)) {
+      hint(wide, COPY.tractionNone);
+      return;
+    }
     const ropes = specs.ropeClasses?.classes ?? [];
     if (ropes.length > 0) {
       fieldName(wide, COPY.ropeLabel);
@@ -1345,6 +1373,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
           edit(next === '' ? rest : { ...rest, ropeClass: next });
         },
       );
+      hint(wide, COPY.ropeHint);
     }
     fieldName(wide, COPY.driveLabel);
     chipRow(
@@ -1353,13 +1382,14 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       'drive',
       [
         { value: 'plain', label: 'Ordinary' },
-        { value: 'regen', label: 'Give energy back on the way down' },
+        { value: 'regen', label: 'Regenerative: gives energy back' },
       ],
       plan.regenerativeDrive ? 'regen' : 'plain',
       (next) => {
         edit({ ...plan, regenerativeDrive: next === 'regen' });
       },
     );
+    if (plan.shafts.some((shaft) => shaft.machine.specClass === HYDRAULIC_CLASS_ID)) hint(wide, COPY.tractionOnlyHint);
   }
 
   function drawFloorsStep(): void {
@@ -1504,13 +1534,24 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
         });
         take.style.justifySelf = 'start';
       } else {
+        /* An empty form opens on the suggestion for this building; what the reader typed is kept. */
+        if (!stairsTouched) {
+          const suggested = stairsSuggestionFor(plan);
+          stairsDraft.upS = String(suggested.upS);
+          stairsDraft.downS = String(suggested.downS);
+          stairsDraft.up = String(Math.round(suggested.up * 100));
+          stairsDraft.down = String(Math.round(suggested.down * 100));
+        }
+        hint(panel, COPY.stairsHint);
         const typed = (): PlanStairs => ({
           upS: stairsDraft.upS.trim() === '' ? Number.NaN : Number(stairsDraft.upS),
           downS: stairsDraft.downS.trim() === '' ? Number.NaN : Number(stairsDraft.downS),
           up: stairsDraft.up.trim() === '' ? Number.NaN : Number(stairsDraft.up) / 100,
           down: stairsDraft.down.trim() === '' ? Number.NaN : Number(stairsDraft.down) / 100,
         });
-        const form = inlineRow(panel);
+        const form = el(doc, 'div', 'everyday-designer-stairs-form');
+        form.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px';
+        panel.append(form);
         const refused = el(doc, 'div', 'everyday-designer-stairs-refused', '');
         refused.style.cssText = `font-size:12px;color:${C.terracotta};line-height:1.45`;
         const fields: readonly [keyof typeof stairsDraft, string][] = [
@@ -1520,10 +1561,15 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
           ['down', COPY.stairsDownShare],
         ];
         for (const [field, label] of fields) {
-          draftField(form, label, 'number', stairsDraft[field], (next) => {
+          /* A filled field hides its placeholder, so each one carries its name above it. */
+          const named = el(doc, 'label', undefined, label);
+          named.style.cssText = `display:grid;gap:3px;font-size:11.5px;color:${C.warmGrey}`;
+          form.append(named);
+          draftField(named, label, 'number', stairsDraft[field], (next) => {
             stairsDraft[field] = next;
+            stairsTouched = true;
             refused.textContent = '';
-          });
+          }).style.width = '100%';
         }
         const add = button(panel, 'everyday-designer-stairs-add', COPY.stairsAdd, 'stairs-add', () => {
           const stairs = typed();
@@ -1535,12 +1581,12 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
           stairsDraft.downS = '';
           stairsDraft.up = '';
           stairsDraft.down = '';
+          stairsTouched = false;
           edit(withStairsAdded(plan, low, stairs));
         });
         add.style.justifySelf = 'start';
         panel.append(refused);
       }
-      hint(panel, COPY.stairsHint);
     }
 
     fieldName(panel, COPY.panelLabel);
@@ -1837,6 +1883,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   function redraw(keepSide = false): void {
     const active = doc.activeElement;
     const focusKey = active instanceof HTMLElement && root.contains(active) ? active.dataset['k'] : undefined;
+    keepDraft();
     analysis = planAnalysisOf(plan, specs);
     drawFigures();
     drawWarnings();
@@ -1872,6 +1919,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
 
   nameInput.addEventListener('input', () => {
     plan = { ...plan, name: nameInput.value };
+    keepDraft();
   });
   saveButton.addEventListener('click', () => {
     applyAndReport();

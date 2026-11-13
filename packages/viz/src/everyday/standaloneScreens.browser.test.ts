@@ -300,11 +300,15 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     await page.click('.everyday-designer-tab[data-step="floors"]');
     await page.fill('.everyday-designer-number[data-k="number:First floor picked"]', '3');
     await page.keyboard.press('Tab');
-    /* A stair asks for four numbers and is refused, in words, until it has them. */
+    /* The form opens filled in for this floor height, and a stair is refused, in words, with a blank. */
+    expect(
+      Number(await page.inputValue('.everyday-designer-draft[data-k="draft:Seconds to walk up"]')),
+    ).toBeGreaterThan(0);
+    await page.fill('.everyday-designer-draft[data-k="draft:Percent who walk up"]', '');
     await page.click('.everyday-designer-stairs-add');
-    expect(await page.textContent('.everyday-designer-stairs-refused')).toContain('A stair needs all four');
+    expect(await page.textContent('.everyday-designer-stairs-refused')).toContain('Fill in all four');
     for (const [label, value] of [
-      ['Seconds to climb', '30'],
+      ['Seconds to walk up', '30'],
       ['Seconds to walk down', '22'],
       ['Percent who walk up', '20'],
       ['Percent who walk down', '45'],
@@ -409,7 +413,7 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     await openBoard(page);
     await page.click('.everyday-designer-shaft-chip[data-k="shaft:s1"]');
     await page.click('.everyday-designer-tab[data-step="service"]');
-    expect(await page.textContent('.everyday-designer-service-line')).toContain('Local — doors open at G–12.');
+    expect(await page.textContent('.everyday-designer-service-line')).toContain('Local. Doors open at G–12.');
 
     /* The picked shaft is the one outlined in ink. Press it a third of the way down: one floor's doors. */
     const box = await page.$eval('.everyday-designer-svg', (svg) => {
@@ -442,7 +446,7 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     await page.keyboard.press('Tab');
     await page.click('.everyday-designer-sky[data-k="sky:no"]');
     const blocker = (await page.textContent('.everyday-designer-warning-blocker')) ?? '';
-    expect(blocker).toContain('nobody can board from the street');
+    expect(blocker).toContain('cannot be reached from the lobby');
     expect(await page.textContent('.everyday-designer-fix')).toBe('Make floor 30 a sky lobby');
 
     await page.click('.everyday-designer-fix');
