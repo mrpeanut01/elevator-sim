@@ -20,7 +20,7 @@
       "id": "hydraulic",
       "name": "Hydraulic",
       "ratedSpeedMps": {
-        "min": 0.5,
+        "min": 0.25,
         "max": 0.75,
         "typical": 0.63
       },

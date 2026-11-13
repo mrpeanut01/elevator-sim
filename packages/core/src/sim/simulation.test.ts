@@ -304,6 +304,30 @@ describe('a car that fills up leaves people behind, and they are served later', 
     },
   });
 
+  /**
+   * The bottom of the hydraulic band, 0.25 m/s since 2026-11-12 (`docs/02-elevator-reference.md`).
+   * The loader takes it, the run balances, and the same riders spend longer in the car than at
+   * 0.63 m/s — compared on the legs, with the seed and the demand held.
+   */
+  it('runs a hydraulic car at the bottom of its band, and the ride is slower', () => {
+    const rideSeconds = (ratedSpeedMps: number): number => {
+      const result = runSimulation({
+        ...oneCar(),
+        building: tinyBuilding(config, 2500, ratedSpeedMps),
+        demand: { arrivalRatePctPop5min: 2 },
+      });
+      expect(result.conservation.balanced).toBe(true);
+      expect(result.conservation.delivered).toBe(result.conservation.generated);
+      expect(result.conservation.generated).toBeGreaterThan(0);
+      let total = 0;
+      for (const leg of result.record.passengers) {
+        if (leg.boardedAt !== undefined && leg.alightedAt !== undefined) total += leg.alightedAt - leg.boardedAt;
+      }
+      return total / result.conservation.delivered;
+    };
+    expect(rideSeconds(0.25)).toBeGreaterThan(rideSeconds(0.63));
+  });
+
   it('serves the overflow on a later trip instead of losing it', () => {
     const simulation = new Simulation(oneCar());
     const car = simulation.building.cars[0];

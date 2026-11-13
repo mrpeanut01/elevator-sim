@@ -1626,6 +1626,24 @@ function capacityCommentFor(
  * what the numbers are, says they came in on the loaded document and are not this editor's to
  * derive, and stops.
  */
+/**
+ * Vertical walking speeds on a stair, m/s — the pair `data/buildings/st-jude-hospital.json` cites
+ * from Fruin's stair-flow work (0.15–0.20 m/s climbing, about 1.35 times that descending) and
+ * uses for its own stair.
+ */
+export const STAIR_CLIMB_MPS = 0.155;
+export const STAIR_DESCEND_MPS = 0.21;
+
+/**
+ * The two walking times those speeds give over `riseM`, to the whole second, with the climb never
+ * quicker than the walk down. The designer fills a new stair's form with this pair, and
+ * {@link transportCommentFor} recognises it so a stair left at the pair is written as derived.
+ */
+export function stairSecondsFor(riseM: number): { readonly upS: number; readonly downS: number } {
+  const downS = Math.max(1, Math.round(riseM / STAIR_DESCEND_MPS));
+  return { upS: Math.max(downS, Math.round(riseM / STAIR_CLIMB_MPS)), downS };
+}
+
 function transportCommentFor(spec: BuildingSpec, mode: SpecTransportMode): string {
   const [low, high] = [Math.min(...mode.connects), Math.max(...mode.connects)];
   const heightOf = (floor: number): string =>
@@ -1660,6 +1678,19 @@ function transportCommentFor(spec: BuildingSpec, mode: SpecTransportMode): strin
    */
   if (typeof mode.traversalTimeS !== 'number') {
     const pair = traversalTimeLabel(mode.traversalTimeS);
+    const walked = stairSecondsFor(riseM);
+    if (mode.traversalTimeS.upS === walked.upS && mode.traversalTimeS.downS === walked.downS) {
+      const climb = STAIR_CLIMB_MPS.toFixed(3);
+      const descend = STAIR_DESCEND_MPS.toFixed(2);
+      return (
+        `Traversal time DERIVED: ${pair}, landing to landing. It is this spec's ${rise} m rise ` +
+        `(${where}) at ${climb} m/s walking up and ${descend} m/s walking down, each rounded to ` +
+        `the whole second. Those two speeds are the ones data/buildings/st-jude-hospital.json ` +
+        `cites from Fruin's stair-flow work for its own stair; no other source was read for this ` +
+        `one. ASSUMED, not cited: the share of people who walk. No published figure for it was ` +
+        `read for this building, so it is a starting guess to be replaced by a measured one.`
+      );
+    }
     return (
       `Traversal time SET BY HAND and NOT cited: ${pair}, landing to landing. This is a stairs ` +
       `mode, and the EN 115-1 escalator derivation this editor performs for an escalator is ` +

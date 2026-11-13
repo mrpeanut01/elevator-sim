@@ -915,9 +915,13 @@ describe('the building spec', () => {
        * derived comment, correctly, and the old assertion failed on a building where nothing was
        * wrong. The rule is therefore *one of the two, and never the source's own citation*, which
        * is what the assertion above the loop already holds.
+       *
+       * A third joined on 2026-11-12: a stair whose pair is its rise at the two walking speeds
+       * `stairSecondsFor` uses is written as derived, and `st-jude-hospital`'s 26 s and 19 s over
+       * 4.0 m are exactly that.
        */
       for (const mode of written) {
-        expect(mode.$comment, id).toMatch(/SET BY HAND and NOT cited|DERIVED by the building/);
+        expect(mode.$comment, id).toMatch(/SET BY HAND and NOT cited|DERIVED by the building|Traversal time DERIVED/);
       }
     }
     const tower = specFromBuilding(parseBuilding(read('buildings/vertical-city.json')), 'vertical-city');
@@ -983,7 +987,7 @@ describe('the building spec', () => {
      */
     expect(judeSpec.floorHeightM).toBe(4);
     expect((judeOut.transportModes ?? [])[0]?.$comment).toMatch(
-      /rise between these two landings is 4\.00 m/,
+      /4\.00 m rise/,
     );
 
     /*

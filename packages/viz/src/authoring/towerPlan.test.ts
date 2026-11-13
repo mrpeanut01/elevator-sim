@@ -72,6 +72,12 @@ import {
   withShafts,
   withSkyLobbyToggled,
   stairsAbove,
+  stairsAreValid,
+  stairsSuggestionFor,
+  planHasTraction,
+  HYDRAULIC_CLASS_ID,
+  STAIR_CLIMB_MPS,
+  STAIR_DESCEND_MPS,
   withAccessZoneAdded,
   withAccessZoneRemoved,
   withDescentSpeed,
@@ -437,6 +443,35 @@ describe('the drawing board is not decoration — every control moves the legs',
     expect(stairsAbove(walked, 0)?.id).toBe(written?.id);
     expect(escalatorAbove(walked, 0)).toBeUndefined();
     expect(withTransportModeRemoved(walked, written?.id ?? '')).toEqual(base);
+  });
+
+  it('suggests a stair from the floor height: slower up than down, and one the board will take', () => {
+    const suggested = stairsSuggestionFor(base);
+    expect(stairsAreValid(suggested)).toBe(true);
+    expect(suggested.upS).toBe(Math.round(base.floorHeightM / STAIR_CLIMB_MPS));
+    expect(suggested.downS).toBe(Math.round(base.floorHeightM / STAIR_DESCEND_MPS));
+    expect(suggested.upS).toBeGreaterThan(suggested.downS);
+    /* Left at the suggested times, the stair is written as derived; the share who walk stays an assumption. */
+    const written = buildingFromPlan(withStairsAdded(base, 0, suggested), SPECS).transportModes?.[0];
+    expect(written?.$comment).toContain('Traversal time DERIVED');
+    expect(written?.$comment).toContain('ASSUMED, not cited');
+    /* A taller storey is a longer flight. */
+    expect(stairsSuggestionFor({ ...base, floorHeightM: base.floorHeightM * 2 }).upS).toBeGreaterThan(suggested.upS);
+  });
+
+  it('writes the rope and the regenerative drive on traction banks only', () => {
+    const fitted = { ...base, regenerativeDrive: true, ropeClass: 'steel' };
+    const traction = buildingFromPlan(fitted, SPECS).banks;
+    expect(traction.every((bank) => bank.regenerativeDrive === true && bank.ropeClass === 'steel')).toBe(true);
+    const hydraulic = withShafts(fitted, fitted.shafts.map((shaft) => shaft.key), (shaft) => ({
+      ...shaft,
+      machine: { ...shaft.machine, specClass: HYDRAULIC_CLASS_ID },
+    }));
+    expect(planHasTraction(hydraulic)).toBe(false);
+    for (const bank of buildingFromPlan(hydraulic, SPECS).banks) {
+      expect(bank.regenerativeDrive).toBeUndefined();
+      expect(bank.ropeClass).toBeUndefined();
+    }
   });
 
   it('a landing panel is written on its floor and read back', () => {
