@@ -372,16 +372,16 @@ export const DESIGNER_ABSENCES: readonly string[] = Object.freeze([
 /**
  * The rated speeds a lift is sold at, in m/s — the ladder a class's own band is cut against.
  *
- * This is the one authored list in the module and it is § 10.1's own: `0.25 · 0.5 · 0.75` for hydraulics,
- * `1 · 1.6` for MRL, `2.5` for geared, `3.5 · 5 · 7` for gearless, `8 · 10` above it, plus the two
- * intermediate values `data/elevator-specs.json`'s bands name as typical (`1.75`, `4`) so that
+ * This is the one authored list in the module and it is § 10.1's own: `0.25 · 0.5 · 0.63 · 0.75` for hydraulics,
+ * `1 · 1.6` for MRL, `2.5` for geared, `3.5 · 5 · 7` for gearless, `8 · 10` above it, plus the
+ * intermediate values `data/elevator-specs.json`'s bands name as typical (`0.63`, `1.75`, `4`) so that
  * every shipped class has its own typical speed on the ladder. Nothing derives it because no field
  * of the class record enumerates catalogue speeds — a class declares a band, and the band is
  * continuous. `0.25` is the hydraulic band's floor since 2026-11-12, set by the owner without a
  * published figure behind it; `docs/02-elevator-reference.md` says so beside the class table.
  */
 export const CATALOGUE_SPEEDS_MPS: readonly number[] = Object.freeze([
-  0.25, 0.5, 0.75, 1, 1.6, 1.75, 2.5, 3.5, 4, 5, 7, 8, 10, 12.5, 16, 20.5,
+  0.25, 0.5, 0.63, 0.75, 1, 1.6, 1.75, 2.5, 3.5, 4, 5, 7, 8, 10, 12.5, 16, 20.5,
 ]);
 
 /**

@@ -83,6 +83,7 @@ import {
   withTransportModeRemoved,
   type PlanStairs,
   withFloors,
+  withFloorHeight,
   withPopulation,
   withShaftAdded,
   withShaftCopied,
@@ -1099,7 +1100,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       { min: 2.6, max: 6, step: 0.1 },
       plan.floorHeightM,
       (value) => lengthFigure(value, unitsNow()),
-      (current, next) => ({ ...current, floorHeightM: Math.round(next * 10) / 10 }),
+      withFloorHeight,
     );
     sliderRow(
       building,
