@@ -262,6 +262,20 @@ describe('the warnings, most serious first, and the fixes some of them carry', (
     expect(warningsOf(hydraulic).map((warning) => warning.severity).indexOf('class')).toBe(0);
   });
 
+  it('says a group mixing hydraulic and traction lifts loses the chosen rope and drive, and only then', () => {
+    const mixed = withPlanMachineClass(SIZED, [keyAt(SIZED, 1)], classNamed('hydraulic'));
+    const lost = (plan: TowerPlan): boolean => warningsOf(plan).some((warning) => warning.text.includes('mixes hydraulic and traction'));
+    /* Nothing chosen, nothing lost. */
+    expect(lost({ ...mixed, regenerativeDrive: false, ropeClass: undefined })).toBe(false);
+    const fitted = { ...mixed, regenerativeDrive: true };
+    expect(lost(fitted)).toBe(true);
+    expect(warningsOf(fitted).find((warning) => warning.text.includes('mixes hydraulic'))?.text).toContain('change shaft B');
+    /* All traction, or all hydraulic, is not a mix. */
+    expect(lost({ ...SIZED, regenerativeDrive: true })).toBe(false);
+    const allHydraulic = withPlanMachineClass(SIZED, SIZED.shafts.map((shaft) => shaft.key), classNamed('hydraulic'));
+    expect(lost({ ...allHydraulic, regenerativeDrive: true })).toBe(false);
+  });
+
   it('warns under 11% handling capacity and over a forty-second interval, in that order', () => {
     const crowded = { ...SIZED, peoplePerBay: 80, shafts: SIZED.shafts.slice(0, 1) };
     const comfort = warningsOf(crowded).filter((warning) => warning.severity === 'comfort');
