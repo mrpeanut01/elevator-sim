@@ -727,6 +727,7 @@ import {
 import { GAME_FLOORS } from '../everyday/floors.js';
 import { TEST_SIMULATION_LABEL } from '../everyday/types.js';
 import { EXPLAINER_CLOSE_LABEL } from '../everyday/screenDom.js';
+import { EXPLAINER_CLOSE_LABEL as ENGINEER_EXPLAINER_CLOSE_LABEL } from '../dev/dom.js';
 import { LOBBY_COPY, LOBBY_INITIAL, lobbyPoint, lobbyViewOf, type LobbyState } from '../everyday/lobbyModel.js';
 import {
   SURVIVOR_COPY,
@@ -6515,7 +6516,7 @@ const EDITOR_PANELS: SurfaceAdapter = {
      * it, through the export that carries it — was never rendered at all. The two specs here are
      * the two states a reader reaches by pinning a band `[6, 12]` and clicking the toggle: still
      * landing in the lobby (the default; label `✓ express from the lobby, skipping 2–6`), and
-     * taken out of it (label `stays in its band — click to run express from the lobby`).
+     * taken out of it (label `stays in its band: click to run express from the lobby`).
      *
      * The toggle is mounted only where `canExpress` holds (`dev/buildingEditor.ts` `:1554`), so
      * its title is seeded under the same guard; a car without the button has no tooltip to read.
@@ -7261,6 +7262,18 @@ const MENU: SurfaceAdapter = {
         }
         for (const [index, issue] of view.issues.entries()) {
           seeds.push({ field: `${at}.issue.${String(index)}`, text: issue, role: 'reason' });
+        }
+        /* The long notes behind a link: the popover's text is in the document, so it is swept. */
+        for (const [index, note] of view.explainers.entries()) {
+          seeds.push({ field: `${at}.explain.${String(index)}.link`, text: note.link, role: 'label' });
+          seeds.push({ field: `${at}.explain.${String(index)}.title`, text: note.title, role: 'label' });
+          for (const [line, paragraph] of note.body.entries()) {
+            seeds.push({
+              field: `${at}.explain.${String(index)}.body.${String(line)}`,
+              text: paragraph,
+              role: 'prose',
+            });
+          }
         }
         for (const row of view.rows) {
           seeds.push({ field: `${at}.${row.id}.label`, text: row.label, role: 'label' });
@@ -10411,6 +10424,7 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     /* The shell's skip link, GitHub issue #404 — chrome the shell draws and does not author. */
     'everyday/types.ts#SHELL_SKIP_LABEL',
     'everyday/screenDom.ts#EXPLAINER_CLOSE_LABEL',
+    'dev/dom.ts#EXPLAINER_CLOSE_LABEL',
     'everyday/rail.ts#sublineFor',
     /* Wave AS, lane AS-4 (#636 item 6): the played day's subline with the stage's clock. */
     'everyday/rail.ts#stageSublineOf',
@@ -10602,6 +10616,7 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     seeds.push({ field: 'shell.skip.label', text: SHELL_SKIP_LABEL, role: 'label' });
     /* The close button on every explainer popover: one face, shared by every screen that folds help away. */
     seeds.push({ field: 'shell.explainer.close', text: EXPLAINER_CLOSE_LABEL, role: 'label' });
+    seeds.push({ field: 'engineer.explainer.close', text: ENGINEER_EXPLAINER_CLOSE_LABEL, role: 'label' });
 
     /*
      * § 3.2's footer, once — it does not vary by campaign shape.
@@ -12406,8 +12421,6 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
         seeds.push({ field: `${where}.cta`, text: offer.cta, role: 'label' });
         if (offer.refusal !== undefined) seeds.push({ field: `${where}.refusal`, text: offer.refusal, role: 'reason' });
       });
-      seeds.push({ field: `${label}.towers.lately`, text: towers.lately.refusal, role: 'reason' });
-      seeds.push({ field: `${label}.towers.lately.sub`, text: towers.lately.sub, role: 'prose' });
       seeds.push({ field: `${label}.towers.footnote`, text: towers.oddsFootnote, role: 'prose' });
 
       const desk = buildingView(input);
@@ -19186,9 +19199,11 @@ const TELEMETRY_CONSENT: SurfaceAdapter = {
         seeds.push(
           { field: `consent.${state}.heading`, text: ask.heading, role: 'label' },
           { field: `consent.${state}.body`, text: ask.body, role: 'prose' },
-          { field: `consent.${state}.notCollected`, text: ask.notCollected, role: 'prose' },
+          { field: `consent.${state}.never`, text: ask.never, role: 'prose' },
           { field: `consent.${state}.no`, text: ask.no, role: 'label' },
           { field: `consent.${state}.yes`, text: ask.yes, role: 'label' },
+          { field: `consent.${state}.details`, text: ask.details, role: 'label' },
+          { field: `consent.${state}.notCollected`, text: ask.notCollected, role: 'prose' },
           { field: `consent.${state}.later`, text: ask.later, role: 'prose' },
         );
       }

@@ -1059,19 +1059,6 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
     }
     root.append(stats);
 
-    /*
-     * ---- what has happened lately: one line ----
-     * There is no feed to draw, so the section is its heading and one sentence rather than a card.
-     * The campaign's register of absences is on the settings screen (`everyday/buildNotes.ts`,
-     * GitHub issue #207).
-     */
-    const lately = el(doc, 'div', 'everyday-towers-lately');
-    lately.style.cssText = `display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:${String(GAP.section)}px`;
-    const latelyLine = el(doc, 'span', undefined, view.lately.refusal);
-    latelyLine.style.cssText = `font-size:12.5px;color:${C.warmGrey}`;
-    lately.append(eyebrow(doc, `${view.lately.heading} ${view.lately.sub}`, '0'), latelyLine);
-    root.append(lately);
-
     shell.refreshBar?.();
   };
 

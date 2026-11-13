@@ -637,7 +637,7 @@ function mootSentenceOf(
   const others = press.mootUnder.length;
   return (
     `This day runs under the tower’s standing order, ${standing}. Measured on this crowd, ` +
-    `${mootCountClause(others)} with no press at all; the day’s report names ${others === 1 ? 'it' : 'them'}.`
+    `${mootCountClause(others)} with no press at all. The day’s report names ${others === 1 ? 'it' : 'them'}.`
   );
 }
 
@@ -904,14 +904,14 @@ function crowdIsPooledOf(input: TodayInput): boolean {
 
 function seedLineOf(input: TodayInput, crowdIsPinned: boolean, practice: PracticeGround | undefined): string {
   const crowd = `tower ${input.buildingId} · crowd ${input.seed.toString()}`;
-  if (input.crowdIsToday) return `${crowd} · today’s date, so everyone playing today meets this crowd`;
+  if (input.crowdIsToday) return `${crowd} · today’s crowd, the same for everyone playing today`;
   /*
    * **The third arm: a pinned crowd, labelled as one** — [§ D1047](../../../../DECISIONS.md). The
    * ruling's honesty member made it a condition of dealing a newcomer a pinned day, and the second
    * arm's *a crowd of this run's own* is true and says less than is so: everybody who plays this
    * tower's pinned first day meets this crowd, which is the one it was measured on.
    */
-  if (crowdIsPinned) return `${crowd} · the pinned crowd this day was measured on, not the day’s`;
+  if (crowdIsPinned) return `${crowd} · the pinned crowd this day was measured on, not today’s`;
   /*
    * **The fourth arm: a crowd derived from the date** — lane AL-F, [§ D1229](../../../../DECISIONS.md).
    * This device has filed today's date crowd on this tower already, so a further day dealt today
@@ -925,12 +925,12 @@ function seedLineOf(input: TodayInput, crowdIsPinned: boolean, practice: Practic
    */
   if (crowdIsPooledOf(input)) {
     return (
-      `${crowd} · from this weekday’s measured pool, by today’s date, the day of the week and the ` +
-      'weeks you have closed here'
+      `${crowd} · picked from this weekday’s measured crowds by today’s date, the weekday and the ` +
+      'weeks you’ve closed here'
     );
   }
   if (crowdIsDerivedOf(input)) {
-    return `${crowd} · a new crowd for this day, because you have already played today’s own on this tower`;
+    return `${crowd} · a new crowd, because you’ve already played today’s on this tower`;
   }
   /*
    * **And on a scenario's week, what that costs** — wave AK, [§ D1141](../../../../DECISIONS.md).
@@ -938,7 +938,7 @@ function seedLineOf(input: TodayInput, crowdIsPinned: boolean, practice: Practic
    * is practice and the week does not move (`shift/scoredCrowd.ts`), so the line says so before the
    * press rather than the sheet after it.
    */
-  const own = `${crowd} · a crowd of this run’s own, not the day’s`;
+  const own = `${crowd} · this run’s own crowd, not today’s`;
   return practice === 'crowd'
     ? `${own}, so this run is practice and banks nothing into your week`
     : own;

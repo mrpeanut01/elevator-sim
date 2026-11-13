@@ -206,18 +206,16 @@ describe('the triage screen (§ 8.1)', () => {
     }
   });
 
-  it('names the panel it cannot fill, rather than drawing it empty', () => {
+  it('carries no register of absences and no empty panel', () => {
     const view = towersView(inputOf(twoTowers()));
-    /* The offers panel is built now (§ D510); the *lately* panel still says why it is empty. */
-    expect(view.lately.refusal.length).toBeGreaterThan(40);
     /*
      * The campaign's register of absences is no longer on this view: GitHub issue #207 draws all
-     * six registers on the build-information panel. What this screen still owes a player is the
-     * per-control refusal — a panel it cannot fill says so on its own face — which is the two
-     * assertions above. `CAMPAIGN_ABSENCES` itself is pinned in `career.test.ts` and its placement
-     * in `buildNotes.test.ts`.
+     * six registers on the build-information panel. `CAMPAIGN_ABSENCES` itself is pinned in
+     * `career.test.ts` and its placement in `buildNotes.test.ts`. The *lately* line, a section that
+     * only said it was empty, was removed on the product owner's word (2026-11-13).
      */
     expect(view).not.toHaveProperty('absences');
+    expect(view).not.toHaveProperty('lately');
   });
 
   it('says which career snapshot it is showing, derived from the day', () => {

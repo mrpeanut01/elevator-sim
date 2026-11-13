@@ -102,7 +102,7 @@ describe('slice 1’s acceptance check, in unit form', () => {
 
 describe('the words (guide §11.3, §16 rule 11)', () => {
   it('carries the prototype’s copy for labels, reads and ends', () => {
-    expect(lever('patience').label).toBe('How long anyone should wait');
+    expect(lever('patience').label).toBe('Limit the longest wait');
     expect(lever('patience').atZero).toBe('let it slide');
     expect(lever('patience').atFull).toBe('nobody waits');
     expect(lever('lobby').reads).toBe('holds a car at the lobby');
@@ -133,7 +133,7 @@ describe('the echo — docs/19 defect 5', () => {
   it('names the position a slider now holds and the field that holds it', () => {
     const applied = applyPlainLever(SPEC, LEVERS, 'patience', 85);
     const echo = plainLeverEchoOf(lever('patience', applied.spec, applied.levers));
-    expect(echo).toContain('How long anyone should wait');
+    expect(echo).toContain('Limit the longest wait');
     expect(echo).toContain('85');
     expect(echo).toContain('weights.starvation');
   });

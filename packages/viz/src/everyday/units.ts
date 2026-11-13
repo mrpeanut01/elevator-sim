@@ -212,7 +212,7 @@ export function speedRangeFigure(
  */
 export const UNITS_ROW_COPY = Object.freeze({
   label: 'Units',
-  note: 'machine specifications read in metres or feet',
+  note: 'machine specs shown in metres or feet',
   /** The pill's text, per preference. The prototype's own two words (§ 18, `imperial`). */
   face: Object.freeze({ metric: 'metres', imperial: 'feet' }) as Readonly<
     Record<EverydayUnits, string>

@@ -147,7 +147,7 @@ export function describePinnedQueues(
       : '';
   return (
     `${String(worst.waiting)} riders at ${worst.floorId} were each told to take ${worst.carId}, ` +
-    `which holds ${String(worst.capacityPersons)} — so it needs ${String(worst.tripsNeeded)} trips ` +
+    `which holds ${String(worst.capacityPersons)}, so it needs ${String(worst.tripsNeeded)} trips ` +
     `to clear them and no other car may take them in the meantime. That is what the panel bought ` +
     `them a shorter journey with.${suffix}`
   );

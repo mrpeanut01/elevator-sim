@@ -392,7 +392,7 @@ describe('the result view is strictly weaker than the report it reads', () => {
      * is where it shows.
      */
     expect(cell.answer, 'the cell drew no answer to pair the heading with').not.toBeNull();
-    expect(cell.answer).toMatch(/Separated on 1 of the measures compared — average wait/u);
+    expect(cell.answer).toMatch(/Separated on 1 of the measures compared: average wait/u);
   });
 
   it('always carries §12’s three standing notes and the never-a-subtraction rule', () => {

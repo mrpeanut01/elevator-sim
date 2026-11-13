@@ -145,7 +145,7 @@ describe.skipIf(!HAS_BROWSER)('watching, in the Everyday shell — GAMEPLAY § 1
     /* The canvas pill, and it may not claim a server verified anything. */
     const pill = (await page.textContent('.everyday-stage-watching-pill')) ?? '';
     expect(pill).toContain('REPLAY');
-    expect(pill).toContain('VERIFIED BY RE-SIMULATION');
+    expect(pill).toContain('CHECKED BY RE-RUNNING');
     expect(pill.toLowerCase()).not.toContain('server');
     /* The rail subline is § 14.1's `WATCHING · <NAME>` rather than the bare word. */
     const subline = (await page.textContent('.everyday-rail-subline')) ?? '';

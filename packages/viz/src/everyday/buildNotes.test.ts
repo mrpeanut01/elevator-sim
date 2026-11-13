@@ -332,7 +332,7 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * automatically"* is still true. The open issue that asks for days that run and file by themselves
    * is **#536** (*"they automatically run while on this screen"*), so it owns the row.
    */
-  { register: 'CAMPAIGN_ABSENCES', fragment: 'nothing files on', issue: 536 },
+  { register: 'CAMPAIGN_ABSENCES', fragment: 'nothing is filed for you', issue: 536 },
   /*
    * **A row that arrived with a fix rather than with a gap**, which this table has now recorded
    * three times and is the direction § D370's queue reading is weakest about. GitHub issue **#563**
@@ -353,7 +353,7 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * cannot close while it stands; a dedicated issue would be the better owner, and filing one is the
    * integrator's.
    */
-  { register: 'CAMPAIGN_ABSENCES', fragment: 'The month is remembered and the mornings are not', issue: 219 },
+  { register: 'CAMPAIGN_ABSENCES', fragment: 'The month is saved but the mornings are not', issue: 219 },
 
   /* Settings. Two of the six are #229's remainder after its premise was refuted (§ D368). */
   /*

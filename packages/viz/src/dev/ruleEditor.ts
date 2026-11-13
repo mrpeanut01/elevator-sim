@@ -106,9 +106,8 @@ export function rowRefusalOf(index: number, issues: readonly RuleIssue[]): strin
  */
 const APPLIES_NEXT_RUN =
   commitmentOf('viewer.ruleRows', 'writes-only') === 'next-run'
-    ? 'Rules take effect on your next run. While a day plays, the rules it was simulated with ' +
-      'do the deciding — mid-run, your one instrument is the stage control, and a park ordered ' +
-      'there outranks a standing rule.'
+    ? 'Rules take effect on your next run. A day in play keeps the rules it started with. ' +
+      'Mid-run, use the stage control: a park ordered there outranks a standing rule.'
     : '';
 
 /* -------------------------------------------------------------------------- *
@@ -278,8 +277,8 @@ export function mountRuleEditor(elements: RuleEditorElements, context: MountCont
             el(doc, 'span', { className: 'rule-row-word', text: 'then' }),
             then,
             ...(thenValue === undefined ? [] : [thenValue]),
-            button('↑', 'earlier — read sooner, wins ties', () => { move(-1); }),
-            button('↓', 'later — read after the rows above', () => { move(1); }),
+            button('↑', 'move earlier: read sooner, wins ties', () => { move(-1); }),
+            button('↓', 'move later: read after the rows above', () => { move(1); }),
             button('✕', 'delete this rule', () => {
               write(all.filter((_, at) => at !== index));
             }),

@@ -502,8 +502,8 @@ export const TODAY_ASKS_HEADING = 'WHAT TODAY ASKS';
  * mirror and the pair is asserted against the two goal sets in `everyday/goalSets.test.ts`.
  */
 export const TODAY_ASKS_DECIDES =
-  'These five are the week’s, and the contract counts none of them. What files this day, and what ' +
-  'its report is graded on, is the four on the building desk, under WHAT THE CONTRACT ASKS.';
+  'These five are for your week, and the contract counts none of them. This day is filed, and its ' +
+  'report graded, on the four at the building desk, under WHAT THE CONTRACT ASKS.';
 
 /**
  * Today's goals: the handoff's four tests every day, in tension (§ 8.6), plus the energy bar.
@@ -1078,7 +1078,7 @@ export function gaveUpBesideOf(
   if (basis === 'now') {
     return (
       `${String(abandoned)} of ${String(arrived)} have waited past the ${horizonLabelOf(horizonS)} ` +
-      `give-up horizon so far; ${OVERLAP_UNSETTLED}; ${clause}`
+      `give-up line so far; ${OVERLAP_UNSETTLED}; ${clause}`
     );
   }
   const overlap =
@@ -1089,7 +1089,7 @@ export function gaveUpBesideOf(
         : `${String(abandonedCarried)} of them carried`;
   return (
     `${String(abandoned)} of ${String(arrived)} waited past the ${horizonLabelOf(horizonS)} ` +
-    `give-up horizon, ${overlap}; ${clause}`
+    `give-up line, ${overlap}; ${clause}`
   );
 }
 
@@ -1122,7 +1122,7 @@ function progressOf(goal: ShiftGoal, observed: number): number {
  */
 export function bestLineFor(observations: GoalObservations, bestMinutePct: number): string {
   if (observations.arrived < WAKE_UP_ARRIVALS) {
-    return 'not enough riders yet — nothing graded before the building wakes up';
+    return 'too few riders yet: nothing graded';
   }
   return `best day ${String(bestMinutePct)}%`;
 }

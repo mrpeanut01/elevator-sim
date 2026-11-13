@@ -468,7 +468,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     screen: 'stage',
     ctx: 'rush',
     leave: leave(LEAVE_RUSH),
-    back: { label: 'Endless rush', screen: 'rush' },
+    back: { label: 'Rush', screen: 'rush' },
     primary: primary(['End the rush']),
     note: 'Stops the climb and counts the waves.',
     inverted: false,

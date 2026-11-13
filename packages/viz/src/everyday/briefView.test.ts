@@ -43,7 +43,7 @@ const TODAY: TodayRecord = {
   facts: [{ label: 'Floors', value: '13 above the lobby' }],
   load: { word: '590 per working car', note: '1,180 people and 2 working cars today, as the building is configured. The day shows whether that is comfortable; this plate does not grade it.' },
   asks: ['Carry 90% of the people who turn up', 'Nobody waits longer than 120 s'],
-  seedLine: 'tower chancery-house · crowd 424242 · today’s date, so everyone playing today meets this crowd',
+  seedLine: 'tower chancery-house · crowd 424242 · today’s crowd, the same for everyone playing today',
   crowdIsToday: true,
   crowdIsPinned: false,
   firstSessionLine: undefined,
@@ -77,12 +77,12 @@ describe('LOCKED FOR SCORE says whose crowd it is, the way the seed line does �
    */
   it('names the day’s crowd on a day that has it, and does not on one that does not', () => {
     const daily = briefScreenViewOf({ today: TODAY, dispatchers: DISPATCHERS, savedIds: [], selectedId: 'collective' });
-    expect(daily.seedLine).toContain('today’s date');
+    expect(daily.seedLine).toContain('today’s crowd');
     expect(daily.locked.what).toMatch(/^The crowd is the day’s/u);
 
     const own: TodayRecord = {
       ...TODAY,
-      seedLine: 'tower crown-hotel · crowd 20268743 · a crowd of this run’s own, not the day’s',
+      seedLine: 'tower crown-hotel · crowd 20268743 · this run’s own crowd, not today’s',
       crowdIsToday: false,
     };
     const pinned = briefScreenViewOf({ today: own, dispatchers: DISPATCHERS, savedIds: [], selectedId: 'collective' });
@@ -235,7 +235,7 @@ describe('the two cards this build states rather than draws as a live control', 
      */
     const card = lockedForScore(true);
     expect(card.caveat).toBe(
-      'What it opens: the tower (floors above the lobby, shafts), the machines (rated speed, capacity, ' +
+      'What it opens: the tower (floors above the lobby, cars), the machines (rated speed, capacity, ' +
         'door dwell) and the crowd (how busy, arriving at the lobby).',
     );
     expect(card.caveat).not.toMatch(/dispatcher/u);

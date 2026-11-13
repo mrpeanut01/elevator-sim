@@ -137,7 +137,7 @@ describe('interventionStampOf', () => {
     // the stages a player can see move, and the assignments that do not.
     expect(SWITCH_PINS_NOTE).not.toContain('weights');
     expect(SWITCH_PINS_NOTE).toContain('runs as this dispatcher would run it');
-    expect(SWITCH_PINS_NOTE).toContain('calls already given a car keep it');
+    expect(SWITCH_PINS_NOTE).toContain('Calls already given a car keep it');
   });
 
   it('stamps an incident answer with the chosen option’s own words — § 20.16’s clock', () => {

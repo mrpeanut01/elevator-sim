@@ -502,7 +502,7 @@ export function lockedForScore(
   };
 }
 
-/** `the tower (floors above the lobby, shafts), the machines (…) and the crowd (…)`. */
+/** `the tower (floors above the lobby, cars), the machines (…) and the crowd (…)`. */
 function tunerControlsLine(offer: TuneOffer): string {
   const cards = tuneControlsOffered(offer).map(
     (entry) => `${entry.card.toLowerCase()} (${entry.controls.map((label) => label.toLowerCase()).join(', ')})`,

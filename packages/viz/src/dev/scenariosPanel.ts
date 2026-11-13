@@ -239,7 +239,7 @@ function statusDressing(status: ContractStatus): {
  * back* read as the tower being held (the post-AK panel's seat C D4). The reason is
  * {@link ScenarioCardView.offerLine}, drawn under it.
  */
-export const SCENARIO_HELD_OBJECTIVE = 'No clear to win this week: choosing it still plays the week';
+export const SCENARIO_HELD_OBJECTIVE = 'No clear to win this week. Choosing it still plays the week.';
 
 /** `Clear 2 shifts — 1 of 2 banked`, the design's own sentence (`design.html` :2675). */
 function objectiveOf(
@@ -292,7 +292,7 @@ export function scenarioCardsOf(
       statLine: resolved
         ? // The whole of § 4.4, in one call. Nothing here counts anything.
           statLineOf(building)
-        : `no building “${contract.buildingId}” is loaded — nothing to describe`,
+        : `no building “${contract.buildingId}” is loaded: nothing to describe`,
       objective: objectiveOf(contract, week, status),
       offerLine: status === 'cleared' ? undefined : weekOfferOf(contract.id)?.line,
       /*
@@ -309,8 +309,8 @@ export function scenarioCardsOf(
       art: SCENARIO_ART[contract.buildingId] ?? FALLBACK_ART,
       current: status === 'current',
       help: resolved
-        ? `${statusWord(status)} — taking this assignment restarts the week on ${building.name}`
-        : `${statusWord(status)} — this scenario's building is not loaded, so it cannot be run`,
+        ? `${statusWord(status)}: taking this assignment restarts the week on ${building.name}`
+        : `${statusWord(status)}: this scenario's building is not loaded, so it cannot be run`,
       resolved,
     };
   });
@@ -338,8 +338,8 @@ const OWN_CARD = Object.freeze({
   title: 'Build your own scenario',
   cta: 'Start from a blank tower',
   brief:
-    'Draw the building, set the arrival pattern, choose the machines — then run it and see how ' +
-    'long your dispatcher copes. Nothing is graded; the goals go quiet.',
+    'Draw the building, set the arrival pattern, choose the machines, then run it. Nothing is ' +
+    'graded.',
 });
 
 /**

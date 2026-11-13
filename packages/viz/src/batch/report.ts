@@ -413,17 +413,16 @@ function demandClause(result: BatchResult): string {
       rate === undefined
         ? 'at an authored demand condition'
         : `at an authored demand condition arriving at ${String(rate)} % of population per 5 minutes`;
-    return `${rateClause} — not the building's own profile; the population line carries every field of it`;
+    return `${rateClause}, not the building's own profile (the population line has every field)`;
   }
   if (result.arrivalRatePctPop5min !== null) {
     return `at ${String(result.arrivalRatePctPop5min)} % of population arriving per 5 minutes`;
   }
   if (result.demandLevel === undefined) return "at the building's own traffic profile";
   return (
-    `at the ${result.demandLevel} of the building's own traffic profile — the ` +
+    `at the ${result.demandLevel} of the building's own traffic profile: the ` +
     `${result.demandLevel === 'typical' ? 'middle' : result.demandLevel === 'min' ? 'lightest' : 'heaviest'} ` +
-    'arrival rate that profile declares, which is a point of the reference data rather than a ' +
-    'number chosen here'
+    'arrival rate that profile declares, taken from the reference data'
   );
 }
 
@@ -431,16 +430,16 @@ function budgetNote(replications: number): string | null {
   if (replications >= MIN_REPLICATION_BUDGET && replications <= MAX_REPLICATION_BUDGET) return null;
   if (replications < MIN_REPLICATION_BUDGET) {
     return (
-      `This batch ran ${String(replications)} replications. The project's budget is ` +
-      `${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)}: ten replications ` +
+      `This batch ran ${String(replications)} replications, below the ` +
+      `${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)} budget. Ten replications ` +
       'produced a 12 % error against the converged mean in the reference study, so an interval ' +
-      'from fewer than 50 is wider than it looks useful.'
+      'from fewer than 50 is less useful than it looks.'
     );
   }
   return (
-    `This batch ran ${String(replications)} replications, above the project's stated budget of ` +
-    `${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)}. Nothing is wrong with ` +
-    'the arithmetic; it simply costs more than the project budgets for.'
+    `This batch ran ${String(replications)} replications, above the ` +
+    `${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)} budget. The arithmetic is fine; ` +
+    'it just costs more.'
   );
 }
 
@@ -449,7 +448,7 @@ function crnSentence(result: BatchResult): string {
   if (crn.aligned) {
     return (
       `Common random numbers held: ${String(crn.checkedComparisons)} arm-to-arm comparisons were ` +
-      'checked passenger by passenger — arrival time, origin, every leg, mass and credential — ' +
+      'checked passenger by passenger (arrival time, origin, every leg, mass and credential), ' +
       'and the arms saw the same people every time.'
     );
   }
@@ -459,8 +458,7 @@ function crnSentence(result: BatchResult): string {
     `${String(crn.checkedComparisons)} compared replications saw different passengers on arms ` +
     `that share one trace key. First at replication ${String(first?.replication)}, arm ` +
     `"${String(first?.armId)}" against "${String(first?.baselineArmId)}": ${String(first?.detail)}. ` +
-    'No interval is computed from this batch, because a paired interval across these arms would ' +
-    'be arithmetic on unrelated runs.'
+    'No interval is computed from this batch, because the arms did not run on the same passengers.'
   );
 }
 
@@ -625,11 +623,10 @@ function compareMetric(
         `${String(pairing.suppressedPairs)} of ${String(totalPairs)} paired runs had at least one ` +
         'arm whose own summary refuses to quote a mean.',
       note:
-        `${String(valid)} paired runs were left, and they are not averaged. Dropping the ` +
-        'replications a building could not cope with keeps the passenger traces it did cope ' +
-        'with; the two arms lose them at different rates, and the ones that fall out are the ' +
-        'traces the dispatchers differ most on. The survivors would understate the difference in ' +
-        `exactly the case worth fixing. ${suppressionReasons(baseline, candidate)}`,
+        `${String(valid)} paired runs were left, and they are not averaged. The runs that drop out ` +
+        'are the ones a building could not cope with. The two arms lose them at different rates, ' +
+        'and they are the traces the dispatchers differ most on, so averaging the rest would ' +
+        `understate the difference. ${suppressionReasons(baseline, candidate)}`,
     };
   }
 
@@ -645,8 +642,7 @@ function compareMetric(
         `${presentation.label}, so there is nothing to compare.`,
       note:
         'A quantity that was never measured is not a zero. The remaining pairs are not averaged, ' +
-        'for the same reason a partly suppressed estimate is not: the runs that did measure it ' +
-        'are not a random sample of the runs.',
+        'because the runs that did measure it are not a random sample of the runs.',
     };
   }
 
@@ -659,9 +655,9 @@ function compareMetric(
       favours: null,
       sentence:
         `in ${runs(totalPairs)}, ${presentation.label} is not resolved: a single replication has ` +
-        'no measurable spread, so no interval can be formed.',
+        'no spread, so no interval can be formed.',
       note:
-        'One run of a lift peak spans a range the project measures at 4.1–7.4 s on a ' +
+        'One run of a lift peak spans a range measured at 4.1–7.4 s on a ' +
         'configuration whose converged mean is 5.0 s. That is why the budget is 50–200.',
     };
   }
@@ -674,8 +670,8 @@ function compareMetric(
     `Paired difference ${signed(estimate.mean, presentation.places)}${presentation.unit}, ` +
     `${(estimate.confidence * 100).toFixed(0)} % interval, Student-t at ` +
     `${String(estimate.degreesOfFreedom)} degrees of freedom, over ${runs(n)} that saw the same ` +
-    'passengers. The interval is on the difference itself — two separate intervals are never ' +
-    'compared here.';
+    'passengers. The interval is on the difference itself; two separate intervals are never ' +
+    'compared.';
 
   if (metricClass === 'axis') {
     /*
@@ -696,10 +692,10 @@ function compareMetric(
     const lower = estimate.upper < 0 ? candidate : baseline;
     const higher = lower === candidate ? baseline : candidate;
     const sign = Number.isFinite(estimate.lower) && Number.isFinite(estimate.upper) && !intervalContainsZero(estimate)
-      ? ` Across the whole of that interval ${lower.dispatcherProfileName}'s figure is the lower and ` +
-        `${higher.dispatcherProfileName}'s the higher — which is a measurement of drive work and ` +
+      ? ` Across that whole interval ${lower.dispatcherProfileName}'s figure is the lower and ` +
+        `${higher.dispatcherProfileName}'s the higher. That is a measurement of drive work, ` +
         'not a win: this row is an axis and no arm is named ahead on it.'
-      : ' That interval includes zero, so the two are not separated on this axis either — and an ' +
+      : ' That interval includes zero, so the two are not separated on this axis either, and an ' +
         'axis names no arm ahead in any case.';
     return {
       ...base,
@@ -712,7 +708,7 @@ function compareMetric(
         `in ${runs(n)}, ${candidate.dispatcherProfileName}'s ${presentation.label} differed from ` +
         `${baseline.dispatcherProfileName}'s by ${range}.${sign}`,
       note:
-        `${arithmetic} Energy is an axis and never a score: measured across this project's own ` +
+        `${arithmetic} Energy is an axis and never a score: across this project's own ` +
         'experiment matrix, the weakest shipped dispatcher sits on the Pareto front at six of ' +
         'eight cells because it carries fewer people. Read this row beside the waits above, ' +
         'never instead of them.',
@@ -729,7 +725,7 @@ function compareMetric(
       sentence:
         `in ${runs(n)}, the difference in ${presentation.label} between ` +
         `${candidate.dispatcherProfileName} and ${baseline.dispatcherProfileName} was ${range}. That ` +
-        `interval includes zero, so the two are not ordered at n = ${String(n)}: this batch cannot ` +
+        `interval includes zero, so the two are not ordered at n = ${String(n)}. This batch cannot ` +
         'resolve a difference on this measure, which is not the same as the two settings being ' +
         'the same.',
       note: arithmetic,
@@ -766,13 +762,13 @@ function compareMetric(
       sentence:
         `in ${runs(n)}, ${candidate.dispatcherProfileName}'s ${presentation.label} differed from ` +
         `${baseline.dispatcherProfileName}'s by ${range}, and no arm is named ahead on this row: ` +
-        `${runs(n)} is below this project's replication budget of ` +
+        `${runs(n)} is below the replication budget of ` +
         `${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)}, and an interval ` +
-        'that excludes zero over too few paired runs is a direction this batch cannot support.',
+        'that excludes zero over too few paired runs cannot support a direction.',
       note:
         `${arithmetic} Ten replications produced a 12 % error against the converged mean in the ` +
         'reference study, which is why the budget is what it is. The interval above is the ' +
-        'measurement and it is not withheld; the ordering is.',
+        'measurement and is shown; the ordering is withheld.',
     };
   }
 
@@ -808,7 +804,7 @@ function compareMetric(
     sentence:
       `in ${runs(n)}, ${candidate.dispatcherProfileName}'s ${presentation.label} was ${direction} ` +
       `than ${baseline.dispatcherProfileName}'s, by between ${magnitude}` +
-      `${better === null ? '' : ` — the ${better} arm is the one that came out ahead on this row`}.`,
+      `${better === null ? '' : `. The ${better} arm came out ahead on this row`}.`,
     note: arithmetic,
   };
 }
@@ -851,25 +847,25 @@ function summarise(
      * Repeating the winner here would be a second place deciding it; pointing at the row is not.
      */
     clauses.push(
-      `${String(resolved.length)} separated the two — ${labels(resolved)}, and each of those rows ` +
+      `${String(resolved.length)} separated the two: ${labels(resolved)}, and each of those rows ` +
         'names the arm ahead',
     );
   }
   if (underBudget.length > 0) {
     clauses.push(
       `${String(underBudget.length)} measured a difference over too few paired runs to order the ` +
-        `two — ${labels(underBudget)}`,
+        `two: ${labels(underBudget)}`,
     );
   }
   if (unresolved.length > 0) {
     clauses.push(
-      `${String(unresolved.length)} came back with an interval containing zero, which is no ` +
-        `difference this batch can resolve — ${labels(unresolved)}`,
+      `${String(unresolved.length)} had an interval containing zero, so this batch cannot ` +
+        `resolve a difference: ${labels(unresolved)}`,
     );
   }
   if (suppressed.length > 0) {
     clauses.push(
-      `${String(suppressed.length)} could not be compared at all — ${labels(suppressed)}`,
+      `${String(suppressed.length)} could not be compared at all: ${labels(suppressed)}`,
     );
   }
   /*
@@ -885,13 +881,13 @@ function summarise(
   if (unmeasured.length > 0) {
     clauses.push(
       `${String(unmeasured.length)} ${plural(unmeasured.length, 'was', 'were')} never ` +
-        `measured — ${labels(unmeasured)}`,
+        `measured: ${labels(unmeasured)}`,
     );
   }
   if (shown.length > 0) {
     clauses.push(
       `${String(shown.length)} ${plural(shown.length, 'is an energy axis', 'are energy axes')}, ` +
-        `shown and never ranked — ${labels(shown)}`,
+        `shown and never ranked: ${labels(shown)}`,
     );
   }
 
@@ -933,22 +929,22 @@ function answerFor(input: {
 }): string {
   if (input.resolved.length > 0) {
     return (
-      `Separated on ${String(input.resolved.length)} of the measures compared — ` +
-      `${labels(input.resolved)}. Each of those rows names the arm ahead, and does it under a ` +
+      `Separated on ${String(input.resolved.length)} of the measures compared: ` +
+      `${labels(input.resolved)}. Each of those rows names the arm ahead, under a ` +
       `paired-t interval that excludes zero over ${runs(input.pairs)} on the same passengers.`
     );
   }
   if (input.unresolved.length + input.underBudget.length + input.shown.length > 0) {
     return (
       `Indistinguishable at n = ${String(input.pairs)}: no measure this batch compared separated ` +
-      'the two. That is an answer rather than a missing one — the difference is smaller than this ' +
-      'many paired runs resolve — and it is not the same as the two settings being identical.'
+      'the two. The difference is smaller than this many paired runs can resolve, which is ' +
+      'not the same as the two settings being identical.'
     );
   }
   return (
     `No measure could be compared over ${runs(input.pairs)}, so this batch orders nothing. The ` +
-    'rows below say which measures were withheld and on what ground; what the batch observed about ' +
-    'the runs themselves is reported beside them.'
+    'rows below say which measures were withheld and why, beside what the batch observed about ' +
+    'the runs themselves.'
   );
 }
 
@@ -964,8 +960,8 @@ function droppedSentenceFor(rows: readonly BatchComparisonRow[]): string | null 
   if (dropped === undefined) return null;
   const affected = rows.filter((row) => row.verdict === 'suppressed').map((row) => row.metric);
   return (
-    `${String(dropped.suppressedPairs)} of ${String(dropped.totalPairs)} pairs dropped — at least ` +
-    `one arm's own summary refuses to quote a mean on ${runs(dropped.suppressedPairs)} — so ` +
+    `${String(dropped.suppressedPairs)} of ${String(dropped.totalPairs)} pairs dropped: at least ` +
+    `one arm's own summary refuses to quote a mean on ${runs(dropped.suppressedPairs)}, so ` +
     `${labels(affected)} cannot be compared. Every other row below is a count of what happened and ` +
     'is unaffected.'
   );
@@ -992,8 +988,8 @@ function capacityFindingFor(baseline: BatchArmResult, candidate: BatchArmResult)
     `${diverging.dispatcherProfileName}'s queues never stopped growing in ` +
     `${String(divergingCount)} of ${String(baseline.replications.length)} runs and ` +
     `${coping.dispatcherProfileName}'s in ${String(copingCount)}. That is a finding about ` +
-    'capacity, and it does not need a mean to be true: the two arms saw the same passengers, so ' +
-    'the load that one of them stopped coping with is the same load the other did.'
+    'capacity, and it needs no mean: the two arms saw the same passengers, so ' +
+    'the load was the same for both.'
   );
 }
 
@@ -1084,21 +1080,20 @@ function remedyFor(
     parts.push(
       'A measure that could not be compared is the complete-case rule, not a failure: an estimate ' +
         'is reported only when every paired run stands behind one, so more replications make this ' +
-        'more common rather than less. The lever is the load, and "demand %pop/5 min" is where it ' +
-        'is — but a press is one step and not a cure, and this surface will not promise you a ' +
-        'state where nothing is dropped, because the step has never been measured to reach one. ' +
+        'more common rather than less. The lever is the load, at "demand %pop/5 min", ' +
+        'but a press is one step and not a cure: no step has been measured to reach a ' +
+        'state where nothing is dropped. ' +
         'One 10 % drop is measured to leave the dropped-pair count unchanged, to lower it, and to ' +
-        'raise it, on shipped buildings at fifty pairs. Two reasons, and neither is bad luck. ' +
-        'Dropping the rate redraws the passengers, so the runs after a step are different runs, ' +
-        'and the paired discipline ' +
-        'that makes a comparison honest holds across dispatchers and not across a change of ' +
+        'raise it, on shipped buildings at fifty pairs. Two reasons. ' +
+        'Dropping the rate redraws the passengers, so the runs after a step are different runs: ' +
+        'pairing holds across dispatchers and not across a change of ' +
         'demand. And a mean is refused on five grounds, of which only a queue that never stopped ' +
         'growing follows the load down. On a quiet building the ground is more often an empty ' +
-        'reporting window — which the step makes commoner, not rarer — or arrivals that were ' +
-        'never served, and neither of those is a queue the load can stop. Read the ' +
-        'refusal each arm quotes below before pressing again — where it is not a growing queue, ' +
-        'reach for a building that copes with its own traffic instead. The other rows are ' +
-        'unaffected, because they are counts of what happened rather than means.',
+        'reporting window, which the step makes more common, or arrivals that were ' +
+        'never served. Read the ' +
+        'refusal each arm quotes below before pressing again. Where it is not a growing queue, ' +
+        'pick a building that copes with its own traffic instead. The other rows are ' +
+        'unaffected, because they are counts rather than means.',
     );
   }
   if (anyUnresolved) {
@@ -1106,13 +1101,13 @@ function remedyFor(
       pairs < MAX_REPLICATION_BUDGET
         ? `A difference this batch cannot resolve is not a tie. Raising replications from ` +
           `${String(pairs)} toward ${String(MAX_REPLICATION_BUDGET)} narrows the interval, and ` +
-          `${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)} is what this ` +
-          'project budgets for. What is not a remedy is running it again on a different seed until ' +
-          'it separates: that chooses the answer.'
+          `${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)} is the budget. ` +
+          'Running it again on a different seed until it separates is not a remedy: ' +
+          'that chooses the answer.'
         : `A difference this batch cannot resolve is not a tie. This batch is already at the top ` +
-          `of the project's ${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)} ` +
-          'budget, so the honest reading is that the difference is smaller than this apparatus ' +
-          'resolves here — try a building or a demand level where the two settings have more to ' +
+          `of the ${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)} ` +
+          'budget, so the difference is smaller than this setup ' +
+          'resolves here. Try a building or a demand level where the two settings have more to ' +
           'disagree about.',
     );
   }

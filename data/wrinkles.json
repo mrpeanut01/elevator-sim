@@ -132,7 +132,7 @@
     {
       "id": "conference",
       "name": "Conference on the middle floors",
-      "note": "{size} go floor to floor rather than through the lobby, all shift, which no up-peak strategy is tuned for.",
+      "note": "{size} go floor to floor rather than through the lobby, all shift. No setup tuned for the morning rush is built for that.",
       "days": "weekday",
       "effect": {
         "changesNothing": false,

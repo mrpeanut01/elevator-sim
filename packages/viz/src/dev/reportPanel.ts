@@ -732,7 +732,7 @@ export function goalRowViewOf(line: GoalLine): GoalRowView {
  * The dash in the heading carries the disclaimer in the same visual unit as the words it
  * qualifies, which is R13's own placement rule applied to a sentence.
  */
-const SINGLE_RUN_GOALS_HEADING = 'What a scenario would ask — read, not graded';
+const SINGLE_RUN_GOALS_HEADING = 'What a scenario would ask (not graded)';
 
 /**
  * A goal row on a single run's sheet: the reading kept, the grade withheld.
@@ -1044,11 +1044,10 @@ function andList(parts: readonly string[]): string {
  */
 function refusalNoteOf(differsOn: readonly string[]): string {
   return (
-    `The run before this one was ${andList(differsOn)}. Nothing here is a comparison, so the ` +
-    'figures are not paired: the two runs were not asked the same question, and a count that ' +
-    'moved because the building or the traffic moved says nothing about what you changed. What ' +
-    'differs is listed above. Comparing two settings needs them run against the same passengers, ' +
-    '50 or more times each, with an interval that excludes zero — which is what Compare is for.'
+    `The run before this one was ${andList(differsOn)}. Nothing here is a comparison: the two ` +
+    'runs were not asked the same question, so the figures are not paired. To compare two ' +
+    'settings, use Compare: the same passengers, 50 or more runs each, and an interval that ' +
+    'excludes zero.'
   );
 }
 
@@ -1064,8 +1063,8 @@ function refusalNoteOf(differsOn: readonly string[]): string {
 function energyRefusalNoteOf(differsOn: readonly string[]): string {
   return (
     `The run before this one was ${andList(differsOn)}, so no energy figure is paired. Equipment ` +
-    'changes what each move costs and not a single journey, and the two runs price the same moves ' +
-    'on different scales.'
+    'changes what each move costs, not the journeys, so the two runs price the same moves on ' +
+    'different scales.'
   );
 }
 
@@ -1232,8 +1231,7 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
     withheldHere.length === 0
       ? ''
       : ` ${withheldHere.join(' and ')} ${withheldHere.length === 1 ? 'is' : 'are'} not paired: this ` +
-        `run withholds ${withheldHere.length === 1 ? 'it' : 'them'}, and the earlier run's figure ` +
-        `printed beside a withheld cell would read as the number being withheld.`;
+        `run withholds ${withheldHere.length === 1 ? 'it' : 'them'}.`;
   return {
     caption: 'What moved since the run before this one',
     selection,
@@ -1249,14 +1247,13 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
          * orders the two runs, and nothing in the block is coloured: the reported case moved four
          * figures in two directions at once, and the point is precisely that it is a trade.
          */
-        'Two runs are two runs. This is what the two sheets printed, side by side — not a result, ' +
-        'and not a direction. Which setting is better needs 50 or more paired runs against the ' +
-        'same passengers and an interval that excludes zero, which is what Compare is for.'
+        'Two runs are two runs. This is what the two sheets printed, not a result and not a ' +
+        'direction. Which setting is better takes Compare: 50 or more paired runs against the ' +
+        'same passengers, and an interval that excludes zero.'
       : energyRefused !== null
         ? EQUIPMENT_ONLY_NOTE
-        : 'Nothing moved. A run is identified by its building, its dispatcher and its seed, so this ' +
-        'is the same day simulated again and it reproduces exactly — the sheet is not stale, ' +
-        'there was nothing new to say.') +
+        : 'Nothing moved. Same building, dispatcher and seed is the same day simulated again, ' +
+        'and it reproduces exactly.') +
       (energyRefused === null ? '' : ` ${energyRefusalNoteOf(energyRefused.differsOn)}`) +
       withheldNote,
   };
@@ -1265,7 +1262,7 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
 function clearedBannerOf(award: ClearedAward | null): ClearedBannerView | null {
   if (award === null) return null;
   return {
-    note: `${award.reward} — try ${award.nextTitle} next`,
+    note: `${award.reward}. Try ${award.nextTitle} next.`,
     nextContractId: award.nextContractId,
   };
 }
@@ -1316,10 +1313,9 @@ export function emptyReportView(unfiled?: UnfiledSheetFacts): ReportView {
     unfiled?.refusal !== undefined
       ? unfiled.refusal
       : unfiled?.fromPreviousSitting === true
-        ? 'The rail’s banked days are real — they were filed in a previous sitting. Their sheet ' +
-          'was not kept: a sheet is an account of a run, and the run itself is not restored. Play ' +
-          'a day through — press “Run this shift” — and today’s sheet fills itself in.'
-        : 'Play a day through — press “Run this shift” — and the sheet fills itself in.';
+        ? 'The banked days in the rail were filed in a previous sitting, and their sheets were ' +
+          'not kept. Press “Run this shift” and play the day through for today’s sheet.'
+        : 'Press “Run this shift” and play the day through. The sheet fills in when it ends.';
   return {
     filed: false,
     title: 'Nothing filed yet',
@@ -1427,11 +1423,9 @@ function watchingReportView(progress: WatchingRun): ReportView {
     ...emptyReportView(),
     title: 'The day is still running',
     lede:
-      `This sheet reports a whole day at once, and you are watching ${atClock} of a shift that ` +
-      `runs to ${endsAtClock}. It waits for the playhead: a finished day’s figures beside a clock ` +
-      `reading ${atClock} would be two answers to one question. The day is already simulated end ` +
-      'to end, so play it through — or click the far end of the timeline — and the sheet is here. ' +
-      'The left rail reads the shift while it runs.',
+      `This sheet reports a whole day, and you’re at ${atClock} of a shift that runs to ` +
+      `${endsAtClock}. Play it through, or click the far end of the timeline, to see it. The ` +
+      'left rail reads the shift while it runs.',
   };
 }
 

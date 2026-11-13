@@ -210,7 +210,7 @@ describe.skipIf(!HAS_BROWSER)('a sandbox day runs and cannot touch the week — 
       /* Untouched: a sandbox day all the same, and the day that counts is not begun. */
       await page.click('.everyday-brief-locked-go');
       await page.waitForSelector('.everyday-tuner', { timeout: 15_000 });
-      expect(await textOf(page, '.everyday-tuner-state')).toMatch(/^Nothing changed yet — a sandbox day/u);
+      expect(await textOf(page, '.everyday-tuner-state')).toMatch(/^Nothing changed yet\. Still a sandbox day/u);
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
       await page.waitForFunction(() => document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display === '', undefined, {

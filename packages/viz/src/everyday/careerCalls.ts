@@ -200,9 +200,9 @@ export function careerCloseLineOf(input: CareerCloseInput): string | undefined {
   const decider = careerDeciderOf(input);
   const words = CAREER_MARK_WORDS;
   const house = input.houseName;
-  const swapped = `the same day run by ${house} in place of your standing order`;
+  const swapped = `the same day run by ${house} instead of your standing order`;
   const didNot = (reads: 'cleared' | 'missed'): string =>
-    `Your standing order did not: on this crowd, ${swapped} and every press kept read ${words[reads]} too.`;
+    `Your standing order didn’t decide it: on this crowd, ${swapped}, with every press kept, was ${words[reads]} too.`;
   let more: string | undefined;
   switch (decider.kind) {
     case 'call':
@@ -210,34 +210,34 @@ export function careerCloseLineOf(input: CareerCloseInput): string | undefined {
       more = undefined;
       break;
     case 'driver':
-      more = `Your standing order did: on this crowd, ${swapped}${decider.pressed ? ' and every press kept' : ''} read ${words[decider.reads]}.`;
+      more = `Your standing order decided it: on this crowd, ${swapped}${decider.pressed ? ', with every press kept,' : ''} was ${words[decider.reads]}.`;
       break;
     case 'presses':
       more = decider.houseDrove
-        ? `Your presses did, together: on this crowd, ${house} with nothing pressed read ${words[decider.alone]}.`
-        : `${didNot(decider.kept)} Your presses did, together: ${house} with nothing pressed read ${words[decider.alone]}.`;
+        ? `Your presses decided it, together: on this crowd, ${house} with nothing pressed was ${words[decider.alone]}.`
+        : `${didNot(decider.kept)} Your presses decided it, together: ${house} with nothing pressed was ${words[decider.alone]}.`;
       break;
     case 'nothing':
       more =
         decider.pressed && !decider.houseDrove
-          ? `Nothing you chose decided it either: on this crowd, ${house} read ${words[decider.reads]} too, with every press kept and with none.`
-          : `Nothing you chose decided it either: on this crowd, ${house} with nothing pressed read ${words[decider.reads]} too.`;
+          ? `Nothing you chose decided it either: on this crowd, ${house} was ${words[decider.reads]} too, with every press kept and with none.`
+          : `Nothing you chose decided it either: on this crowd, ${house} with nothing pressed was ${words[decider.reads]} too.`;
       break;
     case 'pending':
       more =
         decider.waiting === 'driver-run'
-          ? `What decided it is still being run: ${swapped} and every press kept.`
+          ? `What decided it is still being run: ${swapped}, with every press kept.`
           : decider.known === undefined
-            ? `What decided it waits on ${house} with nothing pressed, which is still being run.`
-            : `${didNot(decider.known)} Whether your presses did waits on ${house} with nothing pressed, which is still being run.`;
+            ? `What decided it depends on ${house} with nothing pressed, which is still being run.`
+            : `${didNot(decider.known)} Whether your presses decided it depends on ${house} with nothing pressed, which is still being run.`;
       break;
     case 'unrun':
       more =
         decider.run === 'driver-run'
-          ? `What decided it is not said: ${swapped} could not be run on this crowd.`
+          ? `What decided it can’t be said: ${swapped} couldn’t be run on this crowd.`
           : decider.known === undefined
-            ? `What decided it is not said: ${house} could not be run on this crowd.`
-            : `${didNot(decider.known)} Whether your presses did is not said: ${house} could not be run on this crowd.`;
+            ? `What decided it can’t be said: ${house} couldn’t be run on this crowd.`
+            : `${didNot(decider.known)} Whether your presses decided it can’t be said: ${house} couldn’t be run on this crowd.`;
       break;
   }
   return more === undefined ? lead.line : `${lead.line} ${more}`;

@@ -316,7 +316,7 @@ export function unbuiltReasonFor(screen: EverydayScreen): string {
 
 /**
  * § 4's name column, keyed — what a screen is called when a heading needs it. The board's entry
- * is the inventory's own slashed pair, because the two boards are one screen and a heading that
+ * is the screen's own title, *Boards & ladder*: the two boards are one screen and a heading that
  * picked one tab would be the rail's two-entries defect in a title.
  */
 export const SCREEN_NAMES: Readonly<Record<EverydayScreen, string>> = Object.freeze({
@@ -332,13 +332,13 @@ export const SCREEN_NAMES: Readonly<Record<EverydayScreen, string>> = Object.fre
   towers: 'All buildings',
   building: 'Building desk',
   contract: 'Contract & works',
-  rush: 'Endless rush',
+  rush: 'Rush',
   fixit: 'Fix a building',
   workshop: 'Dispatcher workshop',
   bench: 'Test bench',
   designer: 'Design a building',
   tuner: 'Tune the tower',
   week: 'Your week',
-  board: "Today's board / Dispatcher ladder",
+  board: 'Boards & ladder',
   settings: 'Settings',
 });

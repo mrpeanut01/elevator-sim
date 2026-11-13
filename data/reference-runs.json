@@ -5,7 +5,7 @@
     {
       "id": "reference-house-baseline",
       "label": "The house baseline",
-      "subtitle": "the shipped dispatcher, on the shipped morning",
+      "subtitle": "the standard dispatcher on the standard morning",
       "record": {
         "version": 3,
         "seed": "20260811",

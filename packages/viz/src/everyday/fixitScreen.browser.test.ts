@@ -493,7 +493,7 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       // measured is deliberately not asserted — § D220 § 4.
       expect(outcome.head.trim()).not.toBe('');
       expect(outcome.rows).toBe(3);
-      expect(outcome.basis).toContain('one run before, one run after');
+      expect(outcome.basis).toContain('One run before, one run after');
       /* A gate that did not clear: no checking state was ever drawn. */
       expect(states.some((state) => /more mornings/.test(state.label))).toBe(false);
       expect(outcome.primary?.disabled).toBe(false);
@@ -664,7 +664,7 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
         fixedTags: [...document.querySelectorAll('.everyday-fixit-tag')].filter((tag) => tag.textContent === 'FIXED').length,
         primary: document.querySelector('.everyday-bar-primary')?.textContent ?? '',
       }));
-      expect(verdict.head).toBe('It cleared on the letter’s morning, and it did not hold on the others.');
+      expect(verdict.head).toBe('It cleared on the letter’s morning but did not hold on the others.');
       expect(verdict.card).toContain('cleared on this morning only');
       expect(verdict.card).toContain('forty-nine more mornings');
       expect(verdict.rows).toBe(4);

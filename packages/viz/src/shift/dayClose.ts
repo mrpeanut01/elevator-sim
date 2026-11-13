@@ -128,11 +128,11 @@ function pressWordsOf(kind: string): string {
 
 /** *No call decided today* when calls were raised and none of their other answers moved the verdict. */
 export const NO_CALL_DECIDED_LINE =
-  'No call decided today: at each of today’s calls, the other answers, run on this crowd from the ' +
-  'call with nothing pressed after it, left the day’s verdict where it was.';
+  'No call decided today: at each call, the other answers, run on this crowd from that call with ' +
+  'nothing pressed after, left the day’s verdict where it was.';
 
 /** The same, on a day the stage raised no call. */
-export const NO_CALL_RAISED_LINE = 'No call decided today: the stage raised none.';
+export const NO_CALL_RAISED_LINE = 'No call decided today: none came up.';
 
 /** {@link decidingCallOf}'s answer: the sentence, and whether a call decided the day. */
 export interface DecidingCall {
@@ -243,8 +243,8 @@ export function decidingCallOf(input: DecidingCallInput): DecidingCall | undefin
       : ` The ${earlier.length === 1 ? 'call' : 'calls'} at ${andList(earlier)} could have turned it too.`;
   return {
     line:
-      `The call that decided today came at ${last.at}, where ${last.chose}: on this crowd, the day run ` +
-      `from ${last.at} with ${orList(last.others)} and nothing pressed after it read ${input.lineOf(last.reads)}.${more}`,
+      `The call that decided today came at ${last.at}, where ${last.chose}. Run again on this crowd ` +
+      `from ${last.at} with ${orList(last.others)} and nothing pressed after, the day read ${input.lineOf(last.reads)}.${more}`,
     decided: true,
   };
 }
@@ -352,9 +352,9 @@ const READ_WORDS: Readonly<Record<Graded, string>> = Object.freeze({
 /** The driver run, as the close names it. */
 const SWAPPED = 'the same day with the tower’s standing order picked in place of yours';
 
-/** *Your driver did not* — said before the house's half wherever the driver run answered and the day had presses. */
+/** *Your dispatcher did not* — said before the house's half wherever the driver run answered and the day had presses. */
 function driverDidNot(reads: Graded): string {
-  return `Your driver did not: on this crowd, ${SWAPPED} and every press kept read ${READ_WORDS[reads]} too.`;
+  return `Your dispatcher did not: on this crowd, ${SWAPPED} and every press kept read ${READ_WORDS[reads]} too.`;
 }
 
 /**
@@ -368,7 +368,7 @@ export function dayDeciderLineOf(decider: DayDecider): string | undefined {
     case 'unsaid':
       return undefined;
     case 'driver':
-      return `Your driver did: on this crowd, ${SWAPPED}${decider.pressed ? ' and every press kept' : ''} read ${READ_WORDS[decider.reads]}.`;
+      return `Your dispatcher did: on this crowd, ${SWAPPED}${decider.pressed ? ' and every press kept' : ''} read ${READ_WORDS[decider.reads]}.`;
     case 'presses':
       return decider.houseDrove
         ? `Your presses did, together: on this crowd, the tower’s standing order left alone read ${READ_WORDS[decider.alone]}.`
@@ -384,11 +384,11 @@ export function dayDeciderLineOf(decider: DayDecider): string | undefined {
         : `${driverDidNot(decider.known)} Whether your presses did waits on the house, which is still being run.`;
     case 'unrun':
       if (decider.run === 'driver-run') {
-        return `What decided it is not said: ${SWAPPED} could not be run on this crowd.`;
+        return `What decided it can’t be said: ${SWAPPED} could not be run on this crowd.`;
       }
       return decider.known === undefined
-        ? 'What decided it is not said: the house could not be run on this crowd.'
-        : `${driverDidNot(decider.known)} Whether your presses did is not said: the house could not be run on this crowd.`;
+        ? 'What decided it can’t be said: the house could not be run on this crowd.'
+        : `${driverDidNot(decider.known)} Whether your presses did can’t be said: the house could not be run on this crowd.`;
   }
 }
 
@@ -485,8 +485,8 @@ export const DAY_CLOSE_HEADING = 'TODAY AGAINST THE HOUSE';
 
 /** What the weekend is on the close that closed the week — [§ D1246](../../../../DECISIONS.md). */
 export const DAY_CLOSE_WEEKEND_LINE =
-  'The rest of this week counts toward no target and is not run against the house; it stays ' +
-  'playable from the week’s sheet.';
+  'The rest of this week counts toward no target and is not run against the house. You can still ' +
+  'play it from the week’s sheet.';
 
 const YOU_WORDS: Readonly<Record<CloseVerdict, string>> = Object.freeze({
   cleared: 'cleared it',

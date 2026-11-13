@@ -2914,27 +2914,35 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
      * the old `flex:1` did, and lets the answers take a line of their own whole when they wrap.
      */
     const said = el(doc, 'div');
-    said.style.cssText = 'min-width:0;flex:999 1 160px';
+    /*
+     * 200 px since the answers became "No" and "Yes": with shorter answers a 160 px basis let them
+     * sit beside the words at 320 px, which squeezed the words to a narrow column and left the
+     * answers to scroll away with them.
+     */
+    said.style.cssText = 'min-width:0;flex:999 1 200px';
     const heading = el(doc, 'div', 'everyday-consent-heading', view.heading);
     heading.style.cssText = `font:600 13px ${TYPE.heading};color:${C.ink}`;
     const body = el(doc, 'div', 'everyday-consent-body', view.body);
     body.style.cssText = `margin-top:3px;font-size:12.5px;line-height:1.45;color:${C.ink};max-width:78ch`;
     /*
-     * The copy edit: what is not recorded, and how to change the answer, sit behind one link. Both
-     * are still in the document on every draw, as a closed popover's words are.
+     * Everything a person needs to answer is read without a press: what is recorded, then one line
+     * on what never is and that a no changes nothing. The whole not-recorded list and how to change
+     * the answer are one press away, behind the link.
      */
+    const never = el(doc, 'div', 'everyday-consent-never', view.never);
+    never.style.cssText = `margin-top:3px;font-size:12.5px;line-height:1.45;color:${C.inkSoft};max-width:78ch`;
     const not = el(doc, 'p', 'everyday-consent-not', view.notCollected);
     not.style.cssText = `margin:0 0 10px;font-size:13px;line-height:1.5;color:${C.inkSoft}`;
     const later = el(doc, 'p', 'everyday-consent-later', view.later);
     later.style.cssText = `margin:0 0 10px;font-size:13px;line-height:1.5;color:${C.inkSoft}`;
     const more = explainer(doc, {
-      link: CONSENT_COPY.details,
-      title: CONSENT_COPY.details,
+      link: view.details,
+      title: view.details,
       body: [view.body, not, later],
     });
     more.root.classList.add('everyday-consent-more');
     more.root.style.cssText = 'display:inline-block;margin-top:4px';
-    said.append(heading, body, more.root);
+    said.append(heading, body, never, more.root);
     row.append(said);
 
     const answers = el(doc, 'div');
@@ -2951,6 +2959,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       'flex:1 0 auto',
       'align-items:center',
       'position:sticky',
+      /* And to the top, for a short wide window where they sit beside words that scroll. */
+      'top:0',
       'bottom:0',
       `background:${C.card}`,
       `box-shadow:0 -8px 0 ${C.card}`,

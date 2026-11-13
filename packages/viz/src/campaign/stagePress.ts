@@ -179,7 +179,7 @@ export function admitStageMove(
         unpriced: [],
         withheld: [],
         reason: resolved.reason,
-        ...sentenceOf('These settings cannot run together on this building, so the stage is not run.'),
+        ...sentenceOf('These settings can’t run together on this building, so the stage is not run.'),
       };
     }
     candidate = resolved.profile;
@@ -208,7 +208,7 @@ export function admitStageMove(
       reason: undefined,
       ...sentenceOf(
         `"${candidateName}" runs the same system as "${baselineName}" on every setting live on this ` +
-          'building, so the two arms are identical by construction and no row can separate them. It ' +
+          'building, so the two arms are identical and nothing can separate them. It ' +
           'costs nothing, and it is the control this stage is meant to survive.',
       ),
     };
@@ -233,7 +233,7 @@ export function admitStageMove(
       reason: purchase.reason,
       ...sentenceOf(
         purchase.withheld.length > 0
-          ? `${head}, and one of them is sold in no scenario, so no budget buys it and the stage is not run.`
+          ? `${head}, and one of them isn’t sold in any scenario, so no budget buys it and the stage is not run.`
           : `${head} and would buy ${changeNamesOf(context.schedule, purchase.changeIds)}: ` +
               `${String(purchase.units)} units against the ${String(budgetUnits)} this budget holds, so the stage is not run.`,
       ),

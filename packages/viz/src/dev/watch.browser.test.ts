@@ -285,7 +285,7 @@ describe.skipIf(!HAS_BROWSER)('watching somebody else’s run — GAMEPLAY § 14
     // canvas — a pill, top left, and it may not claim a server verified anything.
     const pill = (await page.locator('.watch-pill').first().textContent()) ?? '';
     expect(pill).toContain('REPLAY');
-    expect(pill).toContain('VERIFIED BY RE-SIMULATION');
+    expect(pill).toContain('CHECKED BY RE-RUNNING');
     expect(pill.toLowerCase()).not.toContain('server');
 
     // action bar — no timeline, and exactly the two controls.

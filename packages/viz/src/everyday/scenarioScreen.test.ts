@@ -167,7 +167,7 @@ describe('the row’s face matches what the press does', () => {
      */
     expect(SCENARIO_LADDER_COPY.rungsNotSold).not.toMatch(/\bbought\b|\bchimes?\b|\bcan be bought\b/iu);
     expect(SCENARIO_LADDER_COPY.rungsNotSold).not.toContain('No screen in this build sells');
-    expect(SCENARIO_LADDER_COPY.rungsNotSold).toContain('the census finds no further way through');
+    expect(SCENARIO_LADDER_COPY.rungsNotSold).toContain('no further way through was found');
     expect(Object.hasOwn(SCENARIO_LADDER_COPY, 'baseRungNote'), 'the deleted refusal came back').toBe(false);
   });
 });

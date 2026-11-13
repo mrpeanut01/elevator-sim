@@ -48,11 +48,11 @@
  */
 export const HELD_FIX_CASES: Readonly<Record<string, string>> = Object.freeze({
   'cars-that-always-go-home':
-    'Held back. The change its diagnosis names made no difference fifty mornings could tell from luck, so this letter cannot be answered honestly yet.',
+    'Held back. Over fifty mornings, the change its diagnosis names made no difference we could tell from luck, so this letter can’t be answered yet.',
   'everyone-leaves-at-once':
-    'Held back. The change its diagnosis names clears the letter by making the rest of the building worse, and a change that should do nothing passes here too.',
+    'Held back. The change its diagnosis names clears the letter by making the rest of the building worse, and a change that should do nothing passes too.',
   'gym-on-the-top-floor':
-    'Held back. The change its diagnosis names made no difference fifty mornings could tell from luck, so this letter cannot be answered honestly yet.',
+    'Held back. Over fifty mornings, the change its diagnosis names made no difference we could tell from luck, so this letter can’t be answered yet.',
 });
 
 /** Why a case is held, or `undefined` for a case the list offers. */

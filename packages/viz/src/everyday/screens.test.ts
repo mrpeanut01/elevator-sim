@@ -281,7 +281,7 @@ describe('the router', () => {
     for (const screen of EVERYDAY_SCREENS) {
       expect(SCREEN_NAMES[screen].trim(), screen).not.toBe('');
     }
-    // The one slashed pair is the two boards — one screen, so one heading carrying both tabs.
-    expect(SCREEN_NAMES.board).toBe("Today's board / Dispatcher ladder");
+    // The two boards are one screen, so one heading carries both tabs: the screen's own title.
+    expect(SCREEN_NAMES.board).toBe('Boards & ladder');
   });
 });

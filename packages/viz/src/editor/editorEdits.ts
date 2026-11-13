@@ -46,9 +46,9 @@ import type {
  * it actually is rather than an absence they have to infer.
  */
 export const OPERATIONAL_ZONING_NOTE =
-  'Operational zoning — how the dispatcher splits the building at run time — is not building ' +
+  'Operational zoning, how the dispatcher splits the building at run time, is not building ' +
   'geometry and is not edited here. It is a dispatcher weight vector in ' +
-  'data/dispatcher-profiles.json (CLAUDE.md invariant 7: anything tunable is data, not code).';
+  'data/dispatcher-profiles.json.';
 
 /** Deep clone of a plain JSON document. The configs are plain data by construction. */
 function clone<T>(value: T): T {

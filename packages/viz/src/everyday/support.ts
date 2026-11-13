@@ -327,11 +327,11 @@ export const SUPPORT_COPY = Object.freeze({
  * (`MID-DAY`, `WATCHING`), and *what you were playing* is a phrase in a sentence.
  */
 const RUN_CONTEXT_LABELS: Readonly<Record<RunContext, string>> = Object.freeze({
-  daily: 'a day of the daily loop',
-  campaign: 'a day of a career',
+  daily: 'a day of your week',
+  campaign: 'a career day',
   rush: 'a rush',
   watch: 'watching somebody else’s run',
-  replay: 'a past day played again',
+  replay: 'a past day, replayed',
 });
 
 /**

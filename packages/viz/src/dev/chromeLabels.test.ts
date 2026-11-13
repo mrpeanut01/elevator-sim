@@ -424,9 +424,9 @@ describe('every transport control has a name a screen reader can use', () => {
        * a behaviour the control no longer has is `CLAUDE.md`'s stale-refusal defect facing the
        * other way, and this file exists because a hidden explanation is worse than none.
        */
-      loop: 'when the transport reaches the end of the loop, start it again',
+      loop: 'restart when playback reaches the end of the loop',
       'loop-window':
-        'press to mark the start of a section at the playhead, again to mark its end, and again to go back to the whole shift',
+        'press to mark the start at the playhead, again to mark the end, and again for the whole shift',
     };
     for (const [id, expected] of Object.entries(tooltips)) {
       expect(attr(openingTagOf(html, id).tag, 'title'), `#${id} lost its tooltip`).toBe(expected);

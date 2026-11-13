@@ -174,7 +174,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     screen: 'stage',
     ctx: 'rush',
     leave: '⤺ Leave the rush',
-    back: { label: 'Endless rush', screen: 'rush' },
+    back: { label: 'Rush', screen: 'rush' },
     timeline: null,
     primary: ['End the rush'],
     notes: ['Stops the climb and counts the waves.'],

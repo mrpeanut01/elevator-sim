@@ -242,7 +242,7 @@ export function fallbackLineOf(styleName: string): string {
  * in force at a time, and two true rows do not stack.
  */
 export const RULES_EXCLUSIVITY_NOTE =
-  'Rules are read top to bottom and the first match wins. One row is in force at a time — a ' +
+  'Rules are read top to bottom and the first match wins. One row is in force at a time: a ' +
   'weight rule and a parking rule do not stack, even when both their conditions hold.';
 
 /**
@@ -323,13 +323,13 @@ export function ruleIssues(
     if (condition.values !== undefined && !condition.values.some((o) => o.value === row.whenValue)) {
       issues.push({
         field: `rows.${String(index)}.when`,
-        message: `"${substituted(condition, undefined)}" needs one of its listed values — the run is refused by name otherwise.`,
+        message: `"${substituted(condition, undefined)}" needs one of its listed values. Pick one, or the run is refused.`,
       });
     }
     if (action.values !== undefined && !action.values.some((o) => o.value === row.thenValue)) {
       issues.push({
         field: `rows.${String(index)}.then`,
-        message: `"${substituted(action, undefined)}" needs one of its listed values — the run is refused by name otherwise.`,
+        message: `"${substituted(action, undefined)}" needs one of its listed values. Pick one, or the run is refused.`,
       });
     }
     (row.and ?? []).forEach((extra, at) => {
@@ -337,22 +337,22 @@ export function ruleIssues(
       if (words.values !== undefined && !words.values.some((o) => o.value === extra.whenValue)) {
         issues.push({
           field: `rows.${String(index)}.and.${String(at)}`,
-          message: `"${substituted(words, undefined)}" needs one of its listed values — the run is refused by name otherwise.`,
+          message: `"${substituted(words, undefined)}" needs one of its listed values. Pick one, or the run is refused.`,
         });
       }
       if (isTimeCondition(extra.when) && !context.hasClock) {
         issues.push({
           field: `rows.${String(index)}.and.${String(at)}`,
           message:
-            'This crowd has no clock, so this time test reads as never — and because every ' +
-            'condition on a row must hold, the whole row does nothing.',
+            'This crowd has no clock, so this time test never holds. Every condition on a row ' +
+            'must hold, so the whole row does nothing.',
         });
       }
     });
     if ((row.and ?? []).length > MAX_RULE_AND) {
       issues.push({
         field: `rows.${String(index)}.when`,
-        message: `A row carries at most ${String(MAX_RULE_AND)} further conditions — the run is refused by name past that.`,
+        message: `A row carries at most ${String(MAX_RULE_AND)} further conditions. Drop one, or the run is refused.`,
       });
     }
     if (row.then === 'no-new-pickups' && (row.and ?? []).length > 0) {
@@ -360,16 +360,15 @@ export function ruleIssues(
         field: `rows.${String(index)}.then`,
         message:
           '"stop giving it new pickups" is one ceiling for the whole run, so it cannot wait on a ' +
-          'further condition — the run is refused by name.',
+          'further condition. Drop the further condition, or the run is refused.',
       });
     }
     if (isTimeCondition(row.when) && !context.hasClock) {
       issues.push({
         field: `rows.${String(index)}.when`,
         message:
-          'This crowd has no clock — its demand template names no start-of-day, so this time ' +
-          'rule reads as never and the row does nothing. Pick a crowd with a clock, or a ' +
-          'different condition.',
+          'This crowd has no clock, so this time rule never holds and the row does nothing. ' +
+          'Pick a crowd with a clock, or a different condition.',
       });
     }
     if (row.then === 'no-new-pickups') {
@@ -378,16 +377,16 @@ export function ruleIssues(
         issues.push({
           field: `rows.${String(index)}.then`,
           message:
-            '"stop giving it new pickups" only pairs with "a car is fuller than" — with any ' +
-            'other condition there is no car for "it" to name, and the run is refused by name.',
+            '"stop giving it new pickups" only pairs with "a car is fuller than": no other ' +
+            'condition names a car. Change the condition, or the run is refused.',
         });
       }
       if (pickupRows > 1) {
         issues.push({
           field: `rows.${String(index)}.then`,
           message:
-            'A second "stop giving it new pickups" row — both would set the same load ceiling, ' +
-            'and the run is refused by name rather than letting one row silently lose.',
+            'A second "stop giving it new pickups" row. Both would set the same load ceiling. ' +
+            'Remove one, or the run is refused.',
         });
       }
     }

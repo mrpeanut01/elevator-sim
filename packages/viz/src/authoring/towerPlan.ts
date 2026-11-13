@@ -866,8 +866,8 @@ const SAID_BY_THE_BOARD: ReadonlySet<string> = new Set([
  * comparison has not been repeated on it, and the closed form has no term for a sector either.
  */
 export const TWO_CAR_FIGURES_WITHHELD =
-  'Not worked out for a group with two cars in one shaft: the round-trip sum counts every car as ' +
-  'free to reach the lobby and the top, and a pair cannot pass each other. Run it to measure it.';
+  'Not worked out for a group with two cars in one shaft: the sum assumes every car can reach ' +
+  'the lobby and the top, and a pair cannot pass each other. Run it to measure it.';
 
 /**
  * **The plan through the real loader and the real closed form.**

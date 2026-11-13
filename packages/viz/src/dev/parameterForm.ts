@@ -101,6 +101,7 @@ import { renderControls, renderUnsearchable, valueAtSliderPosition } from '../co
 import type { ControlNode } from '../controls/render.js';
 import type { Control, ControlEdit, ControlValues } from '../controls/types.js';
 import { glossaryFor } from '../mode/glossary.js';
+import { explainer } from './dom.js';
 
 /** The id the picker uses for the profile-authorable space, which is not one declared schema. */
 const SEARCH_SPACE_SOURCE = '<dispatcher search space>';
@@ -210,61 +211,88 @@ export function appliedNoteFor(sourceName: string): string {
   switch (sourceName) {
     case 'PATIENCE_PARAMETERS':
       return (
-        'APPLIED — these four reach the next shift. What you set here is written onto the run as ' +
-        'sim.patience, so riders give up and leave. Abandonment improves the average wait by ' +
-        'construction, because it removes the longest waits from the sample: read the abandoned ' +
-        'count beside the mean, never instead of it, and above 2 % the mean is suppressed ' +
-        'outright. Press Run this shift to see it.'
+        'APPLIED. These four reach the next shift as sim.patience, so riders give up and leave. ' +
+        'Read the abandoned count beside the mean: above 2 % the mean is suppressed. Press Run ' +
+        'this shift to see it.'
       );
     case 'TRAFFIC_PARAMETERS':
       return (
-        'APPLIED, in part — eight of these rows reach the next shift as the run’s demand options: ' +
-        'the demand level, whether a group shares a destination, how an interfloor floor is ' +
-        'picked, whether riders carry a credential, the leg ceiling, and the peak window, ' +
-        'baseline and mix amplitude of whichever template is running. A row you have not moved ' +
-        'writes nothing at all, so a default stays the profile’s rather than becoming this ' +
-        'screen’s. Seven rows are NOT applied, in three groups, each refused for its own reason: ' +
-        'the template and the ' +
-        'three template durations are owned by the pattern and shift-length controls, and writing ' +
-        'them here would be a second hand on one dial; the entrance weight is one number for ' +
-        'however many entrances a building has, and relative weights that all move together ' +
-        'normalize back to the mix they already were; and the two constant-template discards have ' +
-        'no field on SimulationDemandOptions to travel in. The nineteen rows listed as not ' +
-        'searchable draw no control here at all. Press Run this shift to see the rest.'
+        'APPLIED, in part: eight of these rows reach the next shift as its demand options. ' +
+        'Seven rows are NOT applied, and the nineteen rows listed as not searchable draw no ' +
+        'control. Press Run this shift to see the rest.'
       );
     case 'CROWDING_PARAMETERS':
       return (
-        'APPLIED — all three reach the next shift as sim.lobbyCrowding, the feedback loop behind ' +
-        'real up-peak collapse: slow boarding lengthens the queue and a longer queue slows ' +
-        'boarding. Leave all three where they are and the run carries no crowding block at all, ' +
-        'which is what every figure this project has published was measured under; move any one ' +
-        'and all three travel together, because core takes the term whole. It can destabilise a ' +
-        'run that was stable — that is a finding to read off the saturation verdict, not a ' +
-        'defect. Press Run this shift to see it.'
+        'APPLIED. All three reach the next shift as sim.lobbyCrowding. Move any one and all ' +
+        'three travel together. Press Run this shift to see it.'
       );
     case 'SIM_PARAMETERS':
       return (
-        'APPLIED — four of these six reach the next shift as the runner’s own tunables: the sky- ' +
-        'lobby transfer walk, the re-offer interval for a call no car could take, the drain grace ' +
-        'past the end of demand, and how often a door close is interrupted by the photo-eye. A ' +
-        'row you have not moved writes nothing. Two are NOT applied, each for its own reason: the ' +
-        'walk from a destination panel to its named car is gated off here because its activeWhen ' +
-        'names two dispatcher rows this picker is not showing; and the queue sample count is the ' +
-        'saturation detector’s own input, so moving it would change whether this run’s average is ' +
-        'suppressed without changing a single leg of the run — a difficulty setting that moves a ' +
-        'measurement, which this project does not ship. The first two can also be quiet on a ' +
-        'building that has no sky lobby and no run that outlives its demand. Press Run this shift ' +
-        'to see them.'
+        'APPLIED, in part: four of these six reach the next shift. Two are NOT applied. Press ' +
+        'Run this shift to see them.'
       );
     default:
       return (
-        `NOT APPLIED — nothing the Run button does reads ${sourceName}. Move a control here, press ` +
-        'Run this shift, and the day that comes back is byte for byte the day you would have got ' +
-        'without touching it. What this is instead: the search space a generic optimizer would be ' +
-        'handed — every tunable core declares, with its type, its range and the gates that decide ' +
-        `when it is live. ${APPLIED_SCHEMAS.join(', ')} are the sources on this picker that do ` +
-        'reach a run.'
+        `NOT APPLIED. Nothing the Run button does reads ${sourceName}: move a control, press ` +
+        'Run this shift, and the day comes back byte for byte the same. ' +
+        `${APPLIED_SCHEMAS.join(', ')} are the sources on this picker that do reach a run.`
       );
+  }
+}
+
+/** The link that opens {@link appliedDetailFor}'s paragraphs, and the popover's heading. */
+const APPLIED_DETAIL_LINK = 'What this tab does';
+
+/**
+ * The long account behind {@link appliedNoteFor}: which rows travel, which do not and why, and how
+ * to read the result. Read once, so it opens from a link beside the note rather than standing above
+ * the controls. Module-private, as the one string these paragraphs were cut from was.
+ */
+function appliedDetailFor(sourceName: string): readonly string[] {
+  switch (sourceName) {
+    case 'PATIENCE_PARAMETERS':
+      return [
+        'Abandonment improves the average wait by construction, because it removes the longest ' +
+          'waits from the sample. Read the abandoned count beside the mean, never instead of it.',
+      ];
+    case 'TRAFFIC_PARAMETERS':
+      return [
+        'The eight that apply: the demand level, whether a group shares a destination, how an ' +
+          'interfloor floor is picked, whether riders carry a credential, the leg ceiling, and ' +
+          'the peak window, baseline and mix amplitude of whichever template is running.',
+        'A row you have not moved writes nothing, so a default stays the profile’s.',
+        'The seven that do not, in three groups. The template and the three template durations ' +
+          'are owned by the pattern and shift-length controls. The entrance weight is one number ' +
+          'for however many entrances a building has, and relative weights that all move ' +
+          'together normalize back to the mix they already were. The two constant-template ' +
+          'discards have no field on SimulationDemandOptions to travel in.',
+      ];
+    case 'CROWDING_PARAMETERS':
+      return [
+        'Lobby crowding is the feedback loop behind real up-peak collapse: slow boarding ' +
+          'lengthens the queue and a longer queue slows boarding.',
+        'Leave all three where they are and the run carries no crowding block, which is what ' +
+          'the published figures were measured under.',
+        'It can destabilise a run that was stable. That is a finding to read off the saturation ' +
+          'verdict, not a defect.',
+      ];
+    case 'SIM_PARAMETERS':
+      return [
+        'The four that apply: the sky-lobby transfer walk, the re-offer interval for a call no ' +
+          'car could take, the drain grace past the end of demand, and how often a door close is ' +
+          'interrupted by the photo-eye. A row you have not moved writes nothing.',
+        'The two that do not. The walk from a destination panel to its named car is gated off ' +
+          'here, because its activeWhen names two dispatcher rows this picker is not showing. ' +
+          'The queue sample count is the saturation detector’s own input: moving it would change ' +
+          'whether this run’s average is suppressed without changing a single leg of the run.',
+        'The first two can also be quiet on a building that has no sky lobby and no run that ' +
+          'outlives its demand.',
+      ];
+    default:
+      return [
+        'These controls are the search space a generic optimizer would be handed: every tunable ' +
+          'core declares, with its type, its range and the gates that decide when it is live.',
+      ];
   }
 }
 
@@ -578,7 +606,7 @@ export function formStatusLine(
     space.unsearchable.size === 0
       ? ''
       : `, ${String(space.unsearchable.size)} declared but not searchable`;
-  return `${String(controls.length)} dimensions, ${String(live)} live${withheld} — ${verdict}. Authorability is a schema check: docs/10 § 8.2 says a profile that passes it is authorable and has no dead gate, not that it is sound.`;
+  return `${String(controls.length)} dimensions, ${String(live)} live${withheld} — ${verdict}. Authorability is a schema check: a profile that passes is authorable and has no dead gate, which does not make it sound.`;
 }
 
 /**
@@ -686,7 +714,15 @@ export function mountParameterForm(options: ParameterFormOptions): void {
      */
     const applied = doc.createElement('p');
     applied.className = 'control-inactive';
-    applied.textContent = appliedNoteFor(sourceName);
+    applied.append(
+      appliedNoteFor(sourceName),
+      ' ',
+      explainer(doc, {
+        link: APPLIED_DETAIL_LINK,
+        title: APPLIED_DETAIL_LINK,
+        body: appliedDetailFor(sourceName),
+      }),
+    );
     container.append(applied);
     container.append(instantiateControlNode(doc, renderControls(controls)));
     const unsearchable = renderUnsearchable(space.unsearchable);

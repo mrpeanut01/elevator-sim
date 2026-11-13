@@ -153,7 +153,7 @@ carrier names and the quoted fragments.
 **Machines editor** (`dev/machinesEditor.ts`)
 - Nine rows, not eleven — door/transfer time are file-level and the absence is said, not drawn dead
 - Every slider names the `data/elevator-specs.json` field it writes, under the slider, exhaustively → `machineFieldOf` (l.69)
-- `maxRiseM` is *"an advisory the loader warns on and builds anyway"* — a true sentence about a
+- `maxRiseM` is *"advisory: the loader warns and builds anyway"* — a true sentence about a
   mechanism, kept true
 - A shipped class is never overwritten (`midtown-office` names `geared-traction` by id) → `specsWithClass`
 
@@ -179,7 +179,7 @@ carrier names and the quoted fragments.
 - Single-run framing *omits* week slots rather than emptying them; levers: only `add-a-car` and
   `zone-the-tower` navigate — the two dispatcher cards keep their words and stay unclickable,
   asserted in both directions → `LEVER_SURFACES`
-- `SINGLE_RUN_GOALS_HEADING = 'What a scenario would ask — read, not graded'` → `unaskedGoalRowViewOf`
+- `SINGLE_RUN_GOALS_HEADING = 'What a scenario would ask (not graded)'` → `unaskedGoalRowViewOf`
 
 **Compare / batch** (`dev/batchPanel.ts` mount l.112; `batch/report.ts`; `batch/intervalPlot.ts`)
 - Verdict taxonomy `resolved | under-budget | unresolved | shown | suppressed | unmeasured`;

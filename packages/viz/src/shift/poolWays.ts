@@ -62,12 +62,12 @@ export function poolWaysLineOf(crowd: PoolCrowd | undefined, pool: WeekPool = WE
   if (cleared.length > 0) {
     return (
       `Ways through, measured on this crowd: left alone, ${String(cleared.length)} of the ${String(of)} ` +
-      `drivers clear the day.`
+      `dispatchers clear the day.`
     );
   }
   if (!answered(crowd)) return undefined;
   return (
-    `Ways through, measured on this crowd: none of the ${String(of)} drivers clears the day left alone; ` +
+    `Ways through, measured on this crowd: none of the ${String(of)} dispatchers clears the day left alone; ` +
     'answering a call cleared it.'
   );
 }
@@ -101,8 +101,8 @@ export function poolCloseLineOf(crowd: PoolCrowd | undefined, nameOf: PoolNameOf
   );
   const unique = [...new Set(answers)];
   if (cleared === undefined) return undefined;
-  if (unique.length === 0) return 'On this crowd, no driver left alone and no answer at a raised call cleared the day.';
-  return `On this crowd, no driver left alone cleared the day; ${listOf(unique)} would have.`;
+  if (unique.length === 0) return 'On this crowd, no dispatcher left alone and no answer at a raised call cleared the day.';
+  return `On this crowd, no dispatcher left alone cleared the day; ${listOf(unique)} would have.`;
 }
 
 /**

@@ -432,9 +432,8 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       return 'Change “your setting” for a stage you can clear.';
     }
     return (
-      `No shipped dispatcher fits the ${String(stageUnitsAt(stage, null))} units this stage's budget holds, so ` +
-      'the weight editor is the way to play it: tick “edit the weights”, move one of them, and ' +
-      'run that against the baseline.'
+      `No shipped dispatcher fits the ${String(stageUnitsAt(stage, null))} units this stage’s budget holds. ` +
+      'Tick “edit the weights”, move one, and run that against the baseline.'
     );
   }
 
@@ -452,15 +451,14 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     const baselineId = stage.dispatcher.startingProfileId;
     if (ui.profile.value === baselineId && !ui.edit.checked) {
       ui.status.textContent =
-        `both settings are ${labelFor(baselineId)} — the two arms are the same system, so no ` +
-        'measure can separate them and “beat the baseline” cannot be reached however long it ' +
-        `runs. That is this surface’s control run, and it is worth doing once. ${wayOutOf(stage)}`;
+        `Both settings are ${labelFor(baselineId)}, so no measure can separate them and “beat ` +
+        `the baseline” cannot be reached. This is the control run. ${wayOutOf(stage)}`;
       return;
     }
     ui.status.textContent =
-      `this stage runs its baseline, ${labelFor(baselineId)}, against your setting, ` +
-      `${labelFor(ui.profile.value)}${ui.edit.checked ? ', with your weight edits' : ''} — ` +
-      'both on the same passengers. Press Run this stage.';
+      `This stage runs its baseline, ${labelFor(baselineId)}, against your setting, ` +
+      `${labelFor(ui.profile.value)}${ui.edit.checked ? ', with your weight edits' : ''}, ` +
+      'on the same passengers. Press Run this stage.';
   }
 
   function fail(text: string): void {
@@ -547,7 +545,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   ): { readonly ok: true; readonly profile: DispatcherProfile } | { readonly ok: false; readonly reason: string } {
     const base = profileById(ui.profile.value);
     if (base === undefined) {
-      return { ok: false, reason: 'this build’s data/ does not carry the profile you picked.' };
+      return { ok: false, reason: 'The profile you picked is missing from the data.' };
     }
     const edit = editFor(stage);
     if (edit === undefined) return { ok: true, profile: base };
@@ -559,7 +557,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
      */
     const building = resources.buildings.find((candidate) => candidate.id === stage.building);
     if (building === undefined) {
-      return { ok: false, reason: 'this build’s data/ does not carry the building this stage runs on.' };
+      return { ok: false, reason: 'The building this stage runs on is missing from the data.' };
     }
     const resolved = resolveEditedProfile(loaded.space, base, edit, {
       building,
@@ -595,11 +593,11 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     weightsRefused = !outcome.ok;
     ui.run.disabled = weightsRefused;
     ui.weightsStatus.textContent =
-      `${String(controls.length)} of ${String(loaded.space.ids.length)} declared dimensions are ` +
+      `${String(controls.length)} of ${String(loaded.space.ids.length)} declared dimensions ` +
       `open on this stage · ${String(moved)} moved · ` +
       (outcome.ok
-        ? 'this vector is authorable and buildable'
-        : 'this vector cannot be run — see the refusal beside it');
+        ? 'this vector can be run'
+        : 'this vector cannot be run: see the refusal beside it');
   }
 
   /**
@@ -677,11 +675,11 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       nodes.push(row('about this building', fact, undefined, 'figure-suppressed figure-warning'));
     }
     for (const missing of briefing.withheld) {
-      nodes.push(row('not judgeable here', missing, undefined, 'figure-absent'));
+      nodes.push(row('can’t be judged here', missing, undefined, 'figure-absent'));
     }
     nodes.push(
       row(
-        'dials this stage opens',
+        'open dials',
         `${String(briefing.editable.length)} of ${String(loaded.space.ids.length)} declared dimensions`,
         briefing.editable
           .slice(0, 12)
@@ -739,7 +737,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     const admission = stageAdmissionOf(stage, candidate);
     if (admission === undefined) {
       return {
-        node: row('your setting', 'this build’s data/ does not carry the stage’s own starting profile.', undefined, 'figure-absent'),
+        node: row('your setting', 'The stage’s starting profile is missing from the data.', undefined, 'figure-absent'),
         glossary: [],
       };
     }
@@ -749,7 +747,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         admission.sentence,
         admission.admitted
           ? undefined
-          : 'A stage is judged at the budget it opens on, the same budget its published count of ways through was taken at. Pick a setting that budget pays for.',
+          : 'A stage is judged at the budget it opens on. Pick a setting that budget pays for.',
         admission.admitted ? 'figure-observation' : 'figure-warning',
       ),
       glossary: admission.glossary,
@@ -784,9 +782,8 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     if (shown.length === 0) return [];
     return [
       row(
-        'the words above',
-        'What each term on this screen means. Definitions only — nothing here is a result, and ' +
-          'nothing here compares two settings.',
+        'glossary',
+        'What the terms above mean. Definitions only, not results.',
         undefined,
         'figure-observation',
       ),
@@ -824,7 +821,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     }
     const baseline = profileById(stage.dispatcher.startingProfileId);
     if (baseline === undefined) {
-      fail('this build’s data/ does not carry one of the two dispatcher profiles this stage needs.');
+      fail('One of the two dispatcher profiles this stage needs is missing from the data.');
       return undefined;
     }
     const outcome = candidateProfileFor(stage);
@@ -840,7 +837,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
      */
     const admission = stageAdmissionOf(stage, outcome.profile);
     if (admission === undefined || !admission.admitted) {
-      fail(admission?.sentence ?? 'this build’s data/ does not carry the stage’s own starting profile.');
+      fail(admission?.sentence ?? 'The stage’s starting profile is missing from the data.');
       return undefined;
     }
     return admission;
@@ -868,16 +865,15 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     const seeds = stageSeedSetOf(stage, seedSet);
     if (seedSet === 'tuning') {
       return (
-        `running ${String(total)} replications on ${seeds.name} — both settings, the same ` +
-        `passengers… If every goal is met here, a second batch of ${String(total)} follows on ` +
-        `${stageSeedSetOf(stage, 'holdout').name}, because a stage is cleared on seeds kept apart ` +
-        'from its own as well.'
+        `Running ${String(total)} replications on ${seeds.name}: both settings, the same ` +
+        `passengers. If every goal is met, a second batch of ${String(total)} follows on ` +
+        `${stageSeedSetOf(stage, 'holdout').name}, seeds kept apart from the stage’s own.`
       );
     }
     return (
-      `every goal met on the runs you made — now running ${String(total)} replications on ` +
+      `Every goal met on the runs you made. Now running ${String(total)} replications on ` +
       `${seeds.name}, seeds kept apart from the stage’s own. This second batch decides whether ` +
-      'the stage is cleared; it adds no figure to the rows you are about to read.'
+      'the stage is cleared.'
     );
   }
 
@@ -889,8 +885,8 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   ): string {
     const done = `${String(completed)} of ${String(total)} replications on ${stageSeedSetOf(stage, seedSet).name}`;
     return seedSet === 'tuning'
-      ? `${done} — the page is still yours while this runs.`
-      : `${done} — the second batch, on seeds kept apart from the stage’s own.`;
+      ? done
+      : `${done} (the second batch, on seeds kept apart from the stage’s own)`;
   }
 
   /**
@@ -906,11 +902,11 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     const tuning = stageSeedSetOf(stage, 'tuning').name;
     if (outcome.verdict.holdout === null) {
       return (
-        `${per} on ${tuning} in ${took}. The holdout batch was not run: a goal missed on the runs ` +
-        'you made cannot be recovered on seeds kept apart from them.'
+        `${per} on ${tuning} in ${took}. The holdout batch was not run, because a goal was ` +
+        'missed on the runs you made.'
       );
     }
-    return `${per} on ${tuning}, and again on ${stageSeedSetOf(stage, 'holdout').name} — ${took} for both batches.`;
+    return `${per} on ${tuning}, and again on ${stageSeedSetOf(stage, 'holdout').name}: ${took} for both batches.`;
   }
 
   /**
@@ -955,7 +951,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         }
         settle();
         if (message.kind === 'failed') {
-          fail(`the stage could not be run: ${message.message}`);
+          fail(`The stage could not be run: ${message.message}`);
           reject(RUN_FAILED);
           return;
         }
@@ -963,7 +959,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       });
       next.addEventListener('error', (event: ErrorEvent) => {
         settle();
-        fail(`the batch worker failed to start: ${event.message}`);
+        fail(`The batch worker failed to start: ${event.message}`);
         reject(RUN_FAILED);
       });
       next.postMessage({
@@ -981,7 +977,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     if (admission === undefined) return;
     const published = loaded.published.scenarios.find((entry) => entry.id === stage.id);
     if (published === undefined) {
-      fail(`stage "${stage.id}" has no published goal table entry, so nothing can be judged.`);
+      fail(`Stage "${stage.id}" has no published goal table entry, so nothing can be judged.`);
       return;
     }
     ui.error.textContent = '';
@@ -1140,8 +1136,8 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     admission: StageAdmission,
   ): HTMLElement {
     const provenance =
-      `seed ${verdict.seed} — every one of these ${String(verdict.replications)} runs replays ` +
-      `from it. ${report.crnSentence}`;
+      `Seed ${verdict.seed}. All ${String(verdict.replications)} runs replay from it. ` +
+      report.crnSentence;
     if (report.arms.length < 2 || admission.moved.length > 0) {
       return row(
         verdict.cleared ? 'stage cleared' : 'stage not cleared',
@@ -1156,23 +1152,21 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     const name = report.arms[0]?.dispatcherProfileName ?? '';
     if (separated.length > 0) {
       return row(
-        'the control did not hold — report this',
+        'the control did not hold: report this',
         `Both arms ran the same system, ${name}, on every setting live on this building, so ` +
-          'every paired difference should have been exactly zero, and ' +
-          `${String(separated.length)} of the measures below came back with an interval that ` +
-          'excludes it. Two identical settings cannot differ unless the two arms saw different ' +
-          `passengers or a run is not reproducible. ${verdict.headline}`,
+          'every paired difference should be exactly zero. ' +
+          `${String(separated.length)} of the measures below have an interval that excludes it. ` +
+          'Identical settings can only differ if the arms saw different passengers or a run is ' +
+          `not reproducible. ${verdict.headline}`,
         provenance,
         'figure-suppressed figure-warning',
       );
     }
     return row(
-      'control run — the two settings are the same',
-      `Both arms ran the same system, ${name}, on every setting live on this building. They are ` +
-        'identical by construction, so no measure can separate them and “beat the baseline” is ' +
-        'unreachable here however long it runs — this is not a ' +
-        'stage you failed, it is the check this surface is built to survive, and it held. ' +
-        `${verdict.headline} ${wayOutOf(stage)}`,
+      'control run: the two settings are the same',
+      `Both arms ran the same system, ${name}, on every setting live on this building, so no ` +
+        'measure can separate them and “beat the baseline” can’t be reached. You didn’t fail ' +
+        `the stage: this is the control, and it held. ${verdict.headline} ${wayOutOf(stage)}`,
       provenance,
       'figure-observation',
     );
@@ -1205,10 +1199,10 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         /* Inflected for `campaign/judge.ts`'s reason — issue #295's F37 on the Engineer mirror of
            the same tally, reachable on the same stage 1 and its single goal. */
         `${String(verdict.goals.length)} ${plural(verdict.goals.length, 'goal', 'goals')}, ` +
-          `judged on ${tuning.name} (seed ${tuning.seed}) — ` +
-          'the seeds this setting was tuned against, and the batch every row below is about.',
-        'These are the counts to play against: a goal missed here is one you can go and look at. ' +
-          'Meeting all of them is half of clearing the stage.',
+          `judged on ${tuning.name} (seed ${tuning.seed}), ` +
+          'the seeds this setting was tuned against.',
+        'A goal missed here is one you can go and look at. Meeting them all is half of ' +
+          'clearing the stage.',
         'figure-observation',
       ),
       ...verdict.goals.map((goal) => row(goal.label, goal.sentence, goal.note, goalClass(goal.met))),
@@ -1220,10 +1214,10 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         ? []
         : [
             row(
-              'drive work, beside the verdict',
+              'drive work',
               verdict.energy,
-              'An axis and never a score: the setting that drives least is often the one that carried ' +
-                'fewest people, so this line is read beside the waits and orders nothing.',
+              'An axis, never a score. The setting that drives least is often the one that ' +
+                'carried fewest people, so read this beside the waits. It orders nothing.',
               'figure-observation',
             ),
           ]),
@@ -1233,11 +1227,9 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     if (holdout === null) {
       nodes.push(
         row(
-          'the holdout seeds — not run',
-          `${holdoutSeeds.name} (seed ${holdoutSeeds.seed}) was not run, because a goal missed on ` +
-            'the runs above cannot be recovered on seeds kept apart from them. A ' +
-            'stage is cleared on both batches or on neither, and nothing here was measured about ' +
-            'this one.',
+          'the holdout seeds: not run',
+          `${holdoutSeeds.name} (seed ${holdoutSeeds.seed}) was not run, because a goal was ` +
+            'missed on the runs above. A stage is cleared on both batches or on neither.',
           undefined,
           'figure-absent',
         ),
@@ -1248,12 +1240,12 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     nodes.push(
       row(
         holdout.held
-          ? 'the held-back runs, kept apart from the stage’s own'
-          : 'the held-back runs, kept apart from the stage’s own — refused',
+          ? 'the held-back runs'
+          : 'the held-back runs: refused',
         holdout.sentence,
-        `A second batch of the same two settings over ${holdout.seedSetName}, run after the batch ` +
-          'above met every goal. It decides whether the stage is cleared and it changes no figure ' +
-          'above it: every row up to here is the batch you ran.',
+        `A second batch of the same two settings over ${holdout.seedSetName}, seeds kept apart ` +
+          'from the stage’s own. It decides whether the stage is cleared and changes no figure ' +
+          'above it.',
         holdout.held ? 'figure-observation' : 'figure-warning',
       ),
       ...holdout.goals.map((goal) =>
@@ -1286,7 +1278,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       row(
         'what went wrong, and how often',
         `The counts are over all ${String(verdict.replications)} runs. The floors and credentials ` +
-          'below are from one of them, replayed so it could be named.',
+          'below are from one of them, replayed.',
         undefined,
         'figure-observation',
       ),
@@ -1315,7 +1307,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     // The population in words, the exact key on the row's `title` — `docs/20` defect 9, and
     // `batch/report.ts#populationLineOf` for why the key is kept rather than dropped.
     const measurementsRow = row(
-      'the measurements behind the verdict',
+      'measurements',
       `${report.buildingName} · ${String(report.replications)} runs per setting · ${report.demandClause}`,
       `Every arm ran this population: ${populationLineOf(report.traceKey, { buildingName: report.buildingName })}.`,
       'figure-observation',
@@ -1348,7 +1340,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
           row(
             item.label,
             item.sentence,
-            first === undefined ? item.note : `The same reason as “${first}” above, in the same words.`,
+            first === undefined ? item.note : `Same reason as “${first}” above.`,
             item.verdict === 'suppressed' || item.verdict === 'unmeasured'
               ? 'figure-suppressed figure-warning'
               : 'figure-observation',
@@ -1460,7 +1452,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     abortRun();
     setRunning(false);
     ui.progress.hidden = true;
-    ui.status.textContent = 'cancelled — a stopped batch has no result, so nothing is reported.';
+    ui.status.textContent = 'Cancelled. A stopped batch reports nothing.';
   });
 
   const first = playable[0];

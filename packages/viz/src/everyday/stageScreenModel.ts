@@ -1412,7 +1412,7 @@ export function stagePressChangedNobody(input: {
  * and § D371 draws no verdict before then.
  */
 export const STAGE_HANDOVER_GOALS_AGREE =
-  'That handover changed who rode which car, and every goal on the strip came out as it did on the day without it.';
+  'That handover changed who rode which car. Every goal on the strip ended the same as on the day without it.';
 
 /**
  * What {@link stageHandoverVerdictOf} found about one handover: `unchanged` (nobody's trip moved,

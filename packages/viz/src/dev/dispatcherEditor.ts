@@ -346,28 +346,26 @@ export function flagRowsOf(spec: DispatcherSpec): readonly FlagRow[] {
     {
       key: 'pool',
       label: 'Pool riders by destination',
-      hint: 'Asks where they are going and groups them. Fewer stops per trip, a longer wait in the lobby.',
+      hint: 'Riders give their floor first and are grouped. Fewer stops per trip, a longer wait in the lobby.',
       help:
-        'dispatch.callType: mobile-credential — destination *disclosure*, the Level-0 arm. The ' +
-        'landing panel that names a car is a passenger-model change (DECISIONS.md § D27) and stays ' +
-        'behind the shipped destination-panel profile, where the choice is named.',
+        'Sets dispatch.callType to mobile-credential: riders disclose a destination. No landing ' +
+        'panel names a car here; the shipped destination-panel profile does that.',
       on: spec.flags.pool,
     },
     {
       key: 'zone',
       label: 'Give each car a zone',
       hint: 'Splits the tower between cars. Wins the peak, wastes the lull.',
-      help: 'idle.parkingStrategy: zone-center, with dispatch.assignmentMode: split-demand.',
+      help: 'Sets idle.parkingStrategy to zone-center and dispatch.assignmentMode to split-demand.',
       on: spec.flags.zone,
     },
     {
       key: 'bypass',
       label: 'Read the load sensor',
-      hint: 'A car over 80% full stops being offered new calls. Turn it off and watch it sail past people.',
+      hint: 'A car over 80% full stops being offered new calls.',
       help:
-        'answer.bypassLoadThreshold — 0.8, which is elevator-specs.json’s own ' +
-        'loadSensor.hallCallBypassThreshold. Off is 1, not infinity: resolveLoadSensor refuses a ' +
-        'threshold outside (0, 1], so “off” means “only when completely full”.',
+        'Sets answer.bypassLoadThreshold to 0.8, the loadSensor.hallCallBypassThreshold in ' +
+        'elevator-specs.json. Off sets it to 1: a car is passed over only when completely full.',
       on: spec.flags.bypass,
     },
   ];
@@ -394,22 +392,20 @@ export function leverRowsOf(levers: GroupLevers): readonly LeverRow[] {
   return [
     {
       key: 'parking',
-      label: 'Park the cars in the lobby before the rush',
+      label: 'Park idle cars in the lobby',
       hint: 'Kills the first wait of the morning. Costs a little motor time all day.',
       help:
-        'idle.parkingStrategy: lobby. An idle car returns to the entrance floor, so the next lobby ' +
-        'call is answered with the doors already in the right place. Outranked by express zoning, ' +
-        'because a car cannot park both in its zone’s centre and in the lobby.',
+        'Sets idle.parkingStrategy to lobby: an idle car returns to the entrance floor. Express ' +
+        'zoning outranks it, because a car cannot park in its zone and in the lobby.',
       on: levers.parking,
     },
     {
       key: 'express',
-      label: 'Express zoning — give each car a slice of the tower',
-      hint: 'Superb at 08:30, wasteful at 15:00. Watch the lull, not the peak.',
+      label: 'Express zoning',
+      hint: 'Gives each car a slice of the tower. Superb at 08:30, wasteful at 15:00.',
       help:
-        'idle.parkingStrategy: zone-center, plus dispatch.assignmentMode: split-demand. The tower ' +
-        'is split into contiguous bands and each car owns one, so cars stop competing for the same ' +
-        'calls.',
+        'Sets idle.parkingStrategy to zone-center and dispatch.assignmentMode to split-demand. ' +
+        'The tower is split into contiguous bands and each car owns one.',
       on: levers.express,
     },
   ];
@@ -462,14 +458,13 @@ export function dwellHintOf(levers: GroupLevers, profile: DispatcherProfile): st
   const own = dwellChoiceOf(profile);
   if (own !== undefined) {
     return (
-      `No override — ${profile.name} authors its own dwell, and it happens to be the ${own} ` +
-      'setting. Press a chip to hold the doors to your figure instead of the dispatcher’s.'
+      `No override. ${profile.name} sets its own dwell, which matches the ${own} setting. ` +
+      'Press a chip to set it yourself.'
     );
   }
   return (
-    `No override — the doors keep whatever ${profile.name} authored, which is not one of these ` +
-    'three. Pressing a chip replaces it; leaving them alone is what keeps the run the one named in ' +
-    'the rail.'
+    `No override. ${profile.name} sets its own dwell, which is none of these three. ` +
+    'Press a chip to replace it.'
   );
 }
 
@@ -774,11 +769,8 @@ export function unauthorableBlocksOf(
  * that is not redundancy: it is there for a reader who never hovers anything.
  */
 const ONE_RUN_PROMISE =
-  'This is one run, not a comparison: same building, same seed, same passengers, a different ' +
-  'dispatcher in charge. A difference between two single runs is not evidence that one dispatcher ' +
-  'is better than another — that needs 50 or more paired runs against the same passengers and an ' +
-  'interval that excludes zero, which is what Compare is for. What one run tells you is what this ' +
-  'dispatcher did today, and the strip below the buttons says what moved.';
+  'This is one run, not a comparison. Showing one dispatcher is better takes ' +
+  '50 or more paired runs and an interval that excludes zero: use Compare for that.';
 
 /*
  * The *now use this* copy. Module-private for the reason stated above, and for the one
@@ -791,20 +783,18 @@ const RUN_THIS_COPY: Readonly<
   saveFirst: Object.freeze({
     label: 'Save it and run it',
     title:
-      'Files these weights as a dispatcher of your own and makes it the one driving, then runs the ' +
-      'shift again. A weight vector that has not been saved cannot drive: the run resolves a ' +
-      `dispatcher by id. ${ONE_RUN_PROMISE}`,
+      'Saves these weights as your own dispatcher, puts it in charge and runs the shift again. ' +
+      `An unsaved dispatcher cannot drive a run. ${ONE_RUN_PROMISE}`,
   }),
   alreadyDriving: Object.freeze({
     label: 'Already driving',
-    title:
-      'This is the dispatcher the shift is already running. Move a weight to make it a new one.',
+    title: 'The shift is already running this dispatcher. Move a weight to make a new one.',
   }),
   select: Object.freeze({
     label: 'Run this dispatcher',
     title:
-      'Makes the dispatcher shown here the one the shift runs, and runs it again on the same ' +
-      `building, seed and traffic. ${ONE_RUN_PROMISE}`,
+      'Puts this dispatcher in charge and runs the shift again on the same building, seed and ' +
+      `traffic. ${ONE_RUN_PROMISE}`,
   }),
 });
 
@@ -819,8 +809,8 @@ const RESULT_EYEBROW = 'What your run moved';
  * thing a reader needs and cannot work out.
  */
 const RESULT_PAIRING_LINE =
-  'Left is what the sheet on screen said when you pressed; right is what the sheet your run filed ' +
-  'says. Both columns are those two sheets’ own words, unedited.';
+  'Left: the sheet on screen when you pressed. Right: the sheet your run filed. Both are quoted ' +
+  'unedited.';
 
 /**
  * The five states that are not a pairing, each saying which one it is.
@@ -833,22 +823,20 @@ const RESULT_PAIRING_LINE =
 const RUN_READ_OUT_COPY: Readonly<Record<Exclude<EditorRunReadOut, 'paired'>, string>> =
   Object.freeze({
     noRun:
-      'Nothing to put side by side yet. Run a dispatcher from this panel and what its sheet printed ' +
-      'lands here, beside what the sheet before it printed.',
+      'Nothing to compare yet. Run a dispatcher from this panel and its sheet lands here, beside ' +
+      'the sheet before it.',
     superseded:
-      'The run this panel started is no longer the one on screen — a different building, dispatcher ' +
-      'or seed has been run since. Run again from here and the pairing starts from the sheet that ' +
-      'is filed now.',
+      'A different building, dispatcher or seed has been run since. Run again from here to start ' +
+      'a new pairing from the sheet filed now.',
     watching:
-      'This strip reports a whole day at once and waits for the playhead: a part-day average is not ' +
-      'an average of the day. Play it through on the Simulation tab, or click the far end of the ' +
-      'timeline, and the two sheets land here.',
+      'This strip waits for the whole day: a part-day average is not an average of the day. Play ' +
+      'it through on the Simulation tab, or click the far end of the timeline.',
     unfiled:
-      'The day has played out and no sheet has been filed for it. Opening the Day report closes the ' +
-      'day and files one; this strip fills in when you come back.',
+      'The day has played out and no sheet is filed for it. Open the Day report to file one, then ' +
+      'come back.',
     firstSheet:
       'This is the first sheet filed this session, so there is nothing to set beside it. Move a ' +
-      'weight, run again from here, and the next sheet arrives paired with this one.',
+      'weight and run again from here.',
   });
 
 /**
@@ -896,27 +884,24 @@ export function familyValueFrom(
 function runReadOutNoteOf(state: Exclude<EditorRunReadOut, 'paired'>, progress: RunProgress): string {
   const base = RUN_READ_OUT_COPY[state];
   if (state !== 'watching' || progress.kind !== 'watching') return base;
-  return `The day is still running — ${progress.atClock} of a shift that runs to ${progress.endsAtClock}. ${base}`;
+  return `The day is still running: ${progress.atClock} of a shift that runs to ${progress.endsAtClock}. ${base}`;
 }
 
 /** The refusals {@link saveNameRefusalOf} returns, said where the reader typed the name. */
 const NAME_REFUSAL_COPY: Readonly<Record<NameRefusal, string>> = Object.freeze({
   empty:
-    'Give this dispatcher a name before saving it. It is the only thing that tells it apart from ' +
-    'the others on every list it appears on.',
+    'Give this dispatcher a name before saving it.',
   taken:
-    'A dispatcher with that name already exists. Two rows with one name are two rows you cannot ' +
-    'tell apart later — change a word and save again, or use Rename to move the name.',
+    'A dispatcher with that name already exists. Change the name and save again, or use Rename.',
 });
 
 /** Why *Rename* is off, said on the control rather than left for the reader to work out. */
 const RENAME_COPY: Readonly<Record<RenameState, string>> = Object.freeze({
   notYours:
-    'Only a dispatcher you saved can be renamed. This one ships with the simulator, and its name ' +
-    'is the one every published figure was measured under.',
-  unchanged: 'The name in the field is already this dispatcher’s name.',
+    'Only a dispatcher you saved can be renamed. This one ships with the simulator.',
+  unchanged: 'That is already this dispatcher’s name.',
   refused: 'That name is empty or already taken by another dispatcher.',
-  ready: 'Renames the saved dispatcher you are editing. Nothing else changes — same id, same weights.',
+  ready: 'Renames the saved dispatcher you are editing. Its id and weights stay the same.',
 });
 
 /**
@@ -979,11 +964,9 @@ const DRAFT_NOTE = draftNoteFor(commitmentOf('viewer.dispatcherSpec', 'writes-on
 function draftNoteFor(commitment: ReturnType<typeof commitmentOf>): string {
   if (commitment === 'draft') {
     return (
-      'Nothing you move here reaches a run yet — this panel holds a draft, and the shift on ' +
-      `screen keeps the dispatcher it was simulated with. ${RUN_THIS_COPY.select.label} is what ` +
-      `hands it over, or ${RUN_THIS_COPY.saveFirst.label} while the draft is still unfiled; ` +
-      'either one re-runs the whole day from the start rather than steering the one you are ' +
-      'watching.'
+      'Nothing you move here reaches a run yet. This panel holds a draft, and the shift on ' +
+      `screen keeps the dispatcher it ran with. ${RUN_THIS_COPY.select.label}, or ` +
+      `${RUN_THIS_COPY.saveFirst.label} for an unsaved draft, re-runs the whole day with it.`
     );
   }
   if (commitment === 'next-run') {
@@ -999,10 +982,9 @@ function draftNoteFor(commitment: ReturnType<typeof commitmentOf>): string {
      * dispatcher has to know which of the two the run obeys.
      */
     return (
-      'These weights take effect on your next run: the day is simulated with them, over whichever ' +
-      'dispatcher is driving. Moving one asks for no run of its own, so the shift on screen keeps ' +
-      `the vector it was simulated under until something else runs one — ${RUN_THIS_COPY.select.label} ` +
-      'is the shortest way to ask for one.'
+      'These weights take effect on your next run, over whichever dispatcher is driving. Moving ' +
+      `one starts no run, so the shift on screen keeps its weights. ${RUN_THIS_COPY.select.label} ` +
+      'starts one.'
     );
   }
   return '';
@@ -1020,20 +1002,17 @@ function draftNoteFor(commitment: ReturnType<typeof commitmentOf>): string {
  */
 const FAMILY_SCOPE_NOTE =
   commitmentOf('viewer.dispatcherSpec', 'writes-only') === 'draft'
-    ? 'These write the same draft the thirteen weights do, and the same note above applies to them: ' +
-      `nothing here reaches a run until ${RUN_THIS_COPY.select.label} or ` +
-      `${RUN_THIS_COPY.saveFirst.label} hands the whole draft over.`
+    ? 'These write the same draft as the thirteen weights: nothing here reaches a run until ' +
+      `${RUN_THIS_COPY.select.label} or ${RUN_THIS_COPY.saveFirst.label} hands the draft over.`
     : commitmentOf('viewer.dispatcherSpec', 'writes-only') === 'next-run'
-      ? 'These write the same working copy the weight sliders do, and the same note above ' +
-        'applies to them: the next run is built with them, and moving one asks for no run of its ' +
-        'own.'
+      ? 'These write the same working copy as the weight sliders: the next run is built with ' +
+        'them, and moving one starts no run.'
       : '';
 
 const LEVERS_NOTE =
   commitmentOf('viewer.levers', 'writes-only') === 'next-run'
-    ? 'Locked for this shift: changes apply to your next run. These do reach a run — the day is ' +
-      'simulated with them — but moving one asks for no run of its own, so the shift on screen ' +
-      'keeps the levers it was simulated under until something else runs one.'
+    ? 'Locked for this shift: changes apply to your next run. Moving one starts no run, so the ' +
+      'shift on screen keeps the levers it ran with.'
     : '';
 
 /* -------------------------------------------------------------------------- *
@@ -1219,8 +1198,7 @@ export function mountDispatcherEditor(
       el(doc, 'p', {
         className: 'helpful',
         text:
-          'Each lever is a plain name for a control below. Moving it moves the same setting the ' +
-          'engineer’s own controls show, so the two can never disagree.',
+          'Each lever is a plain name for a control below, and moves the same setting.',
         style: { 'font-size': '11.5px', color: 'var(--dim)', margin: '0 0 8px', 'line-height': '1.5' },
       }),
       plainEcho,
@@ -1292,8 +1270,8 @@ export function mountDispatcherEditor(
     familySpace = collectSearchSpace();
   } catch (error) {
     familySpaceRefusal =
-      'The family controls are not drawn: the parameter schema this build declares could not be ' +
-      `collected — ${error instanceof Error ? error.message : String(error)}`;
+      'The family controls are not drawn: the parameter schema could not be collected. ' +
+      `${error instanceof Error ? error.message : String(error)}`;
   }
 
   /** The last drawn block, so the change handler can find the control an input belongs to. */
@@ -1529,8 +1507,8 @@ export function mountDispatcherEditor(
       confirmedId = id;
       setText(
         savedNote,
-        `Saved — “${profile.name}” is in your dispatchers. It is not driving yet; press ` +
-          `“${RUN_THIS_COPY.select.label}” to put it in charge of the shift.`,
+        `Saved “${profile.name}” to your dispatchers. It is not driving yet: press ` +
+          `“${RUN_THIS_COPY.select.label}” to put it in charge.`,
       );
       setHidden(savedNote, false);
       return true;
@@ -2143,7 +2121,7 @@ function savedRow(
   const remove = el(doc, 'button', {
     className: 'chip',
     text: 'delete',
-    title: `Remove ${profile.name}. Nothing else is touched; a run already recorded keeps the profile it was run with.`,
+    title: `Remove ${profile.name}. Runs already recorded keep the profile they ran with.`,
     attrs: { type: 'button' },
   });
   remove.addEventListener('click', handlers.onDelete);

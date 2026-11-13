@@ -9,9 +9,10 @@
  *
  * ## The copy is § 15.2's, and where it deviates it says so
  *
- * The heading, the body, the two answers and the line under them are that section's draft
- * unchanged. Three things are added and each is a rule from elsewhere in the same document rather
- * than a new idea:
+ * The words are that section's, as it stands after the copy edit: the heading, one sentence on what
+ * is recorded, one visible line on what never is, the two answers, and a link to the full account.
+ * Three things are added and each is a rule from elsewhere in the same document rather than a new
+ * idea:
  *
  * - the **withdrawn** row's sentence about the half that can fail (§ 4.3, drafted in § 15.2);
  * - the **not durable** line, for a device that refuses storage, which is `everyday/profile.ts`'s
@@ -62,30 +63,34 @@ import type { TelemetryConsent } from './consent.js';
  * reach and how long you play"* is a restatement; *"help us improve"* is a request with the content
  * removed.
  *
- * **`notCollected` is what makes the ask credible**, and § 4.1 requires it: the short form of § 2.2's
- * list belongs on the surface. Every clause in it is a refusal the schema actually enforces —
- * nothing typed can reach a field, there is no account id on a row, no geolocation, no fingerprint
- * and no third party — rather than a promise this module is making on somebody else's behalf.
+ * **`never` is what makes the ask credible**, and § 4.1 requires it: the short form of § 2.2's
+ * list belongs on the surface, read without a press, with the sentence that saying no changes
+ * nothing. `notCollected` is the whole list, one press away behind `details`. Every clause in
+ * either is a refusal the schema actually enforces — nothing typed can reach a field, there is no
+ * account id on a row, no geolocation, no fingerprint and no third party — rather than a promise
+ * this module is making on somebody else's behalf.
  *
  * **`later`'s verb is `asks` rather than `deletes`**, which § 15.2 calls out: the local half is
  * immediate and the server half is a request that can fail, so a consent screen promising deletion
  * outright would make exactly the promise § 13.4's third requirement refuses.
  */
 export const CONSENT_COPY = Object.freeze({
-  heading: 'Can we count how the game is going?',
+  heading: 'Can we record usage data?',
   body:
-    'We would like to record which screens you reach, how long you play, and which building and ' +
-    'settings each run used. It stays on our own server and goes nowhere else.',
-  notCollected:
-    'We do not record anything you type, your name, your email address, where you are, or what ' +
-    'you do on any other site. Saying no changes nothing about the game.',
+    'That’s which screens you reach, how long you play, and which building and settings each run ' +
+    'used. It stays on our own server and goes nowhere else.',
+  /** Drawn under the body, without a press: the short not-recorded list, and that a no costs nothing. */
+  never: 'Never your name, your email or anything you type. Saying no changes nothing about the game.',
   no: 'No',
-  yes: 'Yes, count it',
+  yes: 'Yes',
+  /** The link beside the answers, and the heading of the popover that holds the two notes below. */
+  details: 'What we record',
+  notCollected:
+    'We never record anything you type, your name, your email address, where you are, or what ' +
+    'you do on any other site.',
   later:
     'You can change this later in Settings. Turning it off there also asks us to delete what was ' +
     'already recorded.',
-  /** The link beside the body, and the heading of the popover that holds the two notes above. */
-  details: 'What we record',
 } as const);
 
 /**
@@ -118,10 +123,14 @@ export const CONSENT_ROW_COPY = Object.freeze({
 export interface ConsentAskView {
   readonly heading: string;
   readonly body: string;
-  readonly notCollected: string;
+  /** The visible assurance: the short not-recorded list, and that saying no changes nothing. */
+  readonly never: string;
   /** The two answers. Equally easy to give and equally easy to reach; neither is a default. */
   readonly no: string;
   readonly yes: string;
+  /** The link, and the title of the popover that holds `notCollected` and `later`. */
+  readonly details: string;
+  readonly notCollected: string;
   readonly later: string;
 }
 
@@ -148,9 +157,11 @@ export function consentAskViewOf(state: TelemetryConsent): ConsentAskView | unde
   return Object.freeze({
     heading: CONSENT_COPY.heading,
     body: CONSENT_COPY.body,
-    notCollected: CONSENT_COPY.notCollected,
+    never: CONSENT_COPY.never,
     no: CONSENT_COPY.no,
     yes: CONSENT_COPY.yes,
+    details: CONSENT_COPY.details,
+    notCollected: CONSENT_COPY.notCollected,
     later: CONSENT_COPY.later,
   });
 }

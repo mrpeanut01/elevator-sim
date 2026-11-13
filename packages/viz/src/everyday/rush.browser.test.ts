@@ -398,14 +398,14 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await page.locator('#rail-dispatcher-list .pick', { hasText: 'Nearest car' }).first().click();
       /* And lobby parking, on the dispatcher editor's group lever. */
       await page.locator('#rail-open-dispatcher').first().click();
-      const parking = page.locator('button.toggle', { hasText: 'Park the cars in the lobby before the rush' }).first();
+      const parking = page.locator('button.toggle', { hasText: 'Park idle cars in the lobby' }).first();
       expect(await parking.getAttribute('aria-pressed')).toBe('false');
       await parking.click();
       await page.waitForFunction(
         () =>
           [...document.querySelectorAll('button.toggle')].some(
             (button) =>
-              button.textContent?.includes('Park the cars in the lobby before the rush') === true &&
+              button.textContent?.includes('Park idle cars in the lobby') === true &&
               button.getAttribute('aria-pressed') === 'true',
           ),
         undefined,

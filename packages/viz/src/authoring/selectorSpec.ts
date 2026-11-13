@@ -531,15 +531,14 @@ export function selectorIssues(spec: SelectorSpec, context: SelectorContext): re
         field,
         message:
           'Inert while weight-set selection is off: the dispatcher holds one weight vector for the ' +
-          'whole run and the detector is never built. Choose fuzzy or contextual for this to mean ' +
-          'anything.',
+          'whole run. Choose fuzzy or contextual to use this.',
       });
     }
     issues.push({
       field: 'weightSetsByPattern',
       message:
-        'Inert while weight-set selection is off. These bindings are read only when a policy is ' +
-        'chosen; with it off the dispatcher runs its own weights from the first second to the last.',
+        'Inert while weight-set selection is off: the dispatcher runs its own weights all shift. ' +
+        'Choose a policy to use these bindings.',
     });
     return Object.freeze(issues);
   }
@@ -548,9 +547,8 @@ export function selectorIssues(spec: SelectorSpec, context: SelectorContext): re
     issues.push({
       field: 'policy',
       message:
-        'This dispatcher says it switches weight sets and no pattern library is loaded, so there is ' +
-        'nothing to switch between. The run is refused by name rather than quietly running one ' +
-        'vector.',
+        'This dispatcher switches weight sets, but no pattern library is loaded, so there is ' +
+        'nothing to switch between. The run is refused.',
     });
     return Object.freeze(issues);
   }
@@ -561,9 +559,8 @@ export function selectorIssues(spec: SelectorSpec, context: SelectorContext): re
       issues.push({
         field,
         message:
-          'Inert under the fuzzy rule: the gains are the learned half of the contextual rule and ' +
-          'the fuzzy detector reads the observed rates untouched. Switch to contextual, or leave ' +
-          'this at 1.',
+          'Inert under the fuzzy rule, which reads the observed rates untouched. Switch to ' +
+          'contextual, or leave this at 1.',
       });
     }
   }
@@ -576,8 +573,8 @@ export function selectorIssues(spec: SelectorSpec, context: SelectorContext): re
       issues.push({
         field,
         message:
-          `Outside the declared range ${String(range[0])}–${String(range[1])}. The optimizer and ` +
-          'the loader share these bounds; a value beyond them is not a setting the simulator has.',
+          `Outside the declared range ${String(range[0])}–${String(range[1])}. Choose a value ` +
+          'inside it.',
       });
     }
   }
@@ -586,8 +583,8 @@ export function selectorIssues(spec: SelectorSpec, context: SelectorContext): re
     issues.push({
       field: 'observationWindowS',
       message:
-        'A window of zero seconds means the detector counts nothing: every rate reads zero for the ' +
-        'whole run, so the traffic is never recognised as anything but quiet.',
+        'With a window of zero seconds the detector counts nothing: every rate reads zero, so ' +
+        'the traffic is never recognised as anything but quiet. Set a window above zero.',
     });
   }
 
@@ -597,8 +594,8 @@ export function selectorIssues(spec: SelectorSpec, context: SelectorContext): re
       field: 'hysteresisS',
       message:
         `A ${String(Math.round(spec.hysteresisS))} s hold is at least as long as the ` +
-        `${String(Math.round(duration))} s run, so the detector picks once and can never change its ` +
-        'mind. That is one weight vector for the run with extra steps.',
+        `${String(Math.round(duration))} s run, so the detector picks once and can never change ` +
+        'its mind. Shorten the hold.',
     });
   }
 
@@ -609,8 +606,8 @@ export function selectorIssues(spec: SelectorSpec, context: SelectorContext): re
     issues.push({
       field: 'policy',
       message:
-        `The loaded detector declares the input "${input}", which nothing measures. The run is ` +
-        `refused by name. Implemented inputs: ${SELECTOR_INPUTS.join(', ')}.`,
+        `The loaded detector declares the input "${input}", which nothing measures, so the run ` +
+        `is refused. Implemented inputs: ${SELECTOR_INPUTS.join(', ')}.`,
     });
   }
 
@@ -623,16 +620,15 @@ export function selectorIssues(spec: SelectorSpec, context: SelectorContext): re
       issues.push({
         field,
         message:
-          `The detector can decide the traffic is "${patternId}" and no weight set is bound to it, ` +
-          'so the run is refused by name rather than reaching a regime it has no weights for.',
+          `The detector can decide the traffic is "${patternId}", but no weight set is bound to ` +
+          'it, so the run is refused. Bind one.',
       });
     } else if (!profileIds.has(weightSetId)) {
       issues.push({
         field,
         message:
-          `"${weightSetId}" is not a dispatcher this file declares, so the run is refused by name. ` +
-          'A selector missing one of its regimes would fall back silently at exactly the traffic it ' +
-          'was configured for.',
+          `"${weightSetId}" is not a dispatcher this file declares, so the run is refused. ` +
+          'Bind a declared one.',
       });
     }
     const clauses = membership[patternId] ?? {};
@@ -641,9 +637,8 @@ export function selectorIssues(spec: SelectorSpec, context: SelectorContext): re
       issues.push({
         field,
         message:
-          `"${patternId}" declares no membership clause the detector can evaluate, so its score is a ` +
-          'constant and the traffic can never be recognised as it — nor recognised as anything else ' +
-          'once it wins. The run is refused by name.',
+          `"${patternId}" declares no membership clause the detector can evaluate, so its score ` +
+          'is a constant and the traffic can never be recognised as it. The run is refused.',
       });
     }
   }
@@ -654,8 +649,8 @@ export function selectorIssues(spec: SelectorSpec, context: SelectorContext): re
     issues.push({
       field: `weightSetsByPattern.${patternId}`,
       message:
-        `The detector does not declare a "${patternId}" pattern, so this binding is read by nothing ` +
-        'and the loader will not complain. It is authored decoration until the detector declares it.',
+        `The detector does not declare a "${patternId}" pattern, so nothing reads this binding. ` +
+        'The loader accepts it, and it changes no run.',
     });
   }
 
@@ -671,9 +666,8 @@ export function selectorIssues(spec: SelectorSpec, context: SelectorContext): re
       issues.push({
         field: 'weightSetsByPattern',
         message:
-          'Every pattern selects the same weight vector, so the detector can classify the traffic ' +
-          'perfectly and change no decision. Bind at least two regimes to different weights, or ' +
-          'turn selection off and say so.',
+          'Every pattern selects the same weight vector, so switching can change no decision. Bind ' +
+          'at least two patterns to different weights, or turn selection off.',
       });
     }
   }
@@ -736,15 +730,15 @@ function sameWeights(
  */
 export const PATTERN_LINES: Readonly<Record<string, string>> = Object.freeze({
   'up-peak':
-    'Nearly everybody is arriving. The queue forms in the lobby and almost nowhere else — the morning intake, or the start of a shift.',
+    'Nearly everybody is arriving, and the queue forms in the lobby: the morning intake, or the start of a shift.',
   'down-peak':
     'The building is emptying. The queue forms on every floor at once instead of in one lobby, and the cars come down full.',
   'two-way':
-    'The lobby and the upper floors are busy at the same time — lunch, or a shift change. A car is rarely empty in the direction somebody needs.',
+    'The lobby and the upper floors are busy at the same time: lunch, or a shift change.',
   'interfloor':
-    'People are moving between upper floors and the lobby is quiet — a meeting-heavy afternoon, or a building whose tenants visit each other.',
+    'People are moving between upper floors and the lobby is quiet: a meeting-heavy afternoon, or tenants visiting each other.',
   'idle':
-    'Almost nobody is calling. Whatever the cars do now, they are mostly waiting for the next person to press a button.',
+    'Almost nobody is calling. The cars are mostly waiting for the next call.',
 });
 
 /** The plain-language line for a pattern, or `undefined` when this build has no sentence for it. */
@@ -904,7 +898,7 @@ export function patternCards(spec: SelectorSpec, context: SelectorContext): read
  */
 export function policyLine(spec: SelectorSpec, context: SelectorContext): string {
   if (spec.policy === 'off') {
-    return 'One weight vector for the whole run. The dispatcher does not change its mind about what it is optimising.';
+    return 'One weight vector for the whole run.';
   }
   const patterns = context.patternSwitching?.patternDetector.patterns.length ?? 0;
   const rule =

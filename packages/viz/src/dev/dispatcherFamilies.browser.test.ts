@@ -138,16 +138,16 @@ describe.skipIf(!HAS_BROWSER)('the dispatcher editor authors the families', () =
     // Every family's title, so a block that silently stopped rendering is caught by name rather
     // than by a count that could be met by any thirty-seven controls.
     for (const title of [
-      'The destination panel',
+      'Destination panel',
       'Registration and assignment timing',
       'Operational zoning',
       'Reassignment',
       'Eligibility and hard constraints',
-      'The auction',
-      'The load sensor',
+      'Auction',
+      'Load sensor',
       'Doors and dwell',
       'Where an idle car waits',
-      'The arrival forecast',
+      'Arrival forecast',
       'Cost normalization',
     ]) {
       expect(block.text, `no block titled “${title}”`).toContain(title);

@@ -217,9 +217,8 @@ export function admitEditedVector(
     return {
       admissible: false,
       reason:
-        `this vector is inside every dimension's declared range and is not a dispatcher this ` +
-        `simulator can build: ${why} The refusal is core's, not this form's — the declared box is ` +
-        'not the feasible set.',
+        `this vector is inside every dimension's declared range, but it is not a dispatcher ` +
+        `this simulator can build: ${why} Being in range does not make a combination feasible.`,
       candidate: undefined,
     };
   }
@@ -242,11 +241,9 @@ export function admitEditedVector(
     return {
       admissible: false,
       reason:
-        `this vector is a dispatcher this simulator can build and is not one it can run on this ` +
-        `building: ${onThisBuilding} The refusal is core's, not this form's — a door timing and a ` +
-        `load cell belong to the car, so a vector every dial admits can still be refused by the ` +
-        `equipment it would have to drive, and the same vector can run at one tower and not at ` +
-        `the next.`,
+        `this vector is a dispatcher this simulator can build, but not one it can run on this ` +
+        `building: ${onThisBuilding} Door timing and the load cell belong to the car, so the ` +
+        `same vector can run at one tower and not at the next.`,
       candidate: undefined,
     };
   }

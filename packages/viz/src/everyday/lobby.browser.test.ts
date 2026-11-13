@@ -291,8 +291,11 @@ describe.skipIf(!HAS_BROWSER)('§ D1628 — the lobby is the main menu', () => {
     { width: 320, height: 320 },
     { width: 844, height: 390 },
   ] as const;
-  /* The copy edit: the last two paragraphs sit behind the *What we record* link, so the link is what must be in reach. */
-  const ASK_PARTS = ['heading', 'body', 'more'] as const;
+  /*
+   * What the ask shows without a press: the heading, what is recorded, the line on what never is
+   * (and that a no changes nothing), and the *What we record* link to the whole account.
+   */
+  const ASK_PARTS = ['heading', 'body', 'never', 'more'] as const;
 
   /** Whether a point at the centre of `selector` lands on it, so a pointer there would press it. */
   const landsOn = (page: Page, selector: string): Promise<boolean> =>

@@ -169,7 +169,8 @@ describe('the Scenario hub', () => {
     /*
      * § D1129 made the old half false — the stages play in the fix-it editor and a first clear pays
      * — so it went on the commit that did that, and the half that stays true stays: a clear reaches
-     * no career, and nothing sells a stage a wider budget. Deleting a true refusal to empty a
+     * no career. The other half, *nothing sells a stage a wider budget*, went false when the stage
+     * page began selling rungs (§ D1419), so it is asserted absent. Deleting a true refusal to empty a
      * register is § D227 pointed the other way.
      */
     const joined = SCENARIO_ABSENCES.join(' ');
@@ -177,6 +178,7 @@ describe('the Scenario hub', () => {
     expect(joined).not.toMatch(/stages on the path are played on the Engineer surface/u);
     expect(joined).toMatch(/pays its chimes once/u);
     expect(joined).toMatch(/does not reach a career/u);
+    expect(joined).not.toMatch(/sells a stage a wider budget/u);
   });
 
   it('lists the whole ordered path when one is provided, in the campaign’s own order', () => {

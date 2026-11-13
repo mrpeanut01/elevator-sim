@@ -16,7 +16,7 @@
  * Issue #296 found the footer claiming four when `drivingProfileOf` read three; the correction was
  * disclosure (§ D386), and it left the screen where a player is taught to tune with two live cost
  * terms behind sliders that moved nothing. Issue #575 is that arriving in a playability score: an
- * assessor set *How long anyone should wait* and *How much room to leave in a car* to 100, ran the
+ * assessor set *Limit the longest wait* and *Leave room in a car* to 100, ran the
  * day, got a byte-identical result, and read an echo line naming the field the lever had written.
  * § D886 answers it by wiring rather than by wording — `drivingProfileOf` composes the run's
  * weights, behaviour flags and family moves out of the working copy, over the base `dispatcherId`

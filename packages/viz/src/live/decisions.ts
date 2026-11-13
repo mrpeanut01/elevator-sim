@@ -151,7 +151,7 @@ const REASON_PHRASES: Readonly<Record<string, string>> = Object.freeze({
 });
 
 /** The design's empty state, verbatim — `:2534`. */
-const EMPTY_WHY = 'no calls registered yet — the building is still waking up';
+const EMPTY_WHY = 'no calls registered yet';
 
 /**
  * The newest `limit` decisions at or before `t`, newest first.

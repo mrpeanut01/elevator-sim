@@ -173,7 +173,7 @@ describe.skipIf(!HAS_BROWSER)('the first session’s tower — GitHub issue #208
       const door = await doorOf(page);
       expect(door.seed).toContain(`tower ${contract?.buildingId ?? ''}`);
       expect(door.seed).toContain(`crowd ${dealt.seed.toString()}`);
-      expect(door.seed).toContain('the pinned crowd this day was measured on, not the day’s');
+      expect(door.seed).toContain('the pinned crowd this day was measured on, not today’s');
       expect(door.line).toBe(FIRST_SESSION_LINE_PINNED);
       /* Nothing was stored to get here: the week is not in storage, and the pin is not either. */
       expect(await page.evaluate((key) => window.localStorage.getItem(key), SESSION_KEY)).toBeNull();
@@ -244,7 +244,7 @@ describe.skipIf(!HAS_BROWSER)('the first session’s tower — GitHub issue #208
       await page.waitForSelector('.everyday-door-tower[data-contract="c1"][data-selected="true"]', { timeout: 30_000 });
       const seed = (await page.textContent('.everyday-door-seed')) ?? '';
       expect(seed).toContain(`crowd ${daySeed.toString()}`);
-      expect(seed).toContain('today’s date');
+      expect(seed).toContain('today’s crowd');
     } finally {
       await page.close();
     }

@@ -102,7 +102,7 @@ export const FIXIT_PAR_COPY = Object.freeze({
    * par the game forgot (seat C D6).
    */
   free:
-    'Par is free on this case: the cheapest change we tried that fixes this letter, judged on the same ' +
+    'Par is free here. The cheapest change we tried that fixes this letter, judged on the same ' +
     'forty-nine mornings, cost nothing, so no fix is marked against it.',
   /* The case list's short form of {@link free}. */
   tagFree: 'par free · not marked',
@@ -110,7 +110,7 @@ export const FIXIT_PAR_COPY = Object.freeze({
    * A case fixed before its cost was kept on this device (lane AL-B, seat C D5): the par is still
    * drawn, and the comparison is withheld rather than guessed.
    */
-  unrecorded: 'The cost of your fix was not kept, so it is not compared.',
+  unrecorded: 'The cost of your fix wasn’t kept, so there’s nothing to compare.',
   /* The case list's short form, on a fixed row. */
   tagPar: 'par',
   tagYours: 'yours',

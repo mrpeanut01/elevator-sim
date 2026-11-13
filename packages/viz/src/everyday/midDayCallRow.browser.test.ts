@@ -166,7 +166,7 @@ describe.skipIf(!HAS_BROWSER)('a call’s row on the stage mid-day — § D1219'
       );
       expect(shown.counts, 'a row that reads goals printed a count').toBeNull();
       expect(shown.caveats).toBe(1);
-      expect(shown.caveat).toContain('Whether the day cleared is on the report when the day closes.');
+      expect(shown.caveat).toContain('The report says whether the day cleared.');
       for (const text of [shown.heading, shown.lead, shown.goals]) {
         expect(text).not.toMatch(/Shift (cleared|missed)|cleared with|missed with|the day cleared/u);
       }

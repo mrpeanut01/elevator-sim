@@ -4,9 +4,9 @@
  * Every word and every figure is `rushScreenModel.ts`'s, which is where the ramp arithmetic, the
  * § 20.5 hold line, the register of absences and the § 3.3 refinement live and are argued. This
  * file draws that model with `tokens.ts`'s § 19 values, in the prototype's two-column geometry: the
- * paper column carries the title, the three facts, the five bands and the end rule in one line; the
- * ink column carries the house’s standings under the note that says what they are, and who would
- * drive. The long accounts (how rush works, what the house runs are, the rebuild) sit behind links.
+ * paper column carries the title, the three facts, who drives (the dispatcher choice), the five
+ * bands and the end rule in one line; the ink column carries the house’s standings under the note
+ * that says what they are. The long accounts (how rush works, what the house runs are, the rebuild) sit behind links.
  *
  * It wires **one control**, and this paragraph said *no control* until GitHub issue **#565**
  * (§ D857). § 3.3 still gives the screen one primary (`Start the rush`) and the shell still owns
@@ -73,7 +73,7 @@ const RUSH_ASIDE_PX = 340;
 /** Below this the paper has stopped being a column, so the two stack: about 700 px with the aside. */
 const RUSH_PAPER_MIN_PX = 360;
 
-/** The prototype's ink-column hairline, between the standings and the driving block. */
+/** The prototype's ink-column hairline, around the tags on the house's rows. */
 const INK_RULE = '#3A342C';
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -144,6 +144,135 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   }
   drawFacts();
   paper.append(facts);
+
+  /*
+   * **Who drives, in the paper column under the facts** — the product owner's ruling of 2026-11-13.
+   * The block sat at the foot of the ink column, under the house's runs. It is the screen's one
+   * choice, so it is drawn before the waves table and the house's runs at every width, on the light
+   * ground, with the default link colour.
+   */
+  const drivingBlock = el(doc, 'div');
+  drivingBlock.style.cssText = 'margin-top:22px;max-width:660px';
+  const drivingEyebrow = el(doc, 'div', undefined, COPY.drivingEyebrow);
+  drivingEyebrow.style.cssText = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};margin-bottom:8px`;
+  /*
+   * The standing dispatcher, named through the host's honest lookup: an id this build does not know
+   * is printed as the id rather than substituted for the first shipped profile, which is
+   * `dispatcherById`'s own rule one level down.
+   */
+  const driving = el(doc, 'div', 'everyday-rush-driving');
+  driving.style.cssText = `font-size:15px;font-weight:600;line-height:1.5;color:${C.ink}`;
+  drivingBlock.append(drivingEyebrow, driving);
+
+  /*
+   * **The pick, before the run rather than during it** — GitHub issue #565's second defect,
+   * § D857, and the end of *"it wires no control"* one paragraph up in this file's own docstring.
+   *
+   * It is the brief's control (`everyday/briefScreen.ts:360`), deliberately: the same
+   * `EverydayHost.setDispatcher`, the same `dev/state.ts#withDispatcher` behind it, and the same
+   * `change` listener — a select that writes standing state on `change` costs a state write and is
+   * reversible, which is exactly why § 7's stage picker is the *other* shape and says so on its own
+   * face (`stageScreenModel.ts#STAGE_SWITCH_PICKER_NOTE`). Two selects, two behaviours, and each
+   * one states which it is.
+   *
+   * It is what makes `data/rush-house-runs.json`'s figures reachable: the table's own
+   * `provenance.path` opens `withBuilding → withDispatcher → rushPatchOf`, and until this listener
+   * existed no screen inside the rush took that route. What a mid-run handover reaches instead is
+   * measured in `rushHandover.test.ts` and said on the board's note.
+   */
+  const pickRow = el(doc, 'div');
+  pickRow.style.cssText = `display:flex;align-items:center;gap:10px;margin-top:11px;flex-wrap:wrap`;
+  const pickLabel = el(doc, 'label', undefined, COPY.driverPickLabel);
+  pickLabel.htmlFor = 'everyday-rush-dispatcher';
+  pickLabel.style.cssText = `font-size:12.5px;color:${C.inkSoft}`;
+  const pickSelect = el(doc, 'select', 'everyday-rush-picker');
+  pickSelect.id = 'everyday-rush-dispatcher';
+  pickSelect.style.cssText = [
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.control)}px`,
+    `background:${C.card}`,
+    `color:${C.ink}`,
+    'padding:6px 9px',
+    `font-family:${TYPE.body}`,
+    'font-size:12.5px',
+    'max-width:100%',
+  ].join(';');
+  for (const profile of context.host.dispatchers()) {
+    const option = doc.createElement('option');
+    option.value = profile.id;
+    option.textContent = profile.name;
+    pickSelect.append(option);
+  }
+  pickRow.append(pickLabel, pickSelect);
+  const pickNote = el(doc, 'p', 'everyday-rush-pick-note', COPY.driverPickNote);
+  pickNote.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:8px 0 0`;
+  pickSelect.setAttribute('aria-describedby', 'everyday-rush-pick-note');
+  pickNote.id = 'everyday-rush-pick-note';
+  drivingBlock.append(pickRow, pickNote);
+
+  /*
+   * What a rush does not run of the player's settings, under the driver it names — GitHub issue #523,
+   * item 3. This screen is drawn with no rush standing (every way onto it leaves one, `shell.ts#go`),
+   * so the levers, the selector, patience and the pattern read here are the player's own. The last two
+   * are GitHub PR #530's review, finding 2: a rush runs a fresh session's, which `dev/state.ts#initialState`
+   * seeds as no patience and the building's own pattern.
+   *
+   * Built once and **put into the page only when it has something to say**, because
+   * {@link syncDriver} has to be able to take it away again and bring it back: one of the four
+   * things it names — a dirty weight-set selector — is a fact about *which* dispatcher is standing,
+   * so picking another can make an absent line appear or an present one go. Absent rather than
+   * empty, because an empty paragraph is a line a reader's cursor can land on and a screen reader
+   * announces as nothing at all.
+   */
+  /*
+   * **The line to beat** — wave AS, lane AS-1, [§ D1545](../../../../DECISIONS.md) (GitHub issue #636,
+   * ruling R5). The house's run on this crowd for the dispatcher standing, stated as a fact under the
+   * driving line and above the choice, so the player knows the mark before the round. Absent when the
+   * house has no such run, for {@link leftBehind}'s reason; redrawn by {@link syncDriver}, since it
+   * names whichever dispatcher is standing.
+   */
+  const toBeat = el(doc, 'p', 'everyday-rush-to-beat');
+  toBeat.style.cssText = `font-size:13px;line-height:1.5;color:${C.inkSoft};margin:9px 0 0`;
+  const leftBehind = el(doc, 'p', 'everyday-rush-left-behind');
+  leftBehind.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:9px 0 0`;
+  /*
+   * § D672: a sitting the account has bought a fitted start for says so before it starts, and says
+   * where it will be posted. Absent otherwise — there is no control here and no price, because the
+   * tally in Settings is what sells it and a pitch on a mode's own screen would be a store.
+   */
+  /* Wave AP lane AP-D2: a device purchase is never posted, so its line says so (§ D1418). */
+  const fittedLine = rushFittedLineOf(context.host);
+  if (fittedLine !== undefined) {
+    const fitted = el(doc, 'p', 'everyday-rush-fitted', fittedLine);
+    fitted.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:12px 0 0`;
+    drivingBlock.append(fitted);
+  }
+  /*
+   * The rebuild between rounds, said before the first round — GitHub issue #372, § D1295. Always
+   * drawn, because every sitting earns a purse; the opening figure is the host's, from what the
+   * account owns, and the per-wave figure is `data/rush-purse.json`'s.
+   */
+  const rebuildLine = el(
+    doc,
+    'p',
+    'everyday-rush-rebuild-line',
+    rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, context.host.rushOpeningPurse()),
+  );
+  rebuildLine.style.cssText = `font-size:14px;line-height:1.55;color:${C.inkSoft};margin:0 0 10px`;
+  /* Behind a link: read once, and the result screen's own menu says it again where it is spent. */
+  const rebuildHow = explainer(doc, { link: COPY.rebuildLink, title: COPY.rebuildLink, body: [rebuildLine] });
+  const rebuildRow = el(doc, 'div');
+  rebuildRow.style.cssText = 'margin:12px 0 0';
+  rebuildRow.append(rebuildHow.root);
+  drivingBlock.append(rebuildRow);
+  /* § D478: a stream this far outside the building's band says so before it starts. */
+  const disclosureLine = context.host.rushDisclosure();
+  if (disclosureLine !== undefined) {
+    const disclosure = el(doc, 'p', 'everyday-rush-disclosure', disclosureLine);
+    disclosure.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:12px 0 0`;
+    drivingBlock.append(disclosure);
+  }
+  paper.append(drivingBlock);
 
   /* § 9.1's bands, each a label on the ramp with its proportional bar */
   const bandsBlock = el(doc, 'div');
@@ -261,129 +390,6 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   let alive = true;
   const askedFor = context.host.selection().buildingId;
 
-  const drivingBlock = el(doc, 'div');
-  drivingBlock.style.cssText = `margin-top:auto;border-top:1px solid ${INK_RULE};padding-top:18px`;
-  const drivingEyebrow = el(doc, 'div', undefined, COPY.drivingEyebrow);
-  drivingEyebrow.style.cssText = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};margin-bottom:8px`;
-  /*
-   * The standing dispatcher, named through the host's honest lookup: an id this build does not know
-   * is printed as the id rather than substituted for the first shipped profile, which is
-   * `dispatcherById`'s own rule one level down.
-   */
-  const driving = el(doc, 'div', 'everyday-rush-driving');
-  driving.style.cssText = 'font-size:13.5px;font-weight:600;line-height:1.5';
-  drivingBlock.append(drivingEyebrow, driving);
-
-  /*
-   * **The pick, before the run rather than during it** — GitHub issue #565's second defect,
-   * § D857, and the end of *"it wires no control"* one paragraph up in this file's own docstring.
-   *
-   * It is the brief's control (`everyday/briefScreen.ts:360`), deliberately: the same
-   * `EverydayHost.setDispatcher`, the same `dev/state.ts#withDispatcher` behind it, and the same
-   * `change` listener — a select that writes standing state on `change` costs a state write and is
-   * reversible, which is exactly why § 7's stage picker is the *other* shape and says so on its own
-   * face (`stageScreenModel.ts#STAGE_SWITCH_PICKER_NOTE`). Two selects, two behaviours, and each
-   * one states which it is.
-   *
-   * It is what makes `data/rush-house-runs.json`'s figures reachable: the table's own
-   * `provenance.path` opens `withBuilding → withDispatcher → rushPatchOf`, and until this listener
-   * existed no screen inside the rush took that route. What a mid-run handover reaches instead is
-   * measured in `rushHandover.test.ts` and said on the board's note.
-   */
-  const pickRow = el(doc, 'div');
-  pickRow.style.cssText = `display:flex;align-items:center;gap:10px;margin-top:11px;flex-wrap:wrap`;
-  const pickLabel = el(doc, 'label', undefined, COPY.driverPickLabel);
-  pickLabel.htmlFor = 'everyday-rush-dispatcher';
-  pickLabel.style.cssText = `font-size:12px;color:${C.label}`;
-  const pickSelect = el(doc, 'select', 'everyday-rush-picker');
-  pickSelect.id = 'everyday-rush-dispatcher';
-  pickSelect.style.cssText = [
-    `border:1px solid ${INK_RULE}`,
-    `border-radius:${String(R.control)}px`,
-    `background:${RAIL_SURFACE.card}`,
-    `color:${C.paper}`,
-    'padding:6px 9px',
-    `font-family:${TYPE.body}`,
-    'font-size:12.5px',
-    'max-width:100%',
-  ].join(';');
-  for (const profile of context.host.dispatchers()) {
-    const option = doc.createElement('option');
-    option.value = profile.id;
-    option.textContent = profile.name;
-    pickSelect.append(option);
-  }
-  pickRow.append(pickLabel, pickSelect);
-  const pickNote = el(doc, 'p', 'everyday-rush-pick-note', COPY.driverPickNote);
-  pickNote.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:8px 0 0`;
-  pickSelect.setAttribute('aria-describedby', 'everyday-rush-pick-note');
-  pickNote.id = 'everyday-rush-pick-note';
-  drivingBlock.append(pickRow, pickNote);
-
-  /*
-   * What a rush does not run of the player's settings, under the driver it names — GitHub issue #523,
-   * item 3. This screen is drawn with no rush standing (every way onto it leaves one, `shell.ts#go`),
-   * so the levers, the selector, patience and the pattern read here are the player's own. The last two
-   * are GitHub PR #530's review, finding 2: a rush runs a fresh session's, which `dev/state.ts#initialState`
-   * seeds as no patience and the building's own pattern.
-   *
-   * Built once and **put into the page only when it has something to say**, because
-   * {@link syncDriver} has to be able to take it away again and bring it back: one of the four
-   * things it names — a dirty weight-set selector — is a fact about *which* dispatcher is standing,
-   * so picking another can make an absent line appear or an present one go. Absent rather than
-   * empty, because an empty paragraph is a line a reader's cursor can land on and a screen reader
-   * announces as nothing at all.
-   */
-  /*
-   * **The line to beat** — wave AS, lane AS-1, [§ D1545](../../../../DECISIONS.md) (GitHub issue #636,
-   * ruling R5). The house's run on this crowd for the dispatcher standing, stated as a fact under the
-   * driving line and above the choice, so the player knows the mark before the round. Absent when the
-   * house has no such run, for {@link leftBehind}'s reason; redrawn by {@link syncDriver}, since it
-   * names whichever dispatcher is standing.
-   */
-  const toBeat = el(doc, 'p', 'everyday-rush-to-beat');
-  toBeat.style.cssText = `font-size:13px;line-height:1.5;color:${C.fainter};margin:9px 0 0`;
-  const leftBehind = el(doc, 'p', 'everyday-rush-left-behind');
-  leftBehind.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:9px 0 0`;
-  /*
-   * § D672: a sitting the account has bought a fitted start for says so before it starts, and says
-   * where it will be posted. Absent otherwise — there is no control here and no price, because the
-   * tally in Settings is what sells it and a pitch on a mode's own screen would be a store.
-   */
-  /* Wave AP lane AP-D2: a device purchase is never posted, so its line says so (§ D1418). */
-  const fittedLine = rushFittedLineOf(context.host);
-  if (fittedLine !== undefined) {
-    const fitted = el(doc, 'p', 'everyday-rush-fitted', fittedLine);
-    fitted.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:12px 0 0`;
-    drivingBlock.append(fitted);
-  }
-  /*
-   * The rebuild between rounds, said before the first round — GitHub issue #372, § D1295. Always
-   * drawn, because every sitting earns a purse; the opening figure is the host's, from what the
-   * account owns, and the per-wave figure is `data/rush-purse.json`'s.
-   */
-  const rebuildLine = el(
-    doc,
-    'p',
-    'everyday-rush-rebuild-line',
-    rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, context.host.rushOpeningPurse()),
-  );
-  rebuildLine.style.cssText = `font-size:14px;line-height:1.55;color:${C.inkSoft};margin:0 0 10px`;
-  /* Behind a link: read once, and the result screen's own menu says it again where it is spent. */
-  const rebuildHow = explainer(doc, { link: COPY.rebuildLink, title: COPY.rebuildLink, body: [rebuildLine] });
-  rebuildHow.link.style.color = C.sun;
-  const rebuildRow = el(doc, 'div');
-  rebuildRow.style.cssText = 'margin:12px 0 0';
-  rebuildRow.append(rebuildHow.root);
-  drivingBlock.append(rebuildRow);
-  /* § D478: a stream this far outside the building's band says so before it starts. */
-  const disclosureLine = context.host.rushDisclosure();
-  if (disclosureLine !== undefined) {
-    const disclosure = el(doc, 'p', 'everyday-rush-disclosure', disclosureLine);
-    disclosure.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:12px 0 0`;
-    drivingBlock.append(disclosure);
-  }
-  ink.append(drivingBlock);
 
   /**
    * Everything on this screen that depends on **who is standing**, re-read from the host.
@@ -556,23 +562,6 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   root.style.alignItems = 'stretch';
   ink.style.flexGrow = '1';
 
-  /*
-   * **On a phone the dispatcher choice comes before the house's runs** — wave AS, lane AS-1 (GitHub
-   * issue #635, finding 8). Stacked, the ink column put the choice under thirteen house rows, about
-   * 2 900 px down a 390 px screen. Once the ink column sits under the paper, the driving block is
-   * drawn before the house's runs; side by side the handoff's order stands.
-   * Asked of the layout itself, so a rail that narrows the screen counts. Recorded here under
-   * [§ D405](../../../../DECISIONS.md).
-   */
-  function applyStack(): void {
-    const stacked = ink.getBoundingClientRect().top > paper.getBoundingClientRect().top + 1;
-    drivingBlock.style.order = stacked ? '1' : '';
-    bestsBlock.style.order = stacked ? '2' : '';
-    drivingBlock.style.marginTop = stacked ? '22px' : 'auto';
-  }
-  const Observer = doc.defaultView?.ResizeObserver;
-  const stackWatch = Observer === undefined ? undefined : new Observer(applyStack);
-  stackWatch?.observe(root);
   host.append(root);
 
   /*
@@ -593,7 +582,6 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   return {
     unmount: () => {
       alive = false;
-      stackWatch?.disconnect();
     },
     /*
      * § 9.1's *Start the rush* — GitHub issue #220. The run first, the context second, the brief's

@@ -67,8 +67,8 @@ export function restoreNoticeFor(failure: SessionRestoreFailure): string | undef
        * ever saved. Saying so is what stops a player closing the tab expecting to come back to it.
        */
       return (
-        'This browser is not letting the page store anything, so your week will not survive a ' +
-        'reload. Nothing has been lost — but nothing is being kept either.'
+        'This browser isn’t letting the page store anything, so your week won’t survive a ' +
+        'reload. Nothing has been lost, but nothing is being saved.'
       );
 
     case 'version':
@@ -79,17 +79,17 @@ export function restoreNoticeFor(failure: SessionRestoreFailure): string | undef
        * they lost something.
        */
       return (
-        `Your saved week was written by a different build of this app (version ${String(failure.found)}; ` +
-        `this build is on version ${String(failure.supported)}), so it could not be read. Starting a ` +
-        'fresh week — nothing you do now will be lost.'
+        `Your saved week was written by a different version of the game (version ${String(failure.found)}; ` +
+        `this one is version ${String(failure.supported)}), so it couldn’t be read. Starting a ` +
+        'fresh week. Nothing you do now will be lost.'
       );
 
     case 'parse':
-      return `Your saved week could not be read and has been cleared. Starting fresh. (${failure.message})`;
+      return `Your saved week couldn’t be read and has been cleared. Starting fresh. (${failure.message})`;
 
     case 'shape':
       return (
-        'Your saved week was damaged and could not be read, so it has been cleared. Starting fresh. ' +
+        'Your saved week was damaged and couldn’t be read, so it has been cleared. Starting fresh. ' +
         `(${failure.message})`
       );
 
@@ -101,7 +101,7 @@ export function restoreNoticeFor(failure: SessionRestoreFailure): string | undef
        * and only the second is true.
        */
       return (
-        'Your saved week was on something this build no longer ships, so it could not be reopened: ' +
+        'Your saved week used something the game no longer includes, so it couldn’t be reopened: ' +
         `${failure.missing.join(', ')}. Starting a fresh week.`
       );
   }
@@ -170,12 +170,12 @@ export function libraryNoticeFor(dropped: readonly DroppedEntry[]): string | und
 
   const opening =
     dropped.length === 1
-      ? 'One thing you saved could not be reopened by this build, so it has been left out'
-      : `${String(dropped.length)} things you saved could not be reopened by this build, so they have been left out`;
+      ? 'One thing you saved couldn’t be reopened, so it has been left out'
+      : `${String(dropped.length)} things you saved couldn’t be reopened, so they have been left out`;
 
   return (
-    `${opening}: ${list}. That is this build’s doing rather than anything you did — ` +
-    'everything else you saved is still here and untouched.'
+    `${opening}: ${list}. That’s the game’s doing, not yours. ` +
+    'Everything else you saved is still here.'
   );
 }
 
@@ -216,17 +216,17 @@ export function saveNoticeFor(failure: SessionSaveFailure): string {
        * at somebody who wants to know which building to delete.
        */
       return (
-        `The ${String(failure.entries)} things you have saved have outgrown what this browser will ` +
-        `keep — about ${roughKilobytes(failure.characters)}, and the limit is ` +
+        `The ${String(failure.entries)} things you’ve saved have outgrown what this browser will ` +
+        `keep: about ${roughKilobytes(failure.characters)}, and the limit is ` +
         `${roughKilobytes(failure.limit)}. Nothing has been lost and your last save is untouched, ` +
-        'but nothing new is being kept — including this week — until you delete a saved building, ' +
+        'but nothing new is being saved, including this week, until you delete a saved building, ' +
         'dispatcher, pattern or machine class.'
       );
 
     case 'store':
       return (
-        'This browser would not store your progress just now, so this week will not survive a ' +
-        'reload. Nothing has been lost — everything on screen still works.'
+        'This browser wouldn’t store your progress just now, so this week won’t survive a ' +
+        'reload. Nothing has been lost, and everything on screen still works.'
       );
 
     case 'unserialisable':
@@ -237,9 +237,9 @@ export function saveNoticeFor(failure: SessionSaveFailure): string {
        * module exists to refuse.
        */
       return (
-        'Something in this session could not be written to storage, so your progress is not being ' +
-        'kept. That is a fault in this build rather than anything you did. Nothing has been lost — ' +
-        'everything on screen still works, but the week will not survive a reload.'
+        'Something in this session couldn’t be saved, so your progress isn’t being ' +
+        'kept. That’s a fault in the game, not anything you did. Nothing has been lost: ' +
+        'everything on screen still works, but the week won’t survive a reload.'
       );
   }
 }

@@ -112,7 +112,7 @@ const NOTE_SITES: readonly NoteSite[] = [
     module: './rightRail.ts',
     mount: (elements, context) => mountRightRail(elements.rail, context),
     block: (elements) => elements.rail.dispatcherList,
-    phrase: 'does not steer the shift on screen',
+    phrase: 're-runs the shift from the start',
     count: 3,
   },
   {
@@ -122,7 +122,7 @@ const NOTE_SITES: readonly NoteSite[] = [
     module: './rightRail.ts',
     mount: (elements, context) => mountRightRail(elements.rail, context),
     block: (elements) => elements.rail.trafficList,
-    phrase: 'does not steer the shift on screen',
+    phrase: 're-runs the shift from the start',
     count: 3,
   },
   {
@@ -132,7 +132,7 @@ const NOTE_SITES: readonly NoteSite[] = [
     module: './rightRail.ts',
     mount: (elements, context) => mountRightRail(elements.rail, context),
     block: (elements) => elements.rail.buildingList,
-    phrase: 'does not steer the shift on screen',
+    phrase: 're-runs the shift from the start',
     count: 3,
   },
   {

@@ -134,11 +134,11 @@ export interface CareerLoad {
 export const CAREER_LOAD_NOTICES: Readonly<Record<Exclude<CareerLoadRefusal, 'empty'>, string>> =
   Object.freeze({
     unreadable:
-      'The saved career could not be read, so this one starts fresh. The old save was set aside rather than overwritten, for a build that can read it.',
+      'The saved career couldn’t be read, so this one starts fresh. The old save was set aside rather than overwritten.',
     version:
       'The saved career was written by a different version of the game, so this one starts fresh. The old save was set aside rather than overwritten.',
     shape:
-      'The saved career was not the shape this build expects, so this one starts fresh. The old save was set aside rather than overwritten.',
+      'The saved career wasn’t in the expected format, so this one starts fresh. The old save was set aside rather than overwritten.',
   });
 
 function isRecord(value: unknown): value is Record<string, unknown> {

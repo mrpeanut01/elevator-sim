@@ -940,7 +940,7 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
         {
           label: 'Posted runs',
           value: 'always checked',
-          note: 'Every run you post is re-simulated by the server before it appears on a board.',
+          note: 'Every run you post is re-run by the server before it appears on a board.',
         },
       ],
       telemetryDetail: {

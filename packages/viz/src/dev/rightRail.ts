@@ -986,8 +986,8 @@ export function trafficPlateOf(
       k: 'measured on',
       v: 'observed calls only',
       help:
-        'Every figure this viewer reports about a run is a count of something that happened. ' +
-        'Nothing on this plate is modelled from a nominal round trip.',
+        'Every figure reported about a run is a count of something that happened, not a model ' +
+        'of a nominal round trip.',
     },
   ];
 }
@@ -1053,12 +1053,11 @@ export function closedFormRowsOf(
       k: 'closed form',
       v: 'a specification, not a measurement',
       help:
-        `Barney/CIBSE up-peak round trip, from the same \`analyzeUpPeak\` the correctness oracle ` +
-        `holds the simulator to. It predicts a mean interval and a handling capacity under pure ` +
-        `up-peak; it has no queueing model and no variance, so it cannot predict a wait at all. ` +
-        `${String(CLOSED_FORM_ASSUMPTIONS.length)} simplifications are declared in ` +
-        `\`CLOSED_FORM_ASSUMPTIONS\`, each with the direction it biases the round trip — the first ` +
-        `is \`${CLOSED_FORM_ASSUMPTIONS[0]?.id ?? ''}\`. The rows above are what the run did.`,
+        `Barney/CIBSE up-peak round trip (\`analyzeUpPeak\`): a mean interval and a handling ` +
+        `capacity under pure up-peak. It has no queueing model and no variance, so it cannot ` +
+        `predict a wait. \`CLOSED_FORM_ASSUMPTIONS\` declares its ` +
+        `${String(CLOSED_FORM_ASSUMPTIONS.length)} simplifications, the first ` +
+        `\`${CLOSED_FORM_ASSUMPTIONS[0]?.id ?? ''}\`.`,
     },
   ];
   const named = banks.length > 1;
@@ -1082,9 +1081,8 @@ export function closedFormRowsOf(
         `RTT / L over ${String(bank.carCount)} car${bank.carCount === 1 ? '' : 's'}, from a ` +
         `${figures.roundTripTimeS.toFixed(1)} s round trip ` +
         `(${figures.travelTimeS.toFixed(1)} s travelling, ${figures.stopTimeS.toFixed(1)} s ` +
-        `stopping, ${figures.transferTimeS.toFixed(1)} s transferring). Compare it with the ` +
-        `achieved interval above: under pure up-peak the two should agree within a few percent, ` +
-        `and a visible divergence is a defect report rather than a curiosity.`,
+        `stopping, ${figures.transferTimeS.toFixed(1)} s transferring). Under pure up-peak it ` +
+        `should agree with the achieved interval above within a few percent.`,
     });
     rows.push({
       k: `capacity (closed form)${suffix}`,
@@ -1092,9 +1090,9 @@ export function closedFormRowsOf(
         `${figures.handlingCapacity5Min.toFixed(1)} persons / 5 min · ` +
         `${figures.percentPopulation5Min.toFixed(1)}% of population`,
       help:
-        `300·P/INT, against U = ${grouped(figures.servedPopulation)} — the population this bank ` +
-        `lifts, which is not always the building's. A specification for a crowd that all wants to ` +
-        `go up; the measured row above counts what the day's actual crowd got.`,
+        `300·P/INT, against U = ${grouped(figures.servedPopulation)}, the population this bank ` +
+        `lifts. A specification for a crowd that all goes up; the measured row above counts what ` +
+        `the day's crowd got.`,
     });
     for (const [index, warning] of bank.warnings.entries()) {
       rows.push({
@@ -1195,10 +1193,9 @@ export function buildingPlateOf(
       k: 'core',
       v: `${grouped(area.coreM2)} m² of ${grouped(area.grossM2)} m² (${(area.coreShare * 100).toFixed(1)}%)`,
       help:
-        'Hoistway plan area, summed over every floor each shaft passes through — a high-zone ' +
-        'shaft takes space out of the low floors it never opens onto, which is why sky lobbies ' +
-        'exist. Hoistways only: no lift lobby, no machine room, no riser, so this reads lower ' +
-        'than a published core share for the same building. A double-deck car is one shaft.',
+        'Hoistway plan area, summed over every floor each shaft passes through. Hoistways only: ' +
+        'no lift lobby, machine room or riser, so it reads lower than a published core share. ' +
+        'A double-deck car is one shaft.',
     });
   }
 
@@ -1207,9 +1204,8 @@ export function buildingPlateOf(
       k: 'measured',
       v: 'no run yet',
       help:
-        'Handling capacity and interval are measured from a run, never computed from a nominal ' +
-        'round trip. Run a shift and both appear here. The closed-form rows below are a ' +
-        'specification and need no run, which is why they are there and this one is not.',
+        'Handling capacity and interval are measured from a run. Run a shift and both appear ' +
+        'here. The closed-form rows below are a specification and need no run.',
     });
     /*
      * The specification survives the refusal, and that is the point of labelling it. `no run yet`
@@ -1408,12 +1404,10 @@ function speedPhrase(lowMps: number, highMps: number): string {
  * rule — a wayfinding claim is pinned by the thing it points at, never by another sentence.
  */
 const MACHINES_ARE_REPORTED =
-  'Nothing here is pickable, and that is deliberate: this panel reports the classes the running ' +
-  'building’s cars are built to, and the choice is made on two other screens. Commission the ' +
-  'building (Menu → Scenarios) sets one bank’s class and its rated speed, and reaches the next run ' +
-  'with no save; the building editor sets one class and one speed across a whole building you ' +
-  'draw, behind Save as a new building. The machine editor below authors a class — it does not ' +
-  'decide which cars are built to it.';
+  'Read-only: these are the classes the running building’s cars are built to. Change one bank’s ' +
+  'class and speed in Commission the building (Menu → Scenarios), or a whole building’s in the ' +
+  'building editor (Save as a new building). The machine editor below defines a class; it does ' +
+  'not assign cars to it.';
 
 /**
  * The `NAMEPLATE` plate. Engineer mode only — `#rail-nameplate-block` is hidden in casual (B1).
@@ -1449,8 +1443,7 @@ export function nameplateOf(
       k: 'ride',
       v: `${machineClass.accelerationMps2.toFixed(2)} m/s² · ${machineClass.jerkMps3.toFixed(2)} m/s³`,
       help:
-        'Acceleration and jerk are modelled, so a short hop never reaches rated speed. A ' +
-        'simulator that ignored them would wrongly conclude faster lifts always help.',
+        'Acceleration and jerk are modelled, so a short hop never reaches rated speed.',
     },
     {
       k: 'rated envelope',
@@ -1466,8 +1459,7 @@ export function nameplateOf(
       k: 'design load',
       v: `${(fill80 * 100).toFixed(0)}% of rated`,
       help:
-        '`conventions.designLoadFactor`. Cars fill to this, never to the nameplate — using the ' +
-        'nameplate is how a study ends up flattering.',
+        '`conventions.designLoadFactor`. Cars fill to this, never to the nameplate.',
     },
     {
       k: 'doors',
@@ -1550,7 +1542,7 @@ export function machineWarningOf(
 ): string {
   if (building === undefined) {
     return (
-      'The class sets the speed band, the rise it can serve and the loads it is built in. ' +
+      'A class sets the speed band, the rise it can serve and the loads it is built in. ' +
       MACHINES_ARE_REPORTED
     );
   }
@@ -1582,15 +1574,11 @@ export function machineWarningOf(
     }
   }
   if (over.length === 0) {
-    return (
-      `${building.name} is inside this class's envelope. The class sets the speed band, the rise ` +
-      `it can serve and the loads it is built in. ${MACHINES_ARE_REPORTED}`
-    );
+    return `${building.name} is inside this class's envelope. ${MACHINES_ARE_REPORTED}`;
   }
   return (
-    `⚠ ${over.join(', and ')}. That is an advisory rather than a refusal: the loader raises it as ` +
-    'a warning and builds the bank anyway, so the run happens and the figures describe a machine ' +
-    `outside its class. ${MACHINES_ARE_REPORTED}`
+    `⚠ ${over.join(', and ')}. Advisory, not a refusal: the bank is built anyway, so the figures ` +
+    `describe a machine outside its class. ${MACHINES_ARE_REPORTED}`
   );
 }
 
@@ -1643,10 +1631,9 @@ export function patternOptionsOf(
       id: 'building',
       label: own === undefined ? 'The building’s own profile' : own.name,
       tag: 'DEFAULT',
-      sub: 'the demand every published figure in this project was measured under',
+      sub: 'the demand every published figure was measured under',
       help:
-        'Runs the building’s declared `trafficProfile` with no demand override at all, rather ' +
-        'than reconstructing its numbers and passing them back in.',
+        'Runs the building’s declared `trafficProfile` with no demand override.',
     },
   ];
   for (const profile of resources.trafficProfiles.profiles) {
@@ -1711,10 +1698,7 @@ export function selectedPatternSpecOf(
  * the queue is gone, because the day it was in is gone.
  */
 const PICKS_RE_RUN =
-  'The simulator runs the whole day before it plays any of it back, so picking a card here does ' +
-  'not steer the shift on screen — it throws that day away and simulates a different one from the ' +
-  'start. Nothing on this panel is locked while a shift plays: the run you are watching is ' +
-  'replaced rather than paused, and the playhead goes back to the beginning with it.';
+  'Picking a card re-runs the shift from the start. The day on screen is replaced, not paused.';
 
 /**
  * Build the right rail. Nothing is drawn until {@link Panel.render} is called.

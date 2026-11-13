@@ -376,12 +376,12 @@ describe('what this screen adds on top of the sheet', () => {
       newWeek: false,
       week: 1,
     };
-    const report = sheetOf({ onward, decidingCall: 'No call decided today: the stage raised none.' });
+    const report = sheetOf({ onward, decidingCall: 'No call decided today: none came up.' });
     const view = viewOf({ report, week, house: () => 'missed' });
     /* The week's number since wave AN, lane AN-7 (§ D1252's ordinal, on the screen). */
     expect(view.close?.tomorrow.heading).toBe('TOMORROW · WEEK 1 · TUESDAY, DAY 2');
     expect(view.close?.tomorrow.wrinkle).toBe('Move-in day: A tenant is hauling boxes up.');
-    expect(view.close?.call).toBe('No call decided today: the stage raised none.');
+    expect(view.close?.call).toBe('No call decided today: none came up.');
     expect(view.close?.arithmetic).toBeDefined();
     expect(view.secondary).toEqual({ week: 'Your week', menu: 'Lobby' });
     // No week handed in (every caller but the daily report), a career sheet, or a practice close: no lead.
@@ -451,10 +451,10 @@ describe('what this screen adds on top of the sheet', () => {
       newWeek: false,
       week: 1,
     };
-    const raised = 'No call decided today: the stage raised none.';
+    const raised = 'No call decided today: none came up.';
     const report = sheetOf({ onward, decidingCall: raised, callDecided: false });
     expect(viewOf({ report, week, house: () => 'cleared', driver: () => 'missed' }).close?.call).toBe(
-      `${raised} Your driver did: on this crowd, the same day with the tower’s standing order picked in place of ` +
+      `${raised} Your dispatcher did: on this crowd, the same day with the tower’s standing order picked in place of ` +
         'yours and every press kept read Shift missed.',
     );
     expect(viewOf({ report, week, house: () => 'cleared' }).close?.call).toBe(
@@ -691,8 +691,8 @@ describe('§ 6.5’s closing block is layered rather than one wall — issue #21
     // lost the longest refusal in the product without failing anything.
     const view = realView();
     expect(typeof view.honesty.body).toBe('string');
-    expect(view.honesty.body).toContain('This is one replication of one day on one seed.');
-    expect(view.honesty.body).toContain('The “view” control switches between them.');
+    expect(view.honesty.body).toContain('This was one day on one crowd');
+    expect(view.honesty.body).toContain('The engineer’s view is one switch away.');
   });
 
   it('opens on the sheet’s own refusal, not on the mode’s front matter', () => {
@@ -704,28 +704,28 @@ describe('§ 6.5’s closing block is layered rather than one wall — issue #21
      * you that anything is better than anything*. A layering that folded that and left the
      * translations open would be § D299's *may not make it say less*, dressed as tidying.
      */
-    expect(open?.kind === 'open' ? open.text : '').toContain(
-      'This is one replication of one day on one seed.',
-    );
-    expect(open?.kind === 'open' ? open.text : '').toContain('50 or more paired runs');
+    expect(open?.kind === 'open' ? open.text : '').toContain('This was one day on one crowd');
+    expect(open?.kind === 'open' ? open.text : '').toMatch(/not whether .+ is better than anything else\.$/u);
+    // How a real comparison is made is the next fold's handle, drawn without a press too.
+    expect(drawnOpen(view.honesty.parts).join(' ')).toContain('repeated runs of each on the same crowds');
   });
 
-  it('keeps the block’s own order, so “Two phrases below” is still about what is below', () => {
+  it('keeps the block’s own order, so “named below” is still about what is below', () => {
     const view = realView();
     const drawn = laidOut(view.honesty.parts);
     const at = (needle: string): number => drawn.findIndex((text) => text.includes(needle));
     // Casual's lead announces two phrases *below* it and asks to be read *before* them. Hoisting
     // the sheet's refusal above it would read better and make that sentence false about its own
     // page — § D227's stale-position defect, manufactured.
-    expect(at('Two phrases below are worth having')).toBe(0);
-    expect(at('This is one replication')).toBeGreaterThan(at('Two phrases below are worth having'));
-    expect(at('The “view” control switches between them.')).toBe(drawn.length - 1);
+    expect(at('How to read this sheet.')).toBe(0);
+    expect(at('This was one day on one crowd')).toBeGreaterThan(at('How to read this sheet.'));
+    expect(at('The engineer’s view is one switch away.')).toBe(drawn.length - 1);
   });
 
   it('holds the stated budget: a short open block and no paragraph over the ceiling', () => {
     const view = realView();
     const open = drawnOpen(view.honesty.parts).reduce((sum, text) => sum + words(text), 0);
-    expect(words(view.honesty.body)).toBeGreaterThan(300);
+    expect(words(view.honesty.body)).toBeGreaterThan(200);
     expect(open).toBeLessThanOrEqual(SMALL_PRINT_BUDGET.open);
     // And the reduction is the fix rather than a rounding of it: a third of the block, not 90 % of
     // it. The issue's complaint is the wall, and a wall one word shorter is still the wall.

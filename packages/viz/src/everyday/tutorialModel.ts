@@ -519,7 +519,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = Object.freeze([
     id: 'levers',
     control: 'Dispatcher workshop · the four levers',
     title: 'Change how the lifts decide',
-    body: 'Four levers: how long anyone should wait, keep a car downstairs, spread the cars out, and how much room to leave in a car. A change applies to the next run, not the one you are watching.',
+    body: 'Four levers: limit the longest wait, keep a car downstairs, spread the cars out, and leave room in a car. A change applies to the next run, not the one you are watching.',
   }),
   Object.freeze({
     /*

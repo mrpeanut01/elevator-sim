@@ -85,8 +85,7 @@ import type { VizRecording } from '../contract/types.js';
  * it names what a loaded recording *is* good for instead of only what it is not.
  */
 export const LOADED_RUN_CANNOT_BANK =
-  'this run was loaded from a file, so it is not a day of this week and nothing is banked from it — ' +
-  'watch it, scrub it and compare it, and run the shift here to bank one';
+  'this run was loaded from a file, so nothing is banked from it. To bank a day, run the shift here';
 
 /**
  * Why a run nobody started may not close a day — § D232's ground, given the sentence issue #136's
@@ -108,8 +107,8 @@ export const LOADED_RUN_CANNOT_BANK =
  * was naming the same control as advice the player had (from their view) already followed.
  */
 export const UNCHOSEN_RUN_CANNOT_BANK =
-  'this run was set going by the page when it loaded, not by you, so it banks nothing — ' +
-  'press “Run this shift”, or pick a scenario, and the day you start files itself here';
+  'this run was started by the page when it loaded, not by you, so it banks nothing. ' +
+  'Press “Run this shift” or pick a scenario to bank a day';
 
 /**
  * Why a run left behind by a day the player walked away from may not close one — GitHub issue #526.
@@ -121,8 +120,8 @@ export const UNCHOSEN_RUN_CANNOT_BANK =
  * and names the press that does count, for {@link LOADED_RUN_CANNOT_BANK}'s reason.
  */
 export const LEFT_UNFINISHED_CANNOT_BANK =
-  'this run belongs to a day that was left unfinished, so it banks nothing — ' +
-  'start a day, or press “Run this shift”, and that run files itself here';
+  'this run belongs to a day that was left unfinished, so it banks nothing. ' +
+  'Start a day or press “Run this shift” to bank one';
 
 /**
  * Why an attempt left for later is not filed from here — wave AL, lane AL-E,
@@ -132,8 +131,8 @@ export const LEFT_UNFINISHED_CANNOT_BANK =
  * them. The attempt is filed once it is resumed on the stage and closed there.
  */
 export const ATTEMPT_LEFT_CANNOT_BANK =
-  'this run is an attempt at a scored day that was left for later, so it is not filed from here — ' +
-  'resume it from the day’s brief and close it on the stage';
+  'this run is an attempt at a scored day that was left for later, so it is not filed from here. ' +
+  'Resume it from the day’s brief and close it on the stage';
 
 /**
  * Why a scored attempt is not filed from the Engineer surface even when it is on screen — wave AM,
@@ -147,7 +146,7 @@ export const ATTEMPT_LEFT_CANNOT_BANK =
  */
 export const ATTEMPT_CLOSES_ON_ITS_STAGE =
   'this run is your attempt at a scored day in Everyday Mode, so it is not pressed or filed from ' +
-  'here — it is played and closed on its own stage there';
+  'here: it is played and closed on its own stage there';
 
 /**
  * The Engineer transport's line while it is held at a scored attempt's reach — § D1239. Said once,
@@ -177,8 +176,8 @@ export const ATTEMPT_DAY_SHOWN_TO_ITS_REACH =
  * all refuse, in these words, on the status line.
  */
 export const ATTEMPT_ENGINEER_WATCHES_ONLY =
-  'your attempt at a scored day is open in Everyday Mode, so this surface only watches it and makes ' +
-  'or changes no run until that day is closed on its stage';
+  'your attempt at a scored day is open in Everyday Mode, so this panel only watches it: no run is ' +
+  'made or changed until that day is closed on its stage';
 
 /**
  * The same rule, drawn above the rail's cards while it holds — "state it to the player where the card
@@ -187,7 +186,7 @@ export const ATTEMPT_ENGINEER_WATCHES_ONLY =
  */
 export const ATTEMPT_RAIL_NOTE =
   'Your attempt at a scored day is open in Everyday Mode. Until it is closed on its stage, this ' +
-  'surface only watches it: a card picked here runs nothing.';
+  'panel only watches: picking a card runs nothing.';
 
 /**
  * Why *Save recording* refuses while a scored attempt stands — § D1323, seat D (D1). A recording

@@ -266,7 +266,7 @@ describe('the four outcomes — § 10.4, copy verbatim', () => {
     expect(outcome.rows.map((row) => row.passed)).toEqual([true, true, true]);
     expect(outcome.basis).toBe(BASIS_LINE);
     expect(outcome.basis).toBe(
-      'one run before, one run after — enough to see a repair this size; not enough to split hairs.',
+      'One run before, one run after. Enough to see a repair this size, not enough to split hairs.',
     );
   });
 

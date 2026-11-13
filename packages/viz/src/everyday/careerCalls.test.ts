@@ -266,7 +266,7 @@ describe('what decided a career day — § D1409', () => {
     /* The driver run read the other mark: the standing order decided it. */
     expect(careerDeciderOf({ ...base, driverRun: 'missed' })).toEqual({ kind: 'driver', pressed: true, reads: 'missed' });
     expect(careerCloseLineOf({ ...base, driverRun: 'missed' })).toBe(
-      `${NO_CALL_DECIDED_LINE} Your standing order did: on this crowd, the same day run by Conventional collective in place of your standing order and every press kept read ${CAREER_MARK_WORDS.missed}.`,
+      `${NO_CALL_DECIDED_LINE} Your standing order decided it: on this crowd, the same day run by Conventional collective instead of your standing order, with every press kept, was ${CAREER_MARK_WORDS.missed}.`,
     );
     /* The driver run read the day's mark and the house the other: the presses did. */
     expect(careerDeciderOf({ ...base, driverRun: 'cleared', house: 'missed' })).toEqual({
@@ -298,7 +298,7 @@ describe('what decided a career day — § D1409', () => {
     expect(careerDeciderOf({ ...base, driverRun: 'cleared' })).toEqual({ kind: 'pending', waiting: 'house', known: 'cleared' });
     expect(careerDeciderOf({ ...base, driverRun: 'unrecorded' })).toEqual({ kind: 'unrun', run: 'driver-run' });
     expect(careerCloseLineOf(base)).toContain('What decided it is still being run');
-    expect(careerCloseLineOf({ ...base, driverRun: 'unrecorded' })).toContain('could not be run on this crowd');
+    expect(careerCloseLineOf({ ...base, driverRun: 'unrecorded' })).toContain('couldn’t be run on this crowd');
   });
 });
 

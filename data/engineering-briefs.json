@@ -7,11 +7,11 @@
       "id": "brief-e5-handling-capacity",
       "kind": "meet-the-target",
       "name": "E5 — Meet the handling-capacity target",
-      "teaches": "that a bank with cars to spare can still fail to carry the crowd that arrives, and that the two figures to compare are offered and carried over the same five minutes",
+      "teaches": "A bank with cars to spare can still fail to carry the crowd. Compare how many people arrive and how many are carried over the same five minutes.",
       "brief": [
-        "Chancery House has more cars than its floor count suggests it needs, and it was handed over on a setting chosen to keep the machines quiet.",
-        "Two figures decide this one: how many people arrive every five minutes, and how many the bank carries in the same five minutes. They are not the same figure, and the second is the one a dispatcher can move.",
-        "Change whatever you like and run it again. The bar is the handover setting's own count on these fifty traces, and the brief is only met on fifty more it never saw."
+        "Chancery House has more cars than its floors seem to need, and it was handed over on a setting chosen to keep the machines quiet.",
+        "Two figures decide this one: how many people arrive every five minutes, and how many the bank carries in the same five minutes. The second is the one a dispatcher can move.",
+        "Change whatever you like and run it again. The bar is the handover setting's own count on these fifty crowds, and the brief is only met on fifty more it never saw."
       ],
       "building": "chancery-house",
       "traffic": {
@@ -100,11 +100,11 @@
       "id": "brief-e3-diagnose-the-saturation",
       "kind": "diagnose",
       "name": "E3 — Diagnose the saturation",
-      "teaches": "how to read a report that withholds its average wait, and that the reason it was withheld is a fact about the run rather than a setting anybody chose",
+      "teaches": "How to read a report that withholds its average wait. The reason is a fact about the run, not a setting anybody chose.",
       "brief": [
-        "Mixed-Use High-Rise, at the demand its own traffic profile declares, on the setting it was handed over with.",
-        "Some of these runs end with no average wait to quote, because the report refuses to publish a mean the run does not support. It says why, on the run's own terms. Read that, find the dial it points at, and change it.",
-        "The brief is met when the fix holds on the fifty traces you tuned on and on fifty more you never saw."
+        "Mixed-Use High-Rise, at the demand its traffic profile sets, on the setting it was handed over with.",
+        "Some of these runs end with no average wait, because the report won't publish one the run doesn't support. It says why. Read that, find the dial it points at, and change it.",
+        "The brief is met when the fix holds on the fifty crowds you tuned on and on fifty more you never saw."
       ],
       "building": "mixed-use-high-rise",
       "traffic": {

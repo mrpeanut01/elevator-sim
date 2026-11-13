@@ -63,8 +63,8 @@ export const WATCH_ROWS_HEADING = 'RUNS TO WATCH';
  * which was a stated absence when written and a stale one from the day the board read.
  */
 export const WATCH_ROWS_LEDE =
-  'Watch it re-simulates a run from its record and replays the result. A record that no longer ' +
-  'reproduces the figures it was filed with is not replayed. The rows are the days closed on this ' +
+  'Watch it re-runs a run from its record and replays the result. A record that no longer ' +
+  'reproduces the figures it was filed with isn’t replayed. The rows are the days closed on this ' +
   "device and the reference runs. Other people's posted runs are watched from today's board.";
 
 /** The affordance, and § 1.5's rule is that a row that cannot be replayed loses it rather than dimming it. */

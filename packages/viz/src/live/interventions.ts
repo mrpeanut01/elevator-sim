@@ -92,7 +92,7 @@ export function switchDispatcherLabelOf(name: string): string {
  */
 export const SWITCH_PINS_NOTE =
   'from this moment the day runs as this dispatcher would run it, including when a car may turn ' +
-  'round, hand a call on or park — calls already given a car keep it, and any rules or pattern ' +
+  'round, hand a call on or park. Calls already given a car keep it, and any rules or pattern ' +
   'switching stand down for the rest of the day';
 
 /**
@@ -299,13 +299,13 @@ export function switchNoteOf(target: DispatcherProfile, driving: DispatcherProfi
 
 /** {@link switchNoteOf}'s door half. */
 export const SWITCH_KEEPS_DOORS =
-  'the cars keep the door timing they started the day with, and the load at which a full car ' +
-  'passes a landing — both are fixed when the day starts';
+  'the cars keep their door timing and the load at which a full car ' +
+  'passes a landing, both fixed when the day starts';
 
 /** {@link switchNoteOf}'s forecast half. */
 export const SWITCH_KEEPS_FORECAST =
-  'the cars keep the forecast of where people will call from that they started the day with — ' +
-  'it is set up when the day starts';
+  'the cars keep the forecast of where people will call from, ' +
+  'set up when the day starts';
 
 function carLevelAnswerOf(profile: DispatcherProfile): string {
   const { allowBypassIfSoleEligibleCar: _groupLevel, ...carLevel } = profile.answer ?? {};
@@ -577,7 +577,7 @@ export function worksLabelOf(change: PricedChange): string {
  * not a second sentence.
  */
 export const WORKS_ARM_EXPLAINS =
-  'appends to today’s record at the playhead and re-simulates the day from the start — the ' +
+  'adds to today’s record at the playhead and re-simulates the day from the start: the ' +
   'building changes from this moment on, everything before it is unchanged, and the same people ' +
   'arrive at the same seconds either side of the press';
 

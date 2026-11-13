@@ -69,7 +69,7 @@
     {
       "id": "secure-tower",
       "arrivalRatePctPop5min": 1.5,
-      "why": "a credential on every call, so authorisation and dispatch meet on every decision"
+      "why": "every rider needs a pass, so access rules shape every decision"
     },
     {
       "id": "crown-hotel",
@@ -79,29 +79,29 @@
     {
       "id": "mixed-use-high-rise",
       "arrivalRatePctPop5min": 2,
-      "why": "offices over homes on one stack, shuttles above locals, and no single crowd shape that suits both"
+      "why": "offices over homes, shuttles above local lifts, and two crowds that move differently"
     },
     {
       "id": "midtown-office",
       "arrivalRatePctPop5min": 1,
-      "why": "zoning, and a genuine evening exodus"
+      "why": "lifts split by zone, and a real evening rush out"
     },
     {
       "id": "st-jude-hospital",
       "arrivalRatePctPop5min": 2,
-      "why": "priority traffic that must survive ordinary traffic"
+      "why": "priority trips that must get through ordinary traffic"
     },
     {
       "id": "vertical-city",
       "arrivalRatePctPop5min": 0.75,
-      "why": "a sky lobby, where parking is the whole game"
+      "why": "a sky lobby, where what matters most is where idle cars wait"
     }
   ],
   "crowds": [
     {
       "id": "up-peak",
       "label": "The morning intake",
-      "tests": "everybody arrives at the front door and goes up; filling cars and getting back down",
+      "tests": "everybody arrives at the front door and goes up, so cars must fill and get back down",
       "durationS": 900,
       "demand": {
         "directionalSplit": { "incoming": 1, "outgoing": 0, "interfloor": 0 }
@@ -110,7 +110,7 @@
     {
       "id": "down-peak",
       "label": "Everybody leaving at once",
-      "tests": "every floor calls down together; cars come down full and the ones above are passed",
+      "tests": "every floor calls down together, so cars come down full and pass people waiting",
       "durationS": 900,
       "demand": {
         "directionalSplit": { "incoming": 0, "outgoing": 1, "interfloor": 0 }
@@ -137,7 +137,7 @@
     {
       "id": "surge",
       "label": "A coach at eleven",
-      "tests": "a large party arriving together for one floor, with no warning, mid-shift",
+      "tests": "a large party arrives together for one floor, with no warning, mid-shift",
       "durationS": 600,
       "demand": {
         "directionalSplit": { "incoming": 0.85, "outgoing": 0.1, "interfloor": 0.05 },

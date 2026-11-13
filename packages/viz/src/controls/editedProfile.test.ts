@@ -147,7 +147,7 @@ describe('an invalid edit is refused at the control, with a reason', () => {
       'dispatch.assignmentTiming': 'deferred',
     }, target);
     expect(admission.admissible).toBe(false);
-    expect(admission.reason).toContain('the declared box is not the feasible set');
+    expect(admission.reason).toContain('Being in range does not make a combination feasible');
     expect(admission.reason).toContain('defer');
   });
 

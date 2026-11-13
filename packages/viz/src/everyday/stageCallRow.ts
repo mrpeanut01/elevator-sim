@@ -110,9 +110,9 @@ export const STAGE_CALL_ROWS_HEADING = 'WHAT THE CALLS DID';
  * verdict is the report's. No figure.
  */
 export const STAGE_CALL_ROWS_CAVEAT =
-  'Each call’s answers were run on this crowd from the call, keeping every press before it and none after. ' +
-  'Once the deepest landing or the longest wait is past its bar, it stays past. ' +
-  'Whether the day cleared is on the report when the day closes.';
+  'Each call’s answers were run on this crowd from the call, with every earlier press kept and none after. ' +
+  'Once the deepest landing or the longest wait passes its bar, it stays past. ' +
+  'The report says whether the day cleared.';
 
 /**
  * The caveat for `rows`, or `undefined` where none of them is a call's. Where a row still prints counts (a

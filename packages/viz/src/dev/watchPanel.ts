@@ -278,10 +278,9 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
              * canvas has nowhere to ask.
              */
             text:
-              'Every run here is a record — a seed, a configuration and the changes made during ' +
-              'the day. Pressing Watch it re-simulates that record on this machine and replays ' +
-              'the result. A record that no longer reproduces the figures it was filed with is ' +
-              'not replayed at all.',
+              'Each run is a record: a seed, a configuration and the changes made during the day. ' +
+              'Watch it re-simulates the record on this machine. A record that no longer ' +
+              'reproduces its filed figures is not replayed.',
           }),
           ...(loadFailure === undefined
             ? []
@@ -295,7 +294,7 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
             ? [
                 el(doc, 'p', {
                   style: { color: MUTED },
-                  text: 'No day has been closed on this device yet, and the reference runs have not loaded.',
+                  text: 'No day closed on this device yet, and the reference runs have not loaded.',
                 }),
               ]
             : list.map(rowCard)),

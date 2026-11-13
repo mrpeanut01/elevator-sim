@@ -204,7 +204,7 @@ describe('the deciding sentence over a pinned call', () => {
     const line = decidingCallLineOf({ verdict: 'missed', records: [], pinned, verdictOf, lineOf, clockOf: clock });
     expect(line).not.toBe(NO_CALL_DECIDED_LINE);
     expect(line).toContain('The call that decided today came at 10:40, where nothing was pressed');
-    expect(line).toContain('with spread the cars across the tower and nothing pressed after it read Shift cleared.');
+    expect(line).toContain('with spread the cars across the tower and nothing pressed after, the day read Shift cleared.');
     /* The row's own sentence for the same press on the same crowd. */
     expect(row?.why).toContain('with spread the cars across the tower the day read Shift cleared at every one');
   });

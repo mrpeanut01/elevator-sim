@@ -766,14 +766,14 @@ export const RUSH_RESULT_COPY = Object.freeze({
     const pastTheRun = saturation.windowEndS > endedS;
     if (saturation.verdict === 'diverging-queue') {
       return pastTheRun
-        ? `Then the queue stopped emptying between cars. The trend test covers the whole generated climb, ${fitted}, past the ${held} this rush held. Over that climb the queue grew ${saturation.slopePersonsPerMinute.toFixed(1)} people a minute (${String(saturation.sampleCount)} samples).`
+        ? `Then the queue stopped emptying between cars. The trend test covers the whole climb, ${fitted}, past the ${held} this rush held. Over that climb the queue grew ${saturation.slopePersonsPerMinute.toFixed(1)} people a minute (${String(saturation.sampleCount)} samples).`
         : `Then the queue stopped emptying between cars. Over the ${fitted} the trend test covers, it grew ${saturation.slopePersonsPerMinute.toFixed(1)} people a minute (${String(saturation.sampleCount)} samples).`;
     }
     return pastTheRun
-      ? `The trend test covers the whole generated climb, ${fitted}, past the ${held} this rush held. It does not call the queue divergent (${saturation.verdict}, ${String(saturation.sampleCount)} samples).`
-      : `The trend test over the whole run does not call the queue divergent (${saturation.verdict}, ${String(saturation.sampleCount)} samples). That is what a line reached and then cleared looks like.`;
+      ? `The trend test covers the whole climb, ${fitted}, past the ${held} this rush held. It doesn’t find the queue still growing (${saturation.verdict}, ${String(saturation.sampleCount)} samples).`
+      : `The trend test over the whole run doesn’t find the queue still growing (${saturation.verdict}, ${String(saturation.sampleCount)} samples). That is what a line reached and then cleared looks like.`;
   },
-  beatTrendAbsent: 'This round has no trend test, so it can’t say where the queue began to diverge.',
+  beatTrendAbsent: 'This round has no trend test, so it can’t say where the queue started growing.',
   beatBroke: (held: string): string => `At ${held}, ${String(RUSH_HOLD_LINE.people)} people had waited over two minutes at once, and the rush ended.`,
   /**
    * **Where it broke** — the beat this result did not have, GitHub issue's L7 shape and the reason

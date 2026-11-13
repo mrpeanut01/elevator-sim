@@ -26,13 +26,13 @@ function crowd(cleared: readonly string[], extra: Partial<PoolCrowd> = {}): Pool
 describe('the brief’s ways line', () => {
   it('counts the drivers that clear the crowd left alone and names none', () => {
     const line = poolWaysLineOf(crowd(['fairness-first', 'collective']));
-    expect(line).toBe(`Ways through, measured on this crowd: left alone, 2 of the ${String(PROFILES.length)} drivers clear the day.`);
+    expect(line).toBe(`Ways through, measured on this crowd: left alone, 2 of the ${String(PROFILES.length)} dispatchers clear the day.`);
     for (const name of Object.values(NAMES)) expect(line).not.toContain(name);
   });
 
   it('says a call cleared it where no driver does, and is silent on a crowd nothing cleared', () => {
     const called = crowd([], { calls: [{ by: 'fairness-first', atS: 2648, question: 'driver', offered: ['eta', 'auction'], clears: ['eta'] }] });
-    expect(poolWaysLineOf(called)).toMatch(/none of the 13 drivers clears the day left alone; answering a call cleared it\.$/u);
+    expect(poolWaysLineOf(called)).toMatch(/none of the 13 dispatchers clears the day left alone; answering a call cleared it\.$/u);
     expect(poolWaysLineOf(crowd([]))).toBeUndefined();
   });
 
@@ -53,7 +53,7 @@ describe('the close’s names', () => {
   it('names the answer that would have, on a crowd no driver cleared', () => {
     const called = crowd([], { calls: [{ by: 'fairness-first', atS: 2648, question: 'driver', offered: ['eta', 'auction'], clears: ['eta'] }] });
     expect(poolCloseLineOf(called, nameOf)).toBe(
-      'On this crowd, no driver left alone cleared the day; handing the day to ETA at the call raised under Fairness first would have.',
+      'On this crowd, no dispatcher left alone cleared the day; handing the day to ETA at the call raised under Fairness first would have.',
     );
   });
 });

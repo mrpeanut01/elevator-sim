@@ -261,7 +261,7 @@ export const CAMPAIGN_ABSENCES: readonly string[] = Object.freeze([
    * The entry's own three sentences are untouched and still true, which is why nothing here moved
    * into or out of the player-facing list.
    */
-  'A day is run from here and scored by the day itself; the month grid marks a day cleared or missed when the career day is filed, and nothing files one automatically.',
+  'Run a day from here. The month grid marks it cleared or missed when you file it; nothing is filed for you.',
   /*
    * **A new entry, added on the commit that made it true** — GitHub issue #563, § D227's rule read
    * in the direction it is usually not: a register owes a sentence back when a change *creates* an
@@ -281,7 +281,7 @@ export const CAMPAIGN_ABSENCES: readonly string[] = Object.freeze([
    * every career already saved would be set aside for a property nobody has asked for. Said here
    * because a player who reloads mid-month and finds a different crowd is owed the reason.
    */
-  'The month is remembered and the mornings are not: a contract day picked up after a reload meets a crowd of its own, and a day you recorded still replays exactly as you played it.',
+  'The month is saved but the mornings are not. A contract day picked up after a reload meets a new crowd, and a day you recorded still replays exactly as you played it.',
   /*
    * **The session-only entry is deleted, not reworded** — GitHub issue #375, § D227, and the same
    * rule the incidents entry above came out under. It read *"The career is this session's. Nothing
@@ -449,7 +449,7 @@ function renewalNeed(tower: CampaignTower): TowerNeed {
      */
     due: RENEWAL_DUE_CELL,
     brief:
-      `Day ${String(CONTRACT_DAYS)} has closed, so this contract has run its ${String(CONTRACT_DAYS)} days, and the next month’s first day does not run until you answer. Their rate is set by what this building costs to run and by the record you have on it — you can sign it, push it, take the machines apart while you are at it, or hand the building back and free the slot.`,
+      `Day ${String(CONTRACT_DAYS)} has closed, so this contract has run its ${String(CONTRACT_DAYS)} days. The next month won’t start until you answer. Their rate comes from what this building costs to run and your record on it. Sign it, push for more, refurbish as you renew, or hand the building back and free the slot.`,
     options: [
       {
         id: 'sign',
@@ -524,7 +524,7 @@ function lostNeed(tower: CampaignTower): TowerNeed {
     title: 'The contract is lost',
     due: 'answer before another day runs here',
     brief:
-      `${contractLostSentenceOf(tower) ?? ''} No more of its days run. Starting the month again keeps the building on the same terms, from day 1 with the purse the month opened with, and counts as a lost contract: three lost and the career ends.`,
+      `${contractLostSentenceOf(tower) ?? ''} No more of its days run. You can start the month again on the same terms, from day 1 with the purse the month opened with. It counts as a lost contract, and three lost ends the career.`,
     options: [
       {
         id: 'start-again',
@@ -553,7 +553,7 @@ function serviceNeed(): TowerNeed {
     title: 'The machines are due a service window',
     due: 'book it this week',
     brief:
-      'Nothing has failed. The trips since the last window have reached the interval, and every trip from here raises how often something does. Booking the nights costs you peaks you still have to clear; not booking them costs you the rate.',
+      'Nothing has failed. The machines have reached their service interval, and every trip from here raises how often something fails. Booking the nights costs you peaks you still have to clear. Not booking them lets the failure rate climb.',
     options: [
       {
         id: 'window',
@@ -577,7 +577,7 @@ function serviceNeed(): TowerNeed {
         units: 0,
         nights: 0,
         when: 'nothing changes',
-        effect: 'The rate keeps climbing with every trip, and the window is still there next week.',
+        effect: 'The failure rate keeps climbing with every trip. The window is still there next week.',
         isDefault: true,
       },
     ],

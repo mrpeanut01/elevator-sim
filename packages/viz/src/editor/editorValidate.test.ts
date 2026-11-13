@@ -272,7 +272,7 @@ describe('a per-floor destination panel is refused until the viewer can describe
     for (const issue of report.issues) {
       expect(issue.code).toBe('landing-call-type-not-playable');
       expect(issue.message).toContain('not playable in the viewer yet');
-      expect(issue.message).toContain('GitHub issue #437');
+      expect(issue.message).toContain('Remove this field');
     }
     expect(issuesMayBeIncomplete(report)).toBe(false);
     expect(summariseReport(report)).toContain(`${String(declaring.length)} problems`);

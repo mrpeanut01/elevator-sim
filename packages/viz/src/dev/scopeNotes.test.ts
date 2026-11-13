@@ -99,8 +99,8 @@ describe('the right rail says a pick discards the day', () => {
       made.elements.rail.buildingList,
     ]) {
       const note = noteBeside(made.around, list);
-      expect(note, 'a live list drew no scope note').toContain('does not steer the shift on screen');
-      expect(note).toContain('simulates a different one from the start');
+      expect(note, 'a live list drew no scope note').toContain('re-runs the shift from the start');
+      expect(note).toContain('replaced, not paused');
     }
   });
 
@@ -116,7 +116,7 @@ describe('the right rail says a pick discards the day', () => {
     expect(note.toLowerCase(), 'the rail claimed a lock the code does not have').not.toContain(
       'locked for this shift',
     );
-    expect(note).toContain('Nothing on this panel is locked');
+    expect(note).toContain('replaced, not paused');
   });
 
   it('leaves the Machines segment alone, because it picks nothing', () => {

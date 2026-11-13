@@ -243,7 +243,7 @@ describe('a maintainer can rebuild the run from the report alone', () => {
     expect(fields.get(SUPPORT_COPY.buildingLabel)).toBe('Midtown Office (midtown-office)');
     expect(fields.get(SUPPORT_COPY.dispatcherLabel)).toBe('Collective control (collective)');
     expect(fields.get(SUPPORT_COPY.dayLabel)).toBe('day 3');
-    expect(fields.get(SUPPORT_COPY.playingLabel)).toBe('a day of the daily loop');
+    expect(fields.get(SUPPORT_COPY.playingLabel)).toBe('a day of your week');
     expect(fields.get(SUPPORT_COPY.buildLabel)).toBe(
       BUILD_VERSION === UNBUILT ? SUPPORT_COPY.buildUnknown : BUILD_VERSION,
     );

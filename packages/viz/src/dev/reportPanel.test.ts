@@ -395,7 +395,7 @@ describe('the average wait is whatever the shift layer produced, and nothing els
 });
 
 describe('energy is an axis, never a score — § D106', () => {
-  const ENERGY_LABELS = ['WORK DONE', 'WORK PER DELIVERED LEG'] as const;
+  const ENERGY_LABELS = ['WORK DONE', 'WORK PER DELIVERED RIDE'] as const;
 
   it('draws both energy cells or neither, on both runs', () => {
     for (const recording of [clean, saturated]) {
@@ -448,7 +448,7 @@ describe('energy is an axis, never a score — § D106', () => {
     // "`workPerServedLegKJ` always appears beside `workKJ`" — adjacency is the claim, so adjacency
     // is what is asserted rather than mere presence.
     const labels = viewOf(clean).figures.map((drawn) => drawn.label);
-    expect(labels.indexOf('WORK PER DELIVERED LEG')).toBe(labels.indexOf('WORK DONE') + 1);
+    expect(labels.indexOf('WORK PER DELIVERED RIDE')).toBe(labels.indexOf('WORK DONE') + 1);
   });
 });
 
@@ -505,7 +505,7 @@ describe('the empty state, which is drawn rather than hidden', () => {
     expect(empty).toEqual(emptyReportView());
     expect(empty.filed).toBe(false);
     expect(empty.title).toBe('Nothing filed yet');
-    expect(empty.lede).toContain('the sheet fills itself in');
+    expect(empty.lede).toContain('The sheet fills in');
   });
 
   it('names a control that exists', () => {
@@ -550,7 +550,7 @@ describe('the empty state, which is drawn rather than hidden', () => {
     });
     expect(view.title).toBe('Nothing filed yet');
     expect(view.lede).toContain(refusal);
-    expect(view.lede).not.toContain('the sheet fills itself in');
+    expect(view.lede).not.toContain('The sheet fills in');
   });
 
   it('connects the rail’s restored streak to the missing sheet — docs/19 defect 14', () => {
@@ -909,7 +909,7 @@ describe('a week’s slots are absent, not blank, on a run that has no week', ()
     }
     // The heading is reframed on this shape only: the markup's *The shift asked for* is a claim
     // about a contract, and no contract asked.
-    expect(single.goalsHeading).toBe('What a scenario would ask — read, not graded');
+    expect(single.goalsHeading).toBe('What a scenario would ask (not graded)');
     expect(week.goalsHeading).toBeUndefined();
     // And the banner is neutral rather than green — a colour may not carry the grade the words
     // withdrew.
@@ -1721,7 +1721,7 @@ describe('two runs on different equipment — § D539, and PR #515’s review fi
    *
    * The comparison basis checks the building, the mode, the traffic, the stretch of the day and the
    * arrival pattern, and equipment was none of them. A player who ran a building, fitted a
-   * regenerative drive to its banks and ran it again read `WORK PER DELIVERED LEG` paired
+   * regenerative drive to its banks and ran it again read `WORK PER DELIVERED RIDE` paired
    * `was … → …` with no refusal: two figures priced on different scales, set side by side as though
    * the second were something the dispatcher did. Each run carried its own disclaimer in its
    * warnings. The pairing carried none, so § D539's *"never silent"* held per run and not per
@@ -2257,7 +2257,7 @@ describe('Casual asks a different question of the same day — issues #110 and #
       'DEEPEST QUEUE',
       'PAST THE GIVE-UP LINE',
       'WORK DONE',
-      'WORK PER DELIVERED LEG',
+      'WORK PER DELIVERED RIDE',
     ]);
   });
 
@@ -2340,7 +2340,7 @@ describe('Casual asks a different question of the same day — issues #110 and #
 
   it('says the two views differ in wording and not in reach — § D299 § 2', () => {
     const [casual] = both(reportOf(clean));
-    expect(casual.smallPrint).toMatch(/every figure the engineer’s view carries/);
+    expect(casual.smallPrint).toMatch(/every figure the engineer’s view has/);
   });
 
   /*
@@ -2375,7 +2375,7 @@ describe('Casual asks a different question of the same day — issues #110 and #
       'AWAY INSIDE A MINUTE',
       'AVERAGE WAIT',
       'WORK DONE',
-      'WORK PER DELIVERED LEG',
+      'WORK PER DELIVERED RIDE',
     ]);
   });
 

@@ -1630,8 +1630,8 @@ goals and § 8.4's honest deltas are possible.
 > neither of them is this paragraph:
 >
 > 1. **The refusal is on the screen.** `dev/parameterForm.ts#appliedNoteFor` draws a line as the
->    first child of the form, per source, naming the button — *move a control here, press Run this
->    shift, and the day that comes back is byte for byte the day you would have got*. Pinned by
+>    first child of the form, per source, naming the button — *move a control, press Run this
+>    shift, and the day comes back byte for byte the same*. Pinned by
 >    `dev/boot.browser.test.ts`, which reads it off a booted page.
 > 2. **One schema is genuinely routed**, so the note is a fact rather than a blanket disclaimer.
 >    `PATIENCE_PARAMETERS` reaches `ViewerState.patience` through `ParameterFormOptions.onCandidate`

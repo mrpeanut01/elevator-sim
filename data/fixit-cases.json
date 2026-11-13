@@ -88,7 +88,7 @@
       ],
       "diagnosis": {
         "text": "Idle cars are sent home to the ground floor — all of them, including the shuttles, whose calls come from the top of the building.",
-        "reasoning": "The standing order parks every idle car at the bottom of its run. For each local bank that is its own lobby, which is where its calls start, so the locals are fine — the rest of the building is away inside a minute on every ride. For the shuttles the bottom of the run is the street, three hundred metres from the lobbies they serve. All 9 waits over a minute in this half hour are riders heading down from a sky lobby, and each one began with every shuttle parked at ground."
+        "reasoning": "The standing order parks every idle car at the bottom of its run. For each local bank that is its own lobby, where its calls start, so the rest of the building is away inside a minute on every ride. For the shuttles the bottom of the run is the street, three hundred metres from the lobbies they serve. All 9 waits over a minute in this half hour are riders heading down from a sky lobby, and each one began with every shuttle parked at ground."
       },
       "budgetUnits": 12,
       "repairs": [
@@ -343,7 +343,7 @@
       ],
       "diagnosis": {
         "text": "The split was drawn by floor count — ten floors against nine — and the heads are the other way round. Three cars carry 600 people; one car carries 1,170.",
-        "reasoning": "The low bank's three cars cover 600 people and every one of their riders is away inside a minute. The high bank's single car covers 1,170, and the mean wait to board on journeys touching those floors is 341 s with a worst of 914 s. Nothing about the machines differs: same class, same speed, same doors. The only asymmetry is where the line was drawn."
+        "reasoning": "The low bank's three cars cover 600 people, and every one of their riders is away inside a minute. The high bank's single car covers 1,170. On journeys touching those floors the mean wait to board is 341 s and the worst is 914 s. The machines are the same class, with the same speed and doors. The only difference is where the line was drawn."
       },
       "budgetUnits": 12,
       "repairs": [
@@ -557,7 +557,7 @@
       ],
       "diagnosis": {
         "text": "The standing order always sends the nearest car and never spreads the fleet, so the three cars drift to the same busy floor and wait there together.",
-        "reasoning": "Sending the nearest car minimises each trip and moves the fleet as little as possible — which is exactly how all three end up standing where the last call was. The next call from a flat then starts with every car at the bottom: 7 waits over a minute began on the top three floors this shift, against a worst of 112 s, while every journey from the lobby was away inside a minute. Traffic here is sparse; where the idle cars stand matters more than which one is chosen."
+        "reasoning": "Sending the nearest car keeps each trip short and moves the fleet as little as possible, so all three cars end up standing where the last call was. The next call from a flat then starts with every car at the bottom. 7 waits over a minute began on the top three floors this shift, the worst 112 s, while every journey from the lobby was away inside a minute. Traffic here is sparse, so where the idle cars stand matters more than which one is chosen."
       },
       "budgetUnits": 10,
       "repairs": [
@@ -711,7 +711,7 @@
       ],
       "diagnosis": {
         "text": "The door dwell is set for the luggage trolleys — eleven seconds at every landing, on every car, for cages that come twice an hour.",
-        "reasoning": "A trolley needs the hold; everyone else pays it at every stop, all day. Every one of the 28 waits over a minute began behind a door that was holding for nobody, the worst of them 196 s — while the guest-floor journeys that skip reception are away inside a minute on 95.6 % of rides. The machines are fine. The timing is not."
+        "reasoning": "A trolley needs the hold. Everyone else pays for it at every stop, all day. Every one of the 28 waits over a minute began behind a door that was holding for nobody, the worst of them 196 s. The guest-floor journeys that skip reception are away inside a minute on 95.6 % of rides. The machines are fine. The timing is not."
       },
       "budgetUnits": 12,
       "repairs": [
@@ -883,7 +883,7 @@
       ],
       "diagnosis": {
         "text": "Idle cars are sent to the sky lobby — the bottom of the tower run — so every call from the upper flats starts with an empty climb.",
-        "reasoning": "The sky lobby is where the morning arrives, and the parking rule was written for it. From the flats it is the far end of the line: all 6 waits over a minute began on the top sixteen floors with every car parked at the bottom, against a worst of 74 s — and the rest of the building, 497 journeys of it, is away inside a minute on every single ride."
+        "reasoning": "The sky lobby is where the morning arrives, and the parking rule was written for it. From the flats it is the far end of the line. All 6 waits over a minute began on the top sixteen floors with every car parked at the bottom, the worst 74 s. The rest of the building, 497 journeys of it, is away inside a minute on every ride."
       },
       "budgetUnits": 10,
       "repairs": [
@@ -1105,7 +1105,7 @@
       ],
       "diagnosis": {
         "text": "Three of the four cars stop one floor short of the garage: their landing doors below were never fitted, so half the building's arrivals queue for the one car that goes all the way down.",
-        "reasoning": "Nothing about the garage car is special — same machine, same speed, same doors as the other three. It is simply the only one the contract took below the street: 17 of the 45 garage journeys waited over a minute, the mean wait to board down there is 59.6 s against a worst of 172 s, and the street-door crowd one floor up is away inside a minute on 96.1 % of its journeys."
+        "reasoning": "The garage car has the same machine, speed and doors as the other three. It is simply the only one the contract took below the street. 17 of the 45 garage journeys waited over a minute, with a mean wait to board of 59.6 s and a worst of 172 s. The street-door crowd one floor up is away inside a minute on 96.1 % of its journeys."
       },
       "budgetUnits": 12,
       "repairs": [
@@ -1446,7 +1446,7 @@
       ],
       "diagnosis": {
         "text": "The upper-zone cars were never restricted after commissioning, so every low-floor call they answer is a stop the upper zone pays for.",
-        "reasoning": "The building was designed as two banks — three cars for the low floors, three running express to the sixteenth and above — and the restriction was never entered. All 4 waits over a minute on upper-zone journeys sit behind a 110 s worst, while the low floors, borrowing six cars instead of three, are away inside a minute on 100.0 % of 112 journeys. What the low zone borrowed, the upper zone paid for."
+        "reasoning": "The building was designed as two banks: three cars for the low floors, and three running express to the sixteenth and above. The restriction was never entered. There are 4 waits over a minute on upper-zone journeys, the worst 110 s, while the low floors, borrowing six cars instead of three, are away inside a minute on 100.0 % of 112 journeys. The upper zone paid for what the low zone borrowed."
       },
       "budgetUnits": 10,
       "repairs": [
@@ -1690,7 +1690,7 @@
       ],
       "diagnosis": {
         "text": "The supply cages ride the two big cars through the morning peak, and those cars hold their doors for the cages — twenty-five seconds at every stop, whoever is aboard.",
-        "reasoning": "Two of the five cars spend most of every stop standing open, and the waits collect where the crowd is: 15 of 164 journeys through the entrance or outpatients waited over a minute, against a worst of 105 s, while the ward-to-ward journeys that dodge both busy floors stay away inside a minute on 94.6 % of rides. The cages need the hold. They do not need the peak."
+        "reasoning": "Two of the five cars spend most of every stop standing open, and the waits collect where the crowd is. 15 of 164 journeys through the entrance or outpatients waited over a minute, the worst 105 s. The ward-to-ward journeys that avoid both busy floors are away inside a minute on 94.6 % of rides. The cages need the hold. They do not need the peak."
       },
       "budgetUnits": 10,
       "repairs": [
@@ -1956,7 +1956,7 @@
       ],
       "diagnosis": {
         "text": "The demand arrives faster than any four-car group can clear it. This is the case where the crowd, not the kit, is wrong.",
-        "reasoning": "Four cars leave the lobby loaded and still 21 of 84 lobby boardings waited over a minute, against a 107 s worst. The journeys that start upstairs ride untroubled — away inside a minute on 95.0 % of 141 of them — because the problem is not the machinery: it is that nine floors of tenants share one start time. No standing order clears a queue that arrives all at once."
+        "reasoning": "Four cars leave the lobby loaded, and still 21 of 84 lobby boardings waited over a minute, the worst 107 s. The journeys that start upstairs are away inside a minute on 95.0 % of 141 of them. The problem is not the machinery. Nine floors of tenants share one start time, and no standing order clears a queue that arrives all at once."
       },
       "budgetUnits": 11,
       "repairs": [
@@ -2147,7 +2147,7 @@
       ],
       "diagnosis": {
         "text": "Every clinic lists for nine o'clock, so seven hundred people pass through outpatients in the same short window — and the landing pays for the print run.",
-        "reasoning": "The group carries the rest of the hospital well: 95.5 % of 264 other journeys are away inside a minute. Outpatients is another story — 10 of the 91 journeys leaving it waited over a minute, one of them 114 s — because the lifts are meeting a surge the letters invented. Move the clinics on four hundred of the letters to half past nine, and the nine o’clock surge is the three hundred left on the old time rather than all seven hundred."
+        "reasoning": "The group carries the rest of the hospital well: 95.5 % of 264 other journeys are away inside a minute. At outpatients, 10 of the 91 journeys leaving it waited over a minute, one of them 114 s, because the lifts are meeting a surge the appointment letters created. Move the clinics on four hundred of the letters to half past nine, and the nine o’clock surge is the three hundred left on the old time rather than all seven hundred."
       },
       "budgetUnits": 13,
       "repairs": [
@@ -2295,7 +2295,7 @@
       ],
       "diagnosis": {
         "text": "The group treats the let-out like an ordinary afternoon: ballroom calls queue for whichever cars come free, alongside every other call in the house.",
-        "reasoning": "The house itself is fine — 92.7 % of 259 other journeys are away inside a minute. The ballroom is not: 12 of its 59 street-bound journeys waited over a minute, the worst 117 s, because a crowd of hundreds boards through the same rank as the teatime traffic. One car, keyed to the ballroom run while the conference sits, is a setting."
+        "reasoning": "The house itself is fine: 92.7 % of 259 other journeys are away inside a minute. The ballroom is not. 12 of its 59 street-bound journeys waited over a minute, the worst 117 s, because a crowd of hundreds boards through the same rank as the teatime traffic. Keying one car to the ballroom run while the conference sits is a setting."
       },
       "budgetUnits": 11,
       "repairs": [
@@ -2580,7 +2580,7 @@
       ],
       "diagnosis": {
         "text": "The refurbishment lockout still stands: the two cars big enough for a bed serve every floor except imaging, theatres and critical care.",
-        "reasoning": "Three cars carry the surgical floors that five were meant to. 5 of 36 journeys starting there waited over a minute, one of them 210 s, while the rest of the hospital — with all five cars answering — stays away inside a minute on 93.0 % of 213 journeys. The lockout was a sensible fence around a building site. The site closed; the fence stayed."
+        "reasoning": "Three cars carry the surgical floors that five were meant to. 5 of 36 journeys starting there waited over a minute, one of them 210 s. The rest of the hospital, with all five cars answering, is away inside a minute on 93.0 % of 213 journeys. The lockout was a sensible fence around a building site. The site closed and the fence stayed."
       },
       "budgetUnits": 15,
       "repairs": [
@@ -2946,7 +2946,7 @@
       ],
       "diagnosis": {
         "text": "The refit is right and the timing is wrong: with two cars out together, the whole upper zone hangs on one.",
-        "reasoning": "19 of 40 upper-zone journeys waited over a minute, the worst 139 s, on a mean of 52.0 s to board — while the low zone, untouched by the works, is away inside a minute on 100.0 % of 72 journeys. The same scope of works, re-phased one car at a time, keeps two cars in service every day of it."
+        "reasoning": "19 of 40 upper-zone journeys waited over a minute, the worst 139 s, on a mean of 52.0 s to board. The low zone, untouched by the works, is away inside a minute on 100.0 % of 72 journeys. The same works, re-phased one car at a time, keep two cars in service every day."
       },
       "budgetUnits": 14,
       "repairs": [
@@ -3811,7 +3811,7 @@
       ],
       "diagnosis": {
         "text": "Each deck believes it is full at five hundred pounds — the plated four thousand divided by eight cars instead of by two decks — so the shuttles run the morning at a fraction of their design load.",
-        "reasoning": "Nothing mechanical is wrong: the cars run, the doors close, the climb is quick. But a deck that carries three where thirteen fit turns the street queue over slowly. 11 of 257 shuttle journeys up from the street waited over a minute against a 79 s worst, while the local zones above — whose cars weigh correctly — stay away inside a minute on 96.7 % of 836 journeys."
+        "reasoning": "Nothing mechanical is wrong: the cars run, the doors close, the climb is quick. But a deck that carries three where thirteen fit clears the street queue slowly. 11 of 257 shuttle journeys up from the street waited over a minute, the worst 79 s. The local zones above, whose cars weigh correctly, are away inside a minute on 96.7 % of 836 journeys."
       },
       "budgetUnits": 16,
       "repairs": [
@@ -4458,7 +4458,7 @@
       ],
       "diagnosis": {
         "text": "The restaurant shares every car with the whole house at the house's busiest hour, and the house wins.",
-        "reasoning": "6 of 44 journeys leaving the restaurant floor waited over a minute, one of them 79 s, while the house around it runs at 94.5 % away inside a minute across 217 journeys. The trolley car can reach every podium floor; keyed to reception, ballroom and restaurant, it becomes the landing's own."
+        "reasoning": "6 of 44 journeys leaving the restaurant floor waited over a minute, one of them 79 s, while the rest of the house is away inside a minute on 94.5 % of 217 journeys. The trolley car can reach every podium floor. Keyed to reception, ballroom and restaurant, it becomes the landing's own."
       },
       "budgetUnits": 12,
       "repairs": [
@@ -4707,7 +4707,7 @@
       ],
       "diagnosis": {
         "text": "The controller splits even a two-person landing across two cars, so half the fleet's trips end at landings someone else has already cleared.",
-        "reasoning": "Sending everything is a setting — the splitting threshold on the commissioning sheet is one. Every wasted trip is a car that cannot answer the next call: 15 of 143 flat journeys waited over a minute against a 130 s worst, while the offices and shuttles below, on their own duty, are away inside a minute on 99.8 % of 520 journeys."
+        "reasoning": "Sending everything is a setting: the splitting threshold on the commissioning sheet is one. Every wasted trip is a car that cannot answer the next call. 15 of 143 flat journeys waited over a minute, the worst 130 s, while the offices and shuttles below, on their own duty, are away inside a minute on 99.8 % of 520 journeys."
       },
       "budgetUnits": 11,
       "repairs": [
@@ -5069,7 +5069,7 @@
       ],
       "diagnosis": {
         "text": "The group is genuinely undersized for the tower it now serves. Configuration buys the morning back; only a new shaft buys more.",
-        "reasoning": "30 of 381 lobby journeys waited over a minute against a 128 s worst. Between floors — the journeys that never touch the lobby — there are too few to say much: away inside a minute on 75.0 % of 12 such journeys. The new tenants agreed staggered starts as a term of their leases; invoking that clause moves their arrivals out of the shared peak, and this run watches the morning it leaves behind. What it does not buy is growth: the next letting starts a capital conversation."
+        "reasoning": "30 of 381 lobby journeys waited over a minute, the worst 128 s. Journeys between floors that never touch the lobby are too few to say much: away inside a minute on 75.0 % of 12 such journeys. The new tenants agreed staggered starts as a term of their leases. Invoking that clause moves their arrivals out of the shared peak, and this run watches the morning it leaves behind. It does not buy growth: the next letting starts a capital conversation."
       },
       "budgetUnits": 16,
       "repairs": [
@@ -5261,7 +5261,7 @@
       ],
       "diagnosis": {
         "text": "Idle cars home to the front door — which was right until the letting on the roof changed where the mornings happen.",
-        "reasoning": "All 3 waits over a minute on top-floor journeys began with both cars standing at the door, the worst of them 80 s of watching the indicator climb. The rest of the block still rides well — away inside a minute on 94.7 % of 57 journeys — because the door is where its calls start. The gym's are the other end of the shaft."
+        "reasoning": "All 3 waits over a minute on top-floor journeys began with both cars standing at the door, the worst of them 80 s. The rest of the block still rides well, away inside a minute on 94.7 % of 57 journeys, because the door is where its calls start. The gym's calls start at the other end of the shaft."
       },
       "budgetUnits": 10,
       "repairs": [

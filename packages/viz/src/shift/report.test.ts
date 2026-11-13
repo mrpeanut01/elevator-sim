@@ -460,7 +460,7 @@ describe('the sheet names the cell it leads with, and a refusal does not take th
     expect(wait.tone).toBe('withheld');
     expect(wait.note).toBe(
       saturated.summary.awtInvalidReason ??
-        'the queues never settled, so there is no cohort to take a mean over — see the small print',
+        'the queues never settled, so there is no steady set of rides to average over',
     );
     // Nothing on the sheet says the mean is available elsewhere, provisionally or otherwise.
     expect(wait.value).not.toContain(saturated.summary.meanWaitS.toFixed(1));
@@ -589,14 +589,14 @@ describe('TOOK THE STAIRS names its true cohort, and the people can be totalled 
 
   it('says the overlap outright when every horizon-crosser was still carried — the audit’s shape', () => {
     const note = withStairs({ abandoned: 348, abandonedCarried: 348 });
-    expect(note).toContain('every one of them is inside CARRIED too');
-    expect(note).toContain('overlap rather than add');
+    expect(note).toContain('every one of them is in CARRIED too');
+    expect(note).toContain('the two figures overlap');
   });
 
   it('says the disjoint case as the gap in CARRIED’s own denominator', () => {
     const note = withStairs({ abandoned: 51, abandonedCarried: 0 });
     expect(note).toContain('never carried');
-    expect(note).toContain('CARRIED’s');
+    expect(note).toContain('among the people who turned up and not among those CARRIED');
   });
 
   it('splits a mixed day with the run’s own count on the carried side', () => {
@@ -607,7 +607,7 @@ describe('TOOK THE STAIRS names its true cohort, and the people can be totalled 
   it('names the run’s own horizon, never a hard-coded fifteen minutes', () => {
     expect(withStairs({ abandoned: 3, abandonedCarried: 3, horizonS: 900 })).toContain('15-minute');
     expect(withStairs({ abandoned: 3, abandonedCarried: 3, horizonS: 600 })).toContain('10-minute');
-    expect(withStairs({ abandoned: 0, abandonedCarried: 0 })).toContain('give-up horizon');
+    expect(withStairs({ abandoned: 0, abandonedCarried: 0 })).toContain('give-up line');
   });
 
   it('says which cohort it is over, in the idiom WORST WAIT already uses — issue #288', () => {
@@ -639,7 +639,7 @@ describe('TOOK THE STAIRS names its true cohort, and the people can be totalled 
     const note = withStairs({ abandoned: 0, abandonedCarried: 0, turnedAway: 72 });
     expect(note).toContain('a further 72 never waited at all');
     expect(note).toContain('turned them away at a credential check');
-    expect(note).toContain('not a slow one');
+    expect(note).toContain('a different outcome from a slow wait');
     // Silent where there is nothing to say, so every unzoned building's sheet is unchanged.
     expect(withStairs({ abandoned: 0, abandonedCarried: 0, turnedAway: 0 })).not.toContain(
       'credential',
@@ -727,7 +727,7 @@ describe('WORST WAIT states its censoring', () => {
       'worst-wait',
     );
     expect(worst.value).toBe('at least 640 s');
-    expect(worst.note).toContain('lower bound');
+    expect(worst.note).toContain('their full wait was longer');
     expect(worst.note).toContain('whole shift');
   });
 
@@ -1086,8 +1086,8 @@ describe('where it went wrong is derived from the run', () => {
 
       for (const id of ['peak-queue', 'peak-phase']) {
         const row = report.diagnosis.find((entry) => entry.id === id);
-        expect(row?.why).toContain(`${reportWindowNameOf(window.id)} window the means above are read over`);
-        expect(row?.why?.includes('That instant is inside')).toBe(inside);
+        expect(row?.why).toContain(`${reportWindowNameOf(window.id)} window the averages are read over`);
+        expect(row?.why?.includes('That moment is inside')).toBe(inside);
         expect(row?.why?.includes('two different parts of it')).toBe(!inside);
       }
     }
@@ -1097,8 +1097,8 @@ describe('where it went wrong is derived from the run', () => {
     // A reconciliation that lives only on the thing being reconciled is not one: this is the
     // paragraph a reader goes to when the heading and the figure grid disagree.
     const smallPrint = reportOf(saturated).smallPrint;
-    expect(smallPrint).toContain('read the whole shift too');
-    expect(smallPrint).toContain('need not be inside the window the means came from');
+    expect(smallPrint).toContain('read over the whole shift too');
+    expect(smallPrint).toContain('need not be inside the window the averages came from');
   });
 
   it('files only rows that are events, on every run', () => {
@@ -1318,7 +1318,7 @@ describe('the rest of the sheet', () => {
       interventions: [{ atS: 2 * 3600 + 48 * 60, change: { kind: 'adopt-dispatcher', profile: fair } }],
     });
     expect(shaped.metaLines[0]).toBe(`${clean.buildingName} · Minimum estimated wait, then Fairness first from 08:48`);
-    expect(shaped.smallPrint).toContain('cannot tell you that minimum estimated wait or fairness first is better');
+    expect(shaped.smallPrint).toContain('not whether minimum estimated wait or fairness first is better');
     /* An untouched day keeps its one name. */
     const untouched = dayReportOf({
       recording: clean,
@@ -1409,7 +1409,7 @@ describe('the rest of the sheet', () => {
   it('misses the shift on the day the building was outrun', () => {
     const report = reportOf(saturated);
     expect(report.verdict).toBe('missed');
-    expect(report.streakLine).toContain('nothing here is a game over');
+    expect(report.streakLine).toContain('nothing here ends the game');
   });
 
   it('carries the four levers verbatim on a day that points at none of them', () => {
@@ -1520,8 +1520,8 @@ describe('the rest of the sheet', () => {
 
   it('prints the small print, naming this run’s dispatcher', () => {
     const report = reportOf(clean);
-    expect(report.smallPrint).toContain('one replication of one day on one seed');
-    expect(report.smallPrint).toContain('50 or more paired runs');
+    expect(report.smallPrint).toContain('This was one day on one crowd');
+    expect(report.smallPrint).toContain('50 or more runs');
     expect(report.smallPrint).toContain('confidence interval that excludes zero');
     expect(report.smallPrint).toContain(clean.dispatcherProfileId.toLowerCase());
   });
@@ -1717,7 +1717,7 @@ describe('the rest of the sheet', () => {
         subject: { kind: 'week-day' },
       }),
     );
-    expect(report.contractLine).toContain('nothing is being banked');
+    expect(report.contractLine).toContain('nothing is banked');
     expect(report.taught).toContain('Nothing banks here');
   });
 
@@ -2072,7 +2072,7 @@ describe('the levers point at what this run showed — issue #55', () => {
     expect(body).toContain('1 ride had not boarded when the day ended');
     // *Waited past the give-up horizon*, not *gave up and took the stairs* — `docs/19` defect 3:
     // the count is an attribute of a wait, and these riders may all be inside CARRIED.
-    expect(body).toContain('1 rider waited past the give-up horizon');
+    expect(body).toContain('1 rider waited past the give-up line');
     expect(body).not.toContain('gave up and took the stairs');
     expect(body).not.toContain('1 rides');
     expect(body).not.toContain('1 riders');
@@ -2092,7 +2092,7 @@ describe('the levers point at what this run showed — issue #55', () => {
     });
     const body = leverBody(weekDay(many), 'add-a-car');
     expect(body).toContain('4 rides had not boarded when the day ended');
-    expect(body).toContain('7 riders waited past the give-up horizon');
+    expect(body).toContain('7 riders waited past the give-up line');
   });
 
   /**
@@ -2216,8 +2216,8 @@ describe('the levers point at what this run showed — issue #55', () => {
         expect(lever.body, lever.id).not.toMatch(/\bbetter than\b|\bbeats?\b|\boutperform/i);
       }
       // And the refusal is published under the cards rather than left to the reader.
-      expect(report.smallPrint).toContain('ordered by what today showed');
-      expect(report.smallPrint).toContain('needs the paired runs');
+      expect(report.smallPrint).toContain('in the order today pointed to');
+      expect(report.smallPrint).toContain('takes those repeated runs');
     }
   });
 });

@@ -1020,7 +1020,7 @@ describe('the building spec', () => {
     expect(named).toStrictEqual(['7', '8', '9']);
     expect(named.every((id) => written.has(id))).toBe(true);
     expect(validateSpec(spec, undefined).find((line) => line.startsWith('No shaft serves'))).toBe(
-      `No shaft serves floor ${named.join(', ')} — a call there is one nobody may answer, which looks nothing like a slow one.`,
+      `No shaft serves floor ${named.join(', ')}. A call there is one no car can answer.`,
     );
   });
 
@@ -1162,7 +1162,7 @@ describe('the building spec', () => {
     expect(transportModesOf(tall)).toHaveLength(1);
     const short: BuildingSpec = { ...tall, floors: 8 };
     expect(transportModesOf(short)).toStrictEqual([]);
-    expect(validateSpec(short, undefined).join(' ')).toMatch(/A connection is a pair of floors/);
+    expect(validateSpec(short, undefined).join(' ')).toMatch(/The whole machine is left out of the saved document/);
     expect(() =>
       resolveBuilding(parseBuilding(buildingFromSpec(short, { specs: SPECS }) as unknown), SPECS),
     ).not.toThrow();

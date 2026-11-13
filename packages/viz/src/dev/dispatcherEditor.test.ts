@@ -956,8 +956,8 @@ describe('the panel says what one press buys, on the press', () => {
 
   it('promises one run on both verbs that run, and on neither that does not', () => {
     expect(code).toContain('const ONE_RUN_PROMISE =');
-    expect(code).toContain('dispatcher by id. ${ONE_RUN_PROMISE}');
-    expect(code).toContain('building, seed and traffic. ${ONE_RUN_PROMISE}');
+    expect(code).toContain('cannot drive a run. ${ONE_RUN_PROMISE}');
+    expect(code).toContain('traffic. ${ONE_RUN_PROMISE}');
     // *Already driving* is disabled and runs nothing, so a promise about a run would be a promise
     // about a press that cannot happen.
     const disabled = code.slice(code.indexOf('alreadyDriving: Object.freeze('));

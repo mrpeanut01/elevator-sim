@@ -479,6 +479,17 @@ export function floorRowFor(rows: readonly MenuAffordance[], key: string): MenuA
   return rows.find((row) => row.enabled && row.floor === plate);
 }
 
+/**
+ * A long note behind a short link: the panel draws {@link MenuExplainer.link} under the rows and
+ * opens {@link MenuExplainer.body} in a popover (`dev/dom.ts#explainer`). What a reader needs in
+ * order to act stays in {@link MenuScreenView.notices}; what they read once goes here.
+ */
+export interface MenuExplainer {
+  readonly link: string;
+  readonly title: string;
+  readonly body: readonly string[];
+}
+
 /** One screen, as everything a renderer needs and nothing it could decide with. */
 export interface MenuScreenView {
   readonly screen: MenuScreen;
@@ -487,6 +498,8 @@ export interface MenuScreenView {
   readonly notices: readonly string[];
   /** Everything wrong with the current selection, in words a player can act on. */
   readonly issues: readonly string[];
+  /** The screen's long notes, each behind its own link. Empty on a screen that has none. */
+  readonly explainers: readonly MenuExplainer[];
   readonly rows: readonly MenuAffordance[];
   /** The plate of the floor this screen stands on ({@link FLOOR_OF_SCREEN}), or `undefined`. */
   readonly floor: string | undefined;
@@ -771,6 +784,7 @@ export function screenOf(input: MenuViewInput): MenuScreenView {
     title: titleOf(screen),
     notices,
     issues: view.issues,
+    explainers: Object.freeze([...(view.explainers ?? [])]),
     rows: screen === 'main' ? split.offered : Object.freeze([...split.offered, BACK]),
     floor: FLOOR_OF_SCREEN[screen],
     withheld: Object.freeze(split.withheld.map((row) => row.id)),
@@ -787,6 +801,7 @@ interface Body {
   readonly rows: readonly MenuAffordance[];
   readonly notices: readonly string[];
   readonly issues: readonly string[];
+  readonly explainers?: readonly MenuExplainer[] | undefined;
 }
 
 const empty = { notices: Object.freeze([]), issues: Object.freeze([]) };
@@ -821,6 +836,7 @@ function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
         ...empty,
         rows: campaignRows(input.calendarPeriodId ?? ''),
         notices: [CAMPAIGN_NOTE],
+        explainers: [CAMPAIGN_HELP],
       };
     case 'leaderboard':
       return leaderboardBody(input);
@@ -845,7 +861,7 @@ function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
  * remedies (hide, disable with the reason, or ship a read-only demo); this is the third with the
  * second's honesty, which is the combination that keeps the teaching and ends the dead end.
  */
-const NEEDS_A_SERVER = ' · needs a server, and this one has none';
+const NEEDS_A_SERVER = ' · needs a server, which this site does not have';
 
 /**
  * The way out — GitHub issue #40, and the row Escape presses.
@@ -889,9 +905,9 @@ function resumeRow(hasRun: boolean, neverLeft: boolean): MenuAffordance {
    * returns the moment they have been out there or a session restored (`everLeftTheMenu`).
    */
   const detail = neverLeft
-    ? 'Close this menu and look around — the page ran a demo day so the stage is not empty; ' +
-      'nothing is filed from it. Start here, above, opens your first real shift.'
-    : 'Back to the shift on screen — nothing here is changed by leaving';
+    ? 'Close the menu and look around. The day on screen is a demo and nothing is filed from ' +
+      'it. Start here opens your first real shift.'
+    : 'Back to the shift on screen. Leaving changes nothing.';
   return {
     id: 'main.resume',
     label: 'Resume',
@@ -905,8 +921,8 @@ function resumeRow(hasRun: boolean, neverLeft: boolean): MenuAffordance {
       ? {}
       : {
           disabledWhy:
-            'There is no shift on screen to go back to yet. Pick a scenario or a free-play ' +
-            'selection above and the menu closes onto it.',
+            'No shift on screen yet. Pick a scenario or a free-play run above, and the menu ' +
+            'closes onto it.',
         }),
     intent: { kind: 'close' },
   };
@@ -917,12 +933,12 @@ function resumeRow(hasRun: boolean, neverLeft: boolean): MenuAffordance {
  *
  * ## What it is allowed to claim, and every clause is checked
  *
- * *"Nothing was restored when this page loaded"* is `persist/types.ts`'s `absent` arm in the words a
- * player has, and it is a claim about the **load** rather than about the store — see
- * {@link MenuViewInput.firstVisit} for why that distinction is the difference between a sentence that
- * stays true and one that is false a keystroke later.
+ * *"First time here?"* is a question and not a claim. It is shown on `persist/types.ts`'s `absent`
+ * arm, which is a fact about the **load** rather than about the store — see
+ * {@link MenuViewInput.firstVisit} — and it asserts nothing about what is saved, so it cannot go
+ * false a keystroke later.
  *
- * *"the row above the rest"* and *"How to play, directly under it"* are claims about the **layout**,
+ * *"Start here"* and *"How to play just under it"* are claims about the **layout**,
  * which is exactly the kind of sentence this repository has shipped stale — `dev/rightRail.ts` spent
  * a wave telling readers to open *Menu → Campaign* after the row had been renamed **Scenarios**. So
  * both are pinned by a test rather than by care: `menu/screens.test.ts` requires the recommended row
@@ -940,9 +956,7 @@ function resumeRow(hasRun: boolean, neverLeft: boolean): MenuAffordance {
  * is for, and stops.
  */
 const FIRST_VISIT_NOTE =
-  'Nothing was restored when this page loaded, so this is a first run. Start here is the row above ' +
-  'the rest, and How to play, directly under it, says what a dispatcher is before anything asks you ' +
-  'to pick one.';
+  'First time here? Press Start here, or open How to play just under it.';
 
 /**
  * The recommended path — GitHub issue #90, and **one door per product** ([§ D299](../../../../DECISIONS.md)).
@@ -990,10 +1004,8 @@ function startHereRow(viewMode: 'basic' | 'advanced'): MenuAffordance {
     id: 'main.start-here',
     label: 'Start here',
     detail: casual
-      ? 'The one to press if you are new: it opens the scenarios board, and the week begins when ' +
-        'you take one.'
-      : 'The one to press if you are new: Free play is a single run you set yourself — six axes, ' +
-        'then Start.',
+      ? 'New here? This opens the Scenarios board. The week begins when you take one.'
+      : 'New here? Free play is one run you set up yourself: six axes, then Start.',
     /*
      * `commit` for Casual because it leaves the menu, `navigate` for Engineer because it goes a
      * screen deeper. The kind names what the row *does*, and the two doors genuinely do different
@@ -1060,19 +1072,19 @@ function mainRows(
      * *Campaign* survives in exactly one place now: the shift layer's own prose, where it means the
      * contract week and nothing competes for it.
      */
-    to('main.campaign', 'Scenarios', 'A week on one building — it grows, and the bar rises', 'campaign'),
+    to('main.campaign', 'Scenarios', 'A week on one building. It grows, and the bars rise.', 'campaign'),
     to('main.free-play', 'Free play', 'Any building, any dispatcher, any traffic', 'free-play'),
     social(
       'main.challenge',
       'This week’s challenge',
-      'Everyone on the same seeds — the dispatcher is what varies',
+      'Same seeds for everyone. You pick the dispatcher.',
       'challenge',
     ),
-    social('main.leaderboard', 'Leaderboard', 'Verified scores, by configuration', 'leaderboard'),
+    social('main.leaderboard', 'Leaderboard', 'Posted scores, each one replayed and checked', 'leaderboard'),
     // *Sign in to post a score* and no password — the second half is the thing a player decides on,
     // and it is now true (§ D241): an address, a link in the inbox, and nothing to choose or forget.
-    social('main.account', 'Account', 'An emailed link, no password — sign in to post a score', 'account'),
-    to('main.settings', 'Settings', 'Presentation only — nothing here changes a run', 'settings'),
+    social('main.account', 'Account', 'Sign in by emailed link to post a score. No password.', 'account'),
+    to('main.settings', 'Settings', 'How things look. Nothing here changes a run.', 'settings'),
     resumeRow(hasRun, neverLeft),
   ];
   /* § D1635: every root row is a landing, and carries its floor's plate. */
@@ -1128,159 +1140,145 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
    * reading is cheaper than a glyph and survives KB-15, which forbids a signal carried by shape or
    * colour alone.
    */
-  summary:
-    'Opens here, and starts nothing: what the game is, what a shift is, and what each control does.',
+  summary: 'Opens here: what the game is, what a shift is, and what each control does.',
   sections: Object.freeze([
     Object.freeze({
-      heading: 'What you are actually doing',
+      heading: 'What you are doing',
       body: Object.freeze([
-        'A building has more people wanting to move than it has cars to move them. Every time ' +
-          'somebody presses a button at a landing, something has to decide which car goes, and ' +
-          'in what order it goes there. That decision is called dispatching, and it is the thing ' +
-          'this simulator is about.',
-        'You do not drive the cars. You choose the rule that answers the calls, point a stretch ' +
-          'of real traffic at it, and read what happened to the people who turned up.',
+        'A building has more people wanting to move than cars to move them. Each time ' +
+          'somebody presses a button at a landing, something has to decide which car goes. That ' +
+          'decision is called dispatching, and it is what this simulator is about.',
+        'You do not drive the cars. You choose the rule that answers the calls, point a ' +
+          'stretch of traffic at it, and read what happened to the people who turned up.',
       ]),
     }),
     Object.freeze({
       heading: 'The three ways in',
       body: Object.freeze([
         'Scenarios is a week on one building. Each day the tenants grow, something is booked ' +
-          'against the day, and the bars you are read against harden. A day that meets every bar ' +
-          'is a clean shift, and clean shifts bank toward clearing the scenario. Every scenario ' +
-          'is open from the start — they teach, they do not gate.',
+          'against the day, and the bars harden. A day that meets every bar is a clean shift, ' +
+          'and clean shifts bank toward clearing the scenario. Every scenario is open from the ' +
+          'start.',
         'Free play is one run on day one: the building as it ships, with no tenant growth and ' +
           'nothing scheduled against it. You set all six axes yourself, and Start opens a fresh ' +
-          'week — no streak, no banked shifts and no history carried in from a scenario. That is ' +
-          'also what makes it the run a leaderboard can replay.',
-        'This week’s challenge fixes the building, the traffic, the run length and the seeds — ' +
-          'the server issues them — and leaves the dispatcher as the one thing that varies. A ' +
-          'set is scored over all of its seeds. A partial set is not a smaller score; it is a ' +
-          'different question.',
-        'Leaderboard, Account and Settings are not modes. A board is one configuration across ' +
-          'seeds, ordered on one named metric, so picking a different dispatcher moves you to a ' +
-          'different board rather than up an existing one. An account is what lets a score be ' +
-          'posted. Settings change how a run is drawn and never what it computes.',
+          'week with no streak, banked shifts or history carried in. That is also what makes it ' +
+          'the run a leaderboard can replay.',
+        'This week’s challenge fixes the building, the traffic, the run length and the seeds, ' +
+          'which the server issues, and leaves the dispatcher as the one thing that varies. A ' +
+          'set is scored over all of its seeds. A partial set is a different question, not a ' +
+          'smaller score.',
+        'Leaderboard, Account and Settings are not modes. A board is ordered on one named ' +
+          'metric. An account is what lets a score be posted. Settings change how a run is ' +
+          'drawn and never what it computes.',
       ]),
     }),
     Object.freeze({
       heading: 'What a shift is',
       body: Object.freeze([
-        'A shift is one day in one building. Passengers arrive, cars answer, and the day is read ' +
-          'against five goals, all five every day: carry a share of the people who turned up, ' +
-          'get a share of riders away inside a minute, hold the deepest landing queue under a ' +
-          'number, keep the worst wait inside a ceiling, and hold the work the machines did per ' +
-          'ride delivered inside a ceiling too. They are in tension: a group that chases the ' +
-          'shares cannot also park a car for the landing that stacks, and the worst wait is the ' +
-          'bar that slips when you serve the average rider first. That tension is the day’s ' +
-          'actual puzzle.',
-        'The energy goal is read on its own and is never mixed into the others. It counts work ' +
-          'per ride delivered rather than work alone, so a day that spends less by carrying ' +
-          'fewer people fails it instead of winning it. There is no combined score anywhere in ' +
-          'this product, and no two dispatchers are ever ranked on energy.',
-        'The first four bars harden as the week goes on, and then they stop. Away-inside-a-minute ' +
-          'tops out at 84 %, carried tops out at 96 %, the queue bar bottoms out at 12 people, and ' +
-          'the worst-wait ceiling bottoms out at 150 seconds. The energy ceiling does not move with ' +
-          'the week at all: work per ride falls on its own as a building fills up, so a ceiling ' +
-          'that tightened nightly would be chasing a number already going the right way. What it ' +
-          'does depend on is how much of the day you run — 80 kJ per ride delivered over a part of ' +
-          'a day, and 350 kJ per ride delivered over a whole authored one, because a ' +
-          'whole day includes the quiet hours where the same travel carries far fewer people. ' +
-          'A day that misses any one of the five is a missed day, and a week that clears too few of its days misses its target.',
+        'A shift is one day in one building, read against five goals, all five every day: ' +
+          'carry a share of the people who turned up, get a share of riders away inside a ' +
+          'minute, hold the deepest landing queue under a number, keep the worst wait inside a ' +
+          'ceiling, and hold the work per ride delivered inside a ceiling too. They pull ' +
+          'against each other: a group that chases the shares cannot also park a car for the ' +
+          'landing that stacks, and the worst wait is the bar that slips when you serve the ' +
+          'average rider first.',
+        'The energy goal is read on its own and is never mixed into the others. It counts ' +
+          'work per ride delivered, not work alone, so a day that spends less by carrying fewer ' +
+          'people fails it. There is no combined score anywhere, and no two dispatchers are ' +
+          'ever ranked on energy.',
+        'The first four bars harden through the week and then stop. Away-inside-a-minute tops ' +
+          'out at 84 %, carried tops out at 96 %, the queue bar bottoms out at 12 people, and ' +
+          'the worst-wait ceiling bottoms out at 150 seconds. The energy ceiling does not move ' +
+          'with the week. It depends on how much of the day you run: 80 kJ per ride delivered ' +
+          'over a part of a day, and 350 kJ per ride delivered over a whole authored one, ' +
+          'because a whole day includes the quiet hours where the same travel carries far fewer ' +
+          'people. A day that misses any one of the five is a missed day, and a week that ' +
+          'clears too few of its days misses its target.',
         'Nothing is graded before the building wakes up: under 20 arrivals every goal reads a ' +
-          'dash instead of a verdict, because a carried share over three riders is arithmetic ' +
-          'rather than competence. The energy goal reads a dash until the day is over, because ' +
-          'the figure behind it is only true of a finished run. No goal is read from an average, ' +
+          'dash instead of a verdict. The energy goal reads a dash until the day is over, ' +
+          'because its figure is only true of a finished run. No goal is read from an average, ' +
           'so a day cannot be graded on a figure the run itself declines to publish.',
       ]),
     }),
     Object.freeze({
       heading: 'The six things Free play lets you set',
       body: Object.freeze([
-        'Building — which tower you are running. Each one ships with its own floors, its ' +
-          'population, its banks and the machines in them, and the menu prints those counts ' +
-          'beside the name. The building decides how far a car has to travel, how many people it ' +
-          'can be asked to carry, and which floors each bank is allowed to serve at all.',
-        'Dispatcher — the rule that answers a call, and the axis this whole simulator exists to ' +
-          'study. Every one of them is a set of weights rather than a program; the next section ' +
-          'takes them one at a time.',
-        'Traffic shape — which demand template the run is drawn from. The shipped set is a rise ' +
-          'and fall, a lunch two-way peak, an office down peak, a shift change, an evening ' +
-          'egress, and a constant ISO load. Each template declares its own period, and each is ' +
-          'marked either recommended — its shape supports a confidence interval across ' +
-          'replications — or cross-checking, which is there to test a result against a ' +
-          'differently shaped day.',
-        'The office down peak and the evening egress are the end of a day twice over, and the ' +
-          'difference is the leading edge. An office empties on a ramp: the working day ends, the ' +
-          'landings fill over a few minutes, and the flow tails off. A venue steps — the doors ' +
-          'open and the whole room is waiting at once, which is the case a ballroom or a cinema ' +
-          'poses and no other shape here produces.',
-        'Arrival rate — how much demand, as a share of the building’s population arriving every ' +
-          'five minutes. Left at this building’s own profile it uses whatever the building ' +
-          'declares, which is the choice that does not pin a number the reference data is free ' +
-          'to change. The ladder spans the shipped buildings’ operating points, so a rate that ' +
-          'is comfortable in one building will swamp another — and a run whose queue never ' +
-          'settles has its average wait withheld rather than reported.',
-        'Part of the day — which stretch of the traffic shape you run, and the same control the ' +
-          'campaign uses. A shape that is one period offers that period; the working day offers ' +
-          'each of its busy parts and the whole of itself, so the morning rush, the lunch two-way ' +
-          'and the evening down-peak are three different problems rather than three lengths of ' +
-          'one. Every option says how much demand it schedules and between which clock times.',
-        'What no option says is when the run ends. The demand schedule stops at the time on the ' +
-          'label and the run keeps going until the building has cleared, which is the part worth ' +
-          'watching and is an outcome rather than a prediction — how long a backlog takes to drain ' +
-          'is what the dispatcher is being judged on.',
+        'Building — which tower you are running. Each one has its own floors, population, ' +
+          'banks and machines, and the menu prints those counts beside the name. The building ' +
+          'decides how far a car has to travel, how many people it can carry, and which floors ' +
+          'each bank serves.',
+        'Dispatcher — the rule that answers a call, and the axis this simulator exists to ' +
+          'study. Every one of them is a set of weights, not a program. The next section takes ' +
+          'them one at a time.',
+        'Traffic shape — which demand template the run is drawn from. The shipped set is a ' +
+          'rise and fall, a lunch two-way peak, an office down peak, a shift change, an evening ' +
+          'egress, and a constant ISO load. Each is marked either recommended, meaning its ' +
+          'shape supports a confidence interval across replications, or cross-checking, which ' +
+          'is there to test a result against a differently shaped day.',
+        'The office down peak and the evening egress both end a day, and the difference is ' +
+          'the leading edge. An office empties on a ramp: the landings fill over a few minutes ' +
+          'and the flow tails off. A venue steps: the doors open and the whole room is waiting ' +
+          'at once.',
+        'Arrival rate — how much demand, as a share of the building’s population arriving ' +
+          'every five minutes. Left at this building’s own profile, it uses whatever the ' +
+          'building declares. A rate that is comfortable in one building will swamp another, ' +
+          'and a run whose queue never settles has its average wait withheld, not reported.',
+        'Part of the day — which stretch of the traffic shape you run, and the same control ' +
+          'the campaign uses. A shape that is one period offers that period. The working day ' +
+          'offers each of its busy parts and the whole of itself. Every option says how much ' +
+          'demand it schedules and between which clock times.',
+        'No option says when the run ends. The demand stops at the time on the label and the ' +
+          'run keeps going until the building has cleared. That is an outcome rather than a ' +
+          'prediction: how long a backlog takes to drain is what the dispatcher is being judged ' +
+          'on.',
         'Seed — 1 to 20 digits naming the passengers. With the building and the traffic held ' +
           'still, the same seed produces the same arrivals, the same decisions and the same ' +
-          'numbers every time. That is what lets a leaderboard verify a posted score by replaying ' +
-          'it, and what lets two dispatchers meet identical traffic instead of different luck. A ' +
-          'seed names a run rather than measuring one: changing it changes who turns up, not how ' +
-          'hard the configuration is.',
+          'numbers every time. That lets a leaderboard verify a posted score by replaying it, ' +
+          'and lets two dispatchers meet identical traffic. Changing the seed changes who turns ' +
+          'up, not how hard the configuration is.',
       ]),
     }),
     Object.freeze({
       heading: 'The dispatchers, and what each one does',
       body: Object.freeze([
-        'A dispatcher here is data rather than code: a set of weights over one shared library of ' +
-          'cost terms. A term measures something about sending a particular car — the new ' +
+        'A dispatcher here is data, not code: a set of weights over one shared library of ' +
+          'cost terms. A term measures something about sending a particular car: the new ' +
           'passenger’s wait, their ride time, the delay added to the people already aboard, the ' +
           'delay added to other assigned calls, a reversal of direction, how full the car is, ' +
           'stops added, metres travelled, how long the oldest call has stood, how far a car ' +
           'strays from its zone, and the queue already standing at the pickup floor. Every term ' +
-          'is normalised to a common scale before it is weighted, so a weight means the same ' +
-          'kind of thing wherever it appears.',
-        'Three carry the role baseline, which means a reference every study holds fixed. Nearest ' +
-          'car weights the metres a car would travel and nothing else. Minimum estimated wait ' +
-          'weights the new passenger’s wait and nothing else. Conventional collective weights ' +
-          'that same wait and adds the constraint a collective controller actually has: a car ' +
-          'does not reverse direction to take a call, it answers in passing.',
+          'is normalised to a common scale before it is weighted.',
+        'Three carry the role baseline, which means a reference every study holds fixed. ' +
+          'Nearest car weights the metres a car would travel and nothing else. Minimum ' +
+          'estimated wait weights the new passenger’s wait and nothing else. Conventional ' +
+          'collective weights that same wait and adds a collective controller’s constraint: a ' +
+          'car does not reverse direction to take a call, it answers in passing.',
         'Conventional collective, en-route pickup is that controller allowed to stop for a ' +
-          'landing it passes, carrying a weight that prices what the extra stop costs the people ' +
-          'already aboard.',
+          'landing it passes, carrying a weight that prices what the extra stop costs the ' +
+          'people already aboard.',
         'Energy aware spreads its weight across wait, stops added and metres travelled, holds ' +
           'doors adaptively, and leaves an idle car where it stands. Fairness first splits its ' +
           'weight between wait and the longest-standing call, and keeps a call reassignable for ' +
-          'as long as it can. Capacity aware weights how full the car is and how many people are ' +
-          'already waiting at the floor, and splits a heavy landing across two cars rather than ' +
-          'serving it twice with one.',
-        'Predictive balanced carries ten weighted terms at once, waits a moment before committing ' +
-          'each assignment, and parks idle cars where it forecasts the next calls.',
+          'as long as it can. Capacity aware weights how full the car is and how many people ' +
+          'are already waiting at the floor, and splits a heavy landing across two cars.',
+        'Predictive balanced carries ten weighted terms at once, waits a moment before ' +
+          'committing each assignment, and parks idle cars where it forecasts the next calls.',
         'Contract-net auction, sealed bid and Contract-net auction, multi-round let every car ' +
-          'price the call from its own estimate and let the group allocate from the bids. The ' +
-          'sealed-bid arm runs a single round; the multi-round arm runs three and lets a ' +
+          'price the call from its own estimate, and the group allocates from the bids. The ' +
+          'sealed-bid arm runs a single round. The multi-round arm runs three and lets a ' +
           'provisional winner hand the contract back on its own reserve price.',
-        'Operational zoning, up-peak splits the bank into one contiguous band per in-service car, ' +
-          'prices how far a car strays from its band, and parks each car in the middle of its own.',
-        'Destination disclosure, credential-aware and Destination dispatch, landing panel both ' +
-          'know where the passenger is going before the car is chosen rather than after. The ' +
-          'first discloses the destination to the dispatcher and leaves boarding alone; the ' +
-          'second assigns the passenger to a named car at the landing.',
-        'Which one to run is not a question this screen answers, and it is not a question one run ' +
-          'answers either. Saying that one dispatcher beat another needs the same passengers fed ' +
-          'to both, 50 to 200 times over, and a paired interval that excludes zero — the Compare ' +
-          'tab is the one surface in this product allowed to say it. Nothing is hidden from you ' +
-          'for scoring badly: a profile that does not beat a baseline is a result about that ' +
-          'profile, and finding that out is what Free play is for.',
+        'Operational zoning, up-peak splits the bank into one contiguous band per in-service ' +
+          'car, prices how far a car strays from its band, and parks each car in the middle of ' +
+          'its own.',
+        'Destination disclosure, credential-aware and Destination dispatch, landing panel ' +
+          'both know where the passenger is going before the car is chosen. The first discloses ' +
+          'the destination to the dispatcher and leaves boarding alone. The second assigns the ' +
+          'passenger to a named car at the landing.',
+        'Which one to run is not a question one run answers. Saying that one dispatcher beat ' +
+          'another needs the same passengers fed to both, 50 to 200 times over, and a paired ' +
+          'interval that excludes zero. The Compare tab is the one place allowed to say it. ' +
+          'Nothing is hidden from you for scoring badly: a profile that does not beat a ' +
+          'baseline is a result about that profile.',
       ]),
     }),
     Object.freeze({
@@ -1291,34 +1289,30 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
          * would have been the shape of staleness this whole section is written against, so the
          * pair of titles is pinned to `dev/reportPanel.ts` in `howToPlay.test.ts`.
          */
-        'The Day report is a statement about a whole day, so it waits for one. Before anything has ' +
-          'run it says nothing has been filed. While the playhead is short of the end of the run ' +
-          'it says the day is still running and names the clock time you are watching, because a ' +
-          'finished day’s figures beside a clock reading half past nine would be two answers to ' +
-          'one question. Play the day through and the sheet fills in. The surface that reads a ' +
-          'shift while it runs is the left rail.',
+        'The Day report is about a whole day, so it waits for one. Before anything has run it ' +
+          'says nothing has been filed. While the playhead is short of the end of the run it ' +
+          'says the day is still running and names the clock time you are watching. Play the ' +
+          'day through and the sheet fills in. To read a shift while it runs, use the left ' +
+          'rail.',
         'Average wait is withheld rather than printed whenever the run cannot support one, on ' +
           'six grounds: an empty measurement window, a queue still growing when the run ends, ' +
-          'too many arrivals never served, a wait past the 15-minute abandonment horizon, ' +
-          'more than 2 % of riders giving up, and an escalator with a declared capacity that ' +
-          'could not carry its crowd. The reason is printed where the figure would have ' +
-          'been. A withheld mean is the run declining to be summarised by one number — not a ' +
-          'fault, and not a low score.',
-        'Energy sits beside the wait figures and is never folded into them. A dispatcher that ' +
-          'drives less carries fewer people, so a configuration that spends less by serving ' +
-          'fewer people has not saved anything; the work per served leg is printed next to the ' +
-          'raw figure for that reason.',
+          'too many arrivals never served, a wait past the 15-minute abandonment horizon, more ' +
+          'than 2 % of riders giving up, and an escalator with a declared capacity that could ' +
+          'not carry its crowd. The reason is printed where the figure would have been. A ' +
+          'withheld mean is not a fault, and not a low score.',
+        'Energy sits beside the wait figures and is never folded into them. A configuration ' +
+          'that spends less by serving fewer people has not saved anything, so the work per ' +
+          'served leg is printed next to the raw figure.',
         'Riders who give up, and riders who take the stairs, are published beside the average ' +
-          'wait rather than inside it. They are the longest waits in the sample, so dropping ' +
-          'them moves the average down by construction.',
+          'wait, not inside it. They are the longest waits in the sample, so dropping them ' +
+          'moves the average down by construction.',
       ]),
     }),
     Object.freeze({
       heading: 'A first run',
       body: Object.freeze([
-        'If you would rather not choose, Start here is the first row on the menu and it is this ' +
-          'paragraph as a button: it opens the scenarios board in Casual and Free play in Engineer, ' +
-          'which are the two shortest routes to watching one.',
+        'If you would rather not choose, Start here is the first row on the menu. It opens ' +
+          'the scenarios board in Casual and Free play in Engineer.',
         /*
          * **The number here is pinned and was right; the control it named was not.**
          *
@@ -1336,16 +1330,15 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
          * pinned figure is kept, and the tail is described the way `detailOf` describes it rather
          * than as an end time this module is not allowed to predict.
          */
-        'Open Free play and set the building to Garden Apartments and the dispatcher to ' +
+        'Or open Free play and set the building to Garden Apartments and the dispatcher to ' +
           'Conventional collective. Leave the arrival rate on this building’s own profile, and ' +
-          'leave Part of the day on the option it opens with — the shortest the traffic shape ' +
-          'offers, 30 minutes of demand and then however long the building takes to clear. Watch ' +
-          'one call appear at a landing, one car answer it, and one wait end — those three things ' +
-          'are what every dispatcher here is made of.',
-        'Then move one axis and run it again, keeping the seed. With the building and the traffic ' +
-          'held still the same seed brings the same passengers, so what moved in the numbers is ' +
-          'what you moved. That is how the feel of it is learned. It is not how a difference is ' +
-          'demonstrated, which is the Compare tab’s job and takes a great many more runs.',
+          'leave Part of the day on the option it opens with: 30 minutes of demand, then ' +
+          'however long the building takes to clear. Watch one call appear at a landing, one ' +
+          'car answer it, and one wait end.',
+        'Then move one axis and run it again, keeping the seed. The same seed brings the same ' +
+          'passengers, so what moved in the numbers is what you moved. That is how the feel of ' +
+          'it is learned. It is not how a difference is demonstrated: that is the Compare tab’s ' +
+          'job, and it takes a great many more runs.',
       ]),
     }),
   ]),
@@ -1453,8 +1446,7 @@ function freePlayBody(input: MenuViewInput): Body {
        * seed brings the same passengers. That is invariant 5 in the words a player has.
        */
       detail:
-        `Digits only, up to ${String(SEED_MAX_DIGITS)}. It names the run rather than measuring it — ` +
-        'the same seed brings the same passengers.',
+        `Digits only, up to ${String(SEED_MAX_DIGITS)}. The same seed brings the same passengers.`,
       kind: 'text',
       scope: 'between-games',
       enabled: true,
@@ -1493,14 +1485,13 @@ function freePlayBody(input: MenuViewInput): Body {
  * between a player who trusts the figure and one who should not have.
  */
 const FREE_PLAY_NOTE =
-  'One run, on day one: the building as it ships, with no tenant growth and nothing scheduled ' +
-  'against it. That is what makes it the run a leaderboard can replay.';
+  'One run of the building as it ships: day one, no tenant growth, nothing scheduled against ' +
+  'it. That is what lets a leaderboard replay it.';
 
 /* ---------------------------------------------------------------- settings */
 
 const SETTINGS_NOTE =
-  'These change how the simulation is drawn, never what it computes — so they cannot move a score ' +
-  'or make two runs incomparable.';
+  'These change how the simulation is drawn, never what it computes, so they cannot move a score.';
 
 function settingsRows(settings: Settings, viewMode: 'basic' | 'advanced'): readonly MenuAffordance[] {
   const toggle = (id: string, label: string, field: keyof Settings, value: boolean): MenuAffordance => ({
@@ -1535,8 +1526,7 @@ function settingsRows(settings: Settings, viewMode: 'basic' | 'advanced'): reado
        * is also why changing a chip does not move this select and vice versa.
        */
       detail:
-        'Your own multiplier on top of the ×1–×900 chips under the stage: the chips pick a run’s ' +
-        'pace, this scales all of them and survives changing chips',
+        'Multiplies the ×1–×900 speed chips under the stage, and stays when you change chip.',
       kind: 'select',
       scope: 'presentation',
       enabled: true,
@@ -1551,7 +1541,13 @@ function settingsRows(settings: Settings, viewMode: 'basic' | 'advanced'): reado
       scope: 'presentation',
       enabled: true,
       value: settings.theme,
-      options: (['system', 'dark', 'light'] as const).map((id) => ({ id, name: id })),
+      options: (
+        [
+          ['system', 'System'],
+          ['dark', 'Dark'],
+          ['light', 'Light'],
+        ] as const
+      ).map(([id, name]) => ({ id, name })),
       intent: { kind: 'set-setting', field: 'theme', value: settings.theme },
     },
   ]);
@@ -1569,9 +1565,19 @@ function settingsRows(settings: Settings, viewMode: 'basic' | 'advanced'): reado
  * out by pressing it.
  */
 const CAMPAIGN_NOTE =
-  'A week on one building: each day the tenants grow, something is booked against you, and the ' +
-  'bars rise. Clean shifts bank toward clearing the scenario. The Lab tab is a different thing — ' +
-  'it judges a dispatcher over a batch of replications rather than over a day.';
+  'A week on one building. Each day it grows, something is booked against you, and the bars rise.';
+
+/** The rest of what {@link CAMPAIGN_NOTE} used to say in the flow of the screen, behind a link. */
+const CAMPAIGN_HELP: MenuExplainer = Object.freeze({
+  link: 'How a scenario week works',
+  title: 'How a scenario week works',
+  body: Object.freeze([
+    'Each day the tenants grow, something is booked against you, and the bars rise.',
+    'Clean shifts bank toward clearing the scenario.',
+    'The Lab tab is a different thing: it judges a dispatcher over a batch of replications, not ' +
+      'over a day.',
+  ]),
+});
 
 /*
  * The note stays even though the row and the tab now share a word, because it disambiguates the
@@ -1620,7 +1626,7 @@ function campaignRows(calendarPeriodId: string): readonly MenuAffordance[] {
        */
       id: 'campaign.open',
       label: 'Pick a scenario',
-      detail: 'Opens the Scenarios board behind this menu — the week starts when you take one',
+      detail: 'Opens the Scenarios board. The week starts when you take one.',
       kind: 'commit',
       scope: 'between-games',
       enabled: true,
@@ -1629,7 +1635,7 @@ function campaignRows(calendarPeriodId: string): readonly MenuAffordance[] {
     {
       id: 'campaign.calendar',
       label: 'Calendar',
-      detail: 'A season over the week — it changes who is in the building, not how you are judged',
+      detail: 'A season over the week. It changes who is in the building, not how you are judged.',
       kind: 'select',
       /*
        * `between-games`. A period holds across a stretch of days and sets the premise the days
@@ -1645,7 +1651,7 @@ function campaignRows(calendarPeriodId: string): readonly MenuAffordance[] {
     {
       id: 'campaign.commissioning',
       label: 'Commission the building',
-      detail: 'Choose the shafts, the machines and their speeds — then live with them',
+      detail: 'Choose the shafts, the machines and their speeds, then live with them.',
       kind: 'navigate',
       scope: 'presentation',
       enabled: true,
@@ -1663,7 +1669,7 @@ function campaignRows(calendarPeriodId: string): readonly MenuAffordance[] {
        */
       id: 'campaign.fixit',
       label: 'Fix a building',
-      detail: 'A tower with one thing wrong and a tenant who has written in — the diagnosis is printed, the decision is what to spend',
+      detail: 'A tower with one thing wrong and a tenant’s complaint. The diagnosis is printed. You decide what to spend.',
       kind: 'commit',
       scope: 'presentation',
       enabled: true,
@@ -1683,7 +1689,7 @@ function campaignRows(calendarPeriodId: string): readonly MenuAffordance[] {
        */
       id: 'campaign.watch',
       label: 'Watch a run',
-      detail: 'A day filed on this device, or a shipped reference run, re-simulated here from its own record and replayed',
+      detail: 'Replay a day filed on this device, or a reference run. It is re-simulated here from its own record.',
       kind: 'commit',
       scope: 'presentation',
       enabled: true,
@@ -1692,7 +1698,7 @@ function campaignRows(calendarPeriodId: string): readonly MenuAffordance[] {
     {
       id: 'campaign.endless',
       label: 'Keep going',
-      detail: 'The same week with no assignment: it grows, nothing is banked, nothing clears',
+      detail: 'The same week with no assignment. It grows, but nothing is banked and nothing clears.',
       kind: 'commit',
       /*
        * `between-games`, because it starts one. It sits on this screen rather than on `main` because
@@ -1749,7 +1755,7 @@ function challengeBody(input: MenuViewInput): Body {
            * the door rather than what is not.
            */
           label: 'Open the leaderboard',
-          detail: 'What a posted run looks like, and what orders one board against another',
+          detail: 'See posted runs, and what orders a board',
           kind: 'navigate' as const,
           scope: 'presentation' as const,
           enabled: true,
@@ -1766,6 +1772,7 @@ function challengeBody(input: MenuViewInput): Body {
        */
       notices: Object.freeze([challenge?.notice ?? CHALLENGE_WITHOUT_ONE]),
       issues: Object.freeze([]),
+      explainers: [CHALLENGE_HELP],
     };
   }
 
@@ -1858,6 +1865,7 @@ function challengeBody(input: MenuViewInput): Body {
     rows: Object.freeze(rows),
     notices: Object.freeze(notices),
     issues: Object.freeze(challenge?.notice === undefined ? [] : [challenge.notice]),
+    explainers: [CHALLENGE_HELP],
   };
 }
 
@@ -1885,20 +1893,29 @@ function challengeBody(input: MenuViewInput): Body {
  * (`dev/measure.surfaceRuns.test.ts`), so any number here would be wrong for most of it.
  */
 const CHALLENGE_RUNNING =
-  'The seeds are running. They are not on the thread that draws this page, so the menu stays ' +
-  'yours while they finish — and picking a different dispatcher stops them, because they would be ' +
-  'runs of something else.';
+  'The seeds are running, and the menu still works while they finish. Picking a different ' +
+  'dispatcher stops them, because they would be runs of something else.';
 
 const CHALLENGE_WITHOUT_ONE =
-  'There is no challenge loaded. Here is what one is. Everybody gets the same building, the same ' +
-  'run length and the same numbered seeds — a seed generates the same passengers arriving at the ' +
-  'same moments, so the only thing that differs between two players is the dispatcher they chose. ' +
-  'A set is scored over all of its seeds rather than a lucky single run, and it is submitted whole ' +
-  'or not at all: a partial set is a different question, not a smaller score. A challenge opens ' +
-  'and closes on the server’s clock, and its board stays readable afterwards. Ordering that board ' +
-  'on one metric is a fact about what was posted and never a claim that one dispatcher beats ' +
-  'another — Compare is the only screen allowed to say that, and only with an interval that ' +
-  'excludes zero.';
+  'No challenge is loaded. In one, everybody gets the same building, the same run length and the ' +
+  'same numbered seeds, and only the dispatcher differs.';
+
+/** What a challenge is and how one is scored: the long account, behind a link on both states. */
+const CHALLENGE_HELP: MenuExplainer = Object.freeze({
+  link: 'How a challenge works',
+  title: 'How a challenge works',
+  body: Object.freeze([
+    'Everybody gets the same building, the same run length and the same numbered seeds. A seed ' +
+      'generates the same passengers arriving at the same moments, so the only thing that differs ' +
+      'between two players is the dispatcher they chose.',
+    'A set is scored over all of its seeds, not a lucky single run, and it is submitted whole or ' +
+      'not at all. A partial set is a different question, not a smaller score.',
+    'A challenge opens and closes on the server’s clock, and its board stays readable afterwards.',
+    'Ordering that board on one metric is a fact about what was posted and never a claim that one ' +
+      'dispatcher beats another. Compare is the only screen allowed to say that, and only with an ' +
+      'interval that excludes zero.',
+  ]),
+});
 
 /**
  * The four the server declares, and no fifth.
@@ -1930,13 +1947,13 @@ function windowLineFor(view: ChallengeView): string {
     case 'open':
       return view.closesInMs === null
         ? 'Open now.'
-        : `Open now — about ${hours(view.closesInMs)} left to post.`;
+        : `Open now. About ${hours(view.closesInMs)} left to post.`;
     case 'upcoming':
       return view.opensInMs === null
         ? 'Not open yet.'
-        : `Opens in about ${hours(view.opensInMs)}. You can run it now; you cannot post it yet.`;
+        : `Opens in about ${hours(view.opensInMs)}. You can run it now, but not post it yet.`;
     case 'closed':
-      return 'Closed. The board stays readable, and nothing further can be posted to it.';
+      return 'Closed. You can still read the board, but nothing more can be posted to it.';
   }
 }
 
@@ -1960,9 +1977,8 @@ function postRefusalFor(
   if (ran < seeds) {
     return {
       disabledWhy:
-        `A challenge is scored over all ${String(seeds)} seeds, and this browser has run ` +
-        `${String(ran)}. Run the set — a partial one is not a smaller score, it is a different ` +
-        'question.',
+        `This browser has run ${String(ran)} of ${String(seeds)} seeds. Run them all: a ` +
+        'challenge is scored over the whole set, and a partial one is a different question.',
     };
   }
   if (!input.canPost) return { disabledWhy: input.postingRefusal ?? 'Sign in to post a score.' };
@@ -2000,14 +2016,14 @@ function commissioningBody(input: MenuViewInput): Body {
       rows: Object.freeze([
         {
           id: 'commissioning.back-to-campaign',
-          label: 'Open the scenarios',
+          label: 'Open Scenarios',
           kind: 'navigate' as const,
           scope: 'presentation' as const,
           enabled: true,
           intent: { kind: 'navigate' as const, to: 'campaign' as const },
         },
       ]),
-      notices: Object.freeze(['There is no building loaded to commission yet.']),
+      notices: Object.freeze(['No building is loaded to commission yet.']),
       issues: Object.freeze([]),
     };
   }
@@ -2015,7 +2031,7 @@ function commissioningBody(input: MenuViewInput): Body {
   const rows: MenuAffordance[] = [
     {
       id: 'commissioning.constraint',
-      label: 'Under',
+      label: 'Constraint',
       detail: constraintById(state.constraintId)?.note ?? '',
       kind: 'select',
       scope: 'between-games',
@@ -2084,8 +2100,8 @@ function commissioningBody(input: MenuViewInput): Body {
     detail: moved
       ? `Undo all ${String(state.review.moved.length)} ${
           state.review.moved.length === 1 ? 'change' : 'changes'
-        } and return to the building as it stands.`
-      : 'The fabric is what the building already has.',
+        } and go back to the building as built.`
+      : 'Nothing has been changed yet.',
     kind: 'commit',
     scope: 'between-games',
     // Offered only when something has moved. A cancel that is always available on a screen where
@@ -2093,13 +2109,13 @@ function commissioningBody(input: MenuViewInput): Body {
     enabled: moved,
     ...(moved
       ? {}
-      : { disabledWhy: 'Nothing has been changed yet, so there is nothing to put back.' }),
+      : { disabledWhy: 'Nothing has changed yet, so there is nothing to put back.' }),
     intent: { kind: 'reset-commissioning' },
   });
   rows.push({
     id: 'commissioning.commit',
     label: 'Commission it',
-    detail: 'Take this fabric into the week. Nothing here moves again once the doors do.',
+    detail: 'Take this building into the week. Nothing here can change once the week starts.',
     kind: 'commit',
     scope: 'between-games',
     enabled: state.review.admissible,
@@ -2130,6 +2146,7 @@ function commissioningBody(input: MenuViewInput): Body {
       ...previewLines(state.review),
     ]),
     issues: Object.freeze(whole),
+    explainers: [COMMISSIONING_HELP],
   };
 }
 
@@ -2162,9 +2179,8 @@ function previewLines(review: CommissioningReview): readonly string[] {
     .map((moved) => `${moved.bankId} ${DIMENSION_LABELS[moved.dimension]} ${movedChoiceText(moved)}`)
     .join('; ');
   return [
-    `What you would be commissioning, against what the building has now: ${changes}. This says ` +
-      'what the hardware would be, and nothing about what it would buy — nothing has been ' +
-      'simulated yet.',
+    `Changed from the building as it stands: ${changes}. This is the hardware only. Nothing ` +
+      'has been simulated yet.',
   ];
 }
 
@@ -2176,9 +2192,7 @@ function previewLines(review: CommissioningReview): readonly string[] {
  * to it.
  */
 const COMMISSIONING_NOTE =
-  'Choose the fabric before the week opens, then live with it — nothing here moves once the doors ' +
-  'do. The capital figure is a limit on what you may build, not a score: it is never compared ' +
-  'between players, never shown beside a wait, and never enters a verdict.';
+  'The capital figure is a limit on what you may build, not a score.';
 
 /**
  * What this screen is *for* — GitHub issue #48's design brief.
@@ -2204,11 +2218,24 @@ const COMMISSIONING_NOTE =
  *    whole argument about a currency that quietly becomes a score.
  */
 const COMMISSIONING_BRIEF =
-  'Three things per bank: how many shafts it has, which machine class goes in them, and what ' +
-  'speed those are rated for. What you may move is the constraint’s to decide — retrofit freezes ' +
-  'the fabric entirely, refurbishment keeps the shafts you have, and a new build opens all three. ' +
-  'Change what you want, then commission it: from that point the week runs on this building, and ' +
-  'the only thing left to move is how the cars are dispatched.';
+  'Set each bank’s shafts, machine class and rated speed, then commission it. After that, only ' +
+  'the dispatching can change.';
+
+/** The long form of {@link COMMISSIONING_BRIEF} and {@link COMMISSIONING_NOTE}, behind a link. */
+const COMMISSIONING_HELP: MenuExplainer = Object.freeze({
+  link: 'How commissioning works',
+  title: 'How commissioning works',
+  body: Object.freeze([
+    'Three things per bank: how many shafts it has, which machine class goes in them, and what ' +
+      'speed those are rated for.',
+    'What you may move is the constraint’s to decide. Retrofit freezes the fabric entirely, ' +
+      'refurbishment keeps the shafts you have, and a new build opens all three.',
+    'Change what you want, then commission it. From that point the week runs on this building, ' +
+      'and the only thing left to move is how the cars are dispatched.',
+    'The capital figure is a limit on what you may build, not a score. It is never compared ' +
+      'between players, never shown beside a wait, and never enters a verdict.',
+  ]),
+});
 
 /* ------------------------------------------------------------- leaderboard */
 
@@ -2293,7 +2320,7 @@ function leaderboardBody(input: MenuViewInput): Body {
    * player to sign in.
    */
   const refusal = !input.hasRun
-    ? 'There is no finished run to post yet.'
+    ? 'No finished run to post yet.'
     : (input.rankingRefusal ?? input.postingRefusal);
 
   rows.push({
@@ -2319,7 +2346,7 @@ function leaderboardBody(input: MenuViewInput): Body {
     rows.push({
       id: 'leaderboard.challenge',
       label: 'This week’s challenge',
-      detail: 'The same seeds for everybody, and the dispatcher left free — the other question',
+      detail: 'Same seeds for everyone, and you pick the dispatcher.',
       kind: 'navigate',
       scope: 'presentation',
       enabled: true,
@@ -2330,7 +2357,7 @@ function leaderboardBody(input: MenuViewInput): Body {
   /*
    * Order matters: what the board *is* comes before what a reader may do about it. The refusal is
    * printed beside the reveal rather than instead of it, because a configuration line carrying
-   * `predictive-x — not in this build` needs the sentence that says what that dash means.
+   * `predictive-x (not in this version)` needs the sentence that says what that dash means.
    */
   const reveal = page === undefined ? undefined : boardRevealOf(configuration);
   const revealRefusal = page === undefined ? undefined : boardRevealRefusalOf(configuration);
@@ -2352,6 +2379,7 @@ function leaderboardBody(input: MenuViewInput): Body {
       ...(configuration.agreed && reveal !== undefined ? [BEATING_NOTE] : []),
     ]),
     issues: Object.freeze([]),
+    explainers: [BOARD_HELP],
   };
 }
 
@@ -2381,11 +2409,25 @@ function leaderboardBody(input: MenuViewInput): Body {
  * (§ D308) — restating it here is how this sentence went stale the first time.
  */
 const LEADERBOARD_NOTE =
-  'Rows are ranked on the named metric alone; the other figures sit beside it and are never ' +
-  'combined into a score. What every row ran in common is named above the table, and what they ' +
-  'differ on is named on each row — the dispatcher can be in either place, because a board does ' +
-  'not fix it. A seed is the number the passengers are generated from, so the same seed brings the ' +
-  'same people at the same moments.';
+  'Rows are ranked on the named metric alone. The other figures sit beside it and are never ' +
+  'combined into a score.';
+
+/** The rest of what {@link LEADERBOARD_NOTE} used to say in the flow of the screen, behind a link. */
+const BOARD_HELP: MenuExplainer = Object.freeze({
+  link: 'How to read a board',
+  title: 'How to read a board',
+  body: Object.freeze([
+    'Rows are ranked on the named metric alone. The other figures sit beside it and are never ' +
+      'combined into a score.',
+    'What every row ran in common is named above the table, and what they differ on is named on ' +
+      'each row. The dispatcher can be in either place, because a board does not fix it.',
+    'A seed is the number the passengers are generated from, so the same seed brings the same ' +
+      'people at the same moments.',
+    'The ids on a board are what the server replayed. The names beside them are this copy of ' +
+      'the game’s own: the board’s identity pins the profile the server loaded, and this ' +
+      'browser does not compute that digest.',
+  ]),
+});
 
 /* ------------------------------------------------------------------ account */
 
@@ -2430,7 +2472,7 @@ function accountBody(input: MenuViewInput): Body {
         {
           id: 'account.submit',
           label: 'Save this name',
-          detail: 'It is what appears on a board beside your figures',
+          detail: 'Shown on a board beside your figures',
           kind: 'commit' as const,
           scope: 'presentation' as const,
           enabled: true,
@@ -2469,9 +2511,9 @@ function accountBody(input: MenuViewInput): Body {
  * already known — which is the whole of § D241 § 7 — and because it is genuinely optional.
  */
 const NAMING_NOTE =
-  'You are signed in. The boards need a name to put beside your figures, and this is the first ' +
-  'moment it can be asked for without telling anyone whether your address was already known. Skip ' +
-  'it if you would rather: a generated name works everywhere, and nothing is withheld for it.';
+  'The boards put a name beside your figures. It is asked for now because this is the first ' +
+  'moment it can be without telling anyone whether your address was already known. Skip it if ' +
+  'you would rather: a generated name works everywhere, and nothing is withheld for it.';
 
 /* -------------------------------------------------------------------------- *
  * Applying an intent — the pure half

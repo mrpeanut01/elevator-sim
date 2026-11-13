@@ -423,7 +423,7 @@ describe('the renewal falls due when day 20 closes (§ D1357)', () => {
     expect(need.due).toBe(RENEWAL_DUE_CELL);
     expect(need.due).not.toContain('by day 20');
     expect(need.brief).toContain('Day 20 has closed');
-    expect(need.brief).toContain('does not run until you answer');
+    expect(need.brief).toContain('won’t start until you answer');
   });
 });
 

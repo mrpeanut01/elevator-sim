@@ -79,7 +79,7 @@ export function machineFieldOf(key: MachineRow['key']): string {
     case 'jerkMps3':
       return 'jerk.typical';
     case 'maxRiseM':
-      return 'maxRiseM — an advisory the loader warns on and builds anyway';
+      return 'maxRiseM (advisory: the loader warns and builds anyway)';
     case 'maxFloors':
       return 'maxFloors';
     case 'loadMinLb':
@@ -245,10 +245,10 @@ const SAVE_LABEL = 'Save as a new class';
  */
 const DRAFT_NOTE =
   commitmentOf('viewer.machineSpec', 'writes-only') === 'draft'
-    ? 'Nothing you move here reaches a run yet — this panel holds a draft of a machine class, and ' +
-      `the shift on screen keeps the cars it was simulated with. ${SAVE_LABEL} files it into the ` +
-      'library the next shift resolves against, with no further selection needed; it does not ' +
-      'put the class in any car, and it does not re-run the shift you are watching.'
+    ? 'Nothing you move here reaches a run yet. This panel holds a draft machine class, and the ' +
+      `shift on screen keeps the cars it ran with. ${SAVE_LABEL} adds it to the library the next ` +
+      'shift uses, with no further selection. It does not put the class in any car or re-run ' +
+      'the shift on screen.'
     : '';
 
 /* -------------------------------------------------------------------------- *
@@ -381,8 +381,8 @@ export function mountMachinesEditor(
           label: entry.label,
           selected: entry.pressed,
           title:
-            `Sets ratedSpeedMps.typical to ${entry.label}. On a short rise it is never reached, ` +
-            'so door and stop time dominate and this does less than it looks like it should.',
+            `Sets ratedSpeedMps.typical to ${entry.label}. A short rise never reaches it, so ` +
+            'door and stop time dominate there.',
           onPick: () => {
             patch({ speedTypicalMps: entry.speed });
           },

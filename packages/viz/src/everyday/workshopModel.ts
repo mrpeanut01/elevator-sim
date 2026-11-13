@@ -212,7 +212,7 @@ export const WORKSHOP_COPY = Object.freeze({
     'A rule can do only what the simulator can run. No rule masks off floors: which floors a ' +
     'shaft serves is the building’s, not the dispatcher’s.',
   rulesEmpty: 'No rules. The settings above decide every call.',
-  showTheMaths: 'show me the maths',
+  showTheMaths: 'Show the maths',
   mathsHeading: 'HOW A CAR IS CHOSEN',
 } as const);
 

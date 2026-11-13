@@ -5,37 +5,37 @@
     {
       "id": "the-basics",
       "name": "The basics",
-      "line": "The designs lifts have run on for decades. One idea each, and nothing else.",
+      "line": "The designs lifts have used for decades. Each has one idea.",
       "profileIds": ["nearest-car", "eta", "collective", "collective-enroute"]
     },
     {
       "id": "one-thing-first",
       "name": "One thing first",
-      "line": "Each puts one concern ahead of the rest, and pays for it somewhere else.",
+      "line": "Each puts one concern first and gives something up elsewhere.",
       "profileIds": ["fairness-first", "capacity-aware", "energy-aware"]
     },
     {
       "id": "divide-the-tower",
       "name": "Divide the tower",
-      "line": "Each car is given part of the building to look after.",
+      "line": "Each car looks after part of the building.",
       "profileIds": ["zoned-uppeak"]
     },
     {
       "id": "ask-the-destination",
       "name": "Ask where they are going",
-      "line": "Riders give their floor before they board, so a car can be filled by destination.",
+      "line": "Riders pick their floor before boarding, so cars can be filled by destination.",
       "profileIds": ["destination-eta", "destination-panel"]
     },
     {
       "id": "cars-that-bid",
       "name": "Cars that bid",
-      "line": "Each car prices the call for itself, and the bids decide who goes.",
+      "line": "Each car bids on a call, and the bids decide which car goes.",
       "profileIds": ["auction", "auction-multi-round"]
     },
     {
       "id": "everything-at-once",
       "name": "Everything at once",
-      "line": "Many concerns weighed together, with a forecast of where the crowd will be.",
+      "line": "Weighs many concerns together and forecasts where the crowd will be.",
       "profileIds": ["predictive-balanced"]
     }
   ]

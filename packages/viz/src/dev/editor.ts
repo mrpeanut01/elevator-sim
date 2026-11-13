@@ -87,6 +87,7 @@ import { buildLayout } from '../render/layout.js';
 import { describePreview, drawPreview } from '../render/preview.js';
 import type { Canvas2DLike, Theme } from '../render/canvas.js';
 import type { BrowserResources } from './data.js';
+import { explainer } from './dom.js';
 
 /**
  * Right gutter wide enough for `114.6 m  not permitted` — the lens's per-floor word.
@@ -312,7 +313,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       cell.className = 'dim';
       cell.textContent =
         floors.length === 0 && (building.floorRanges?.length ?? 0) > 0
-          ? 'no explicit floors — this building is declared by ranges only'
+          ? 'no explicit floors: this building is declared by ranges only'
           : 'no floors yet';
       row.append(cell);
       floorsBody.append(row);
@@ -389,7 +390,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     if (floors.length === 0) {
       declaration.agreement.textContent =
         (building.floorRanges?.length ?? 0) > 0
-          ? 'This building declares no explicit floors — its floors come from ranges, which the loader expands. A range has no position in the floors array to move.'
+          ? 'No explicit floors. This building’s floors come from ranges, and a range has no position in the floors array to move.'
           : 'No floors yet.';
       return;
     }
@@ -421,8 +422,8 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     // Two orders differing is ordinary — four of the five shipped buildings differ on open — so it
     // is stated as a fact about the file and never as a fault with it.
     declaration.agreement.textContent = declarationOrderMatchesBuildingOrder(floors)
-      ? 'This file happens to declare its floors in the same order the table above shows them — top floor first.'
-      : 'This file declares its floors in a different order from the table above. That is ordinary: most of the shipped buildings are written bottom-up.';
+      ? 'This file declares its floors in the same order as the table above: top floor first.'
+      : 'This file declares its floors in a different order from the table above. That is ordinary: most shipped buildings are written bottom-up.';
   }
 
   function renderRanges(building: BuildingConfig): void {
@@ -519,7 +520,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       }
       const zoningLabel = document.createElement('p');
       zoningLabel.className = 'dim';
-      zoningLabel.textContent = 'service zoning — floors these shafts physically reach';
+      zoningLabel.textContent = 'service zoning: floors these shafts physically reach';
       box.append(zoningLabel, zoning);
       banksNode.append(box);
     }
@@ -552,7 +553,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     if ((building.accessZones ?? []).length === 0) {
       const empty = document.createElement('p');
       empty.className = 'dim';
-      empty.textContent = 'no access zones — every credential group may select every floor';
+      empty.textContent = 'no access zones: every credential group may select every floor';
       zonesNode.append(empty);
     }
     renderLensPicker(building);
@@ -577,7 +578,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     lensSelect.disabled = groups.length === 0;
     lensNote.textContent =
       groups.length === 0
-        ? 'no credential groups in this building yet — add an access zone to use the lens'
+        ? 'no credential groups yet: add an access zone to use the lens'
         : LENS_OPERATIONAL_NOTE;
   }
 
@@ -621,7 +622,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       const note = document.createElement('li');
       note.className = 'dim';
       note.textContent =
-        'this document stopped at the schema stage, so cross-reference checks have not run yet — more issues may appear once these are fixed.';
+        'cross-reference checks have not run yet: fix these schema problems first, and more issues may appear.';
       issuesNode.append(note);
     }
 
@@ -631,7 +632,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       item.className = 'warn';
       const where = document.createElement('code');
       where.textContent = `${warning.file}:${warning.path}`;
-      item.append(where, ` — ${warning.message} (warning: suspicious, not fatal)`);
+      item.append(where, ` — ${warning.message} (warning, not an error)`);
       warningsNode.append(item);
     }
 
@@ -639,7 +640,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     runButton.disabled = !report.valid;
     runButton.title = report.valid
       ? 'simulate this building in the run viewer'
-      : `disabled: ${summary}. Fix the problems listed below.`;
+      : `${summary}. Fix the problems listed below to run it.`;
   }
 
   function renderPreview(): void {
@@ -747,7 +748,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
   async function openEntry(file: string): Promise<void> {
     if (history.state.isDirty) {
       const proceed = await options.confirm(
-        'This building has unsaved edits. Opening another one discards them. Continue?',
+        'Opening another building discards your unsaved edits. Continue?',
         'Discard and open',
       );
       if (!proceed) {
@@ -792,7 +793,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     void (async () => {
       if (history.state.isDirty) {
         const proceed = await options.confirm(
-          'This building has unsaved edits. Starting from blank discards them. Continue?',
+          'Starting from blank discards your unsaved edits. Continue?',
           'Discard and start over',
         );
         if (!proceed) return;
@@ -840,7 +841,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
 
       if (history.state.isDirty) {
         const proceed = await options.confirm(
-          `This building has unsaved edits. Importing ${file.name} discards them. Continue?`,
+          `Importing ${file.name} discards your unsaved edits. Continue?`,
           'Discard and import',
         );
         if (!proceed) return;
@@ -851,7 +852,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
         renderValidation();
         const proceed = await options.confirm(
           `${file.name} has ${String(imported.issues.length)} problem${imported.issues.length === 1 ? '' : 's'}, ` +
-            'listed under Validation. Open it anyway so they can be fixed here?',
+            'listed under Validation. Open it anyway to fix them here?',
           'Open anyway',
         );
         if (!proceed) {
@@ -889,7 +890,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
   discardButton.addEventListener('click', () => {
     void (async () => {
       const proceed = await options.confirm(
-        'Discard every change back to the loaded document?',
+        'Discard every change since this document was loaded?',
         'Discard',
       );
       if (!proceed) return;
@@ -910,7 +911,7 @@ export function mountEditor(options: EditorOptions): EditorHandle {
     anchor.download = `${history.current.id}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
-    statusNode.textContent = `downloaded ${history.current.id}.json — move it into data/buildings/ to make it a shipped building`;
+    statusNode.textContent = `downloaded ${history.current.id}.json. Move it into data/buildings/ to ship it.`;
   });
 
   runButton.addEventListener('click', () => {
@@ -1048,13 +1049,22 @@ export function mountEditor(options: EditorOptions): EditorHandle {
  * pre-empting it.
  */
 const DECLARATION_NOTE =
-  'The table above is in building order — highest index at the top, the direction the preview ' +
-  'draws. This list is the floors array in the order the file writes it, which is what you see in ' +
-  'the Document (JSON) below. ⇧ and ⇩ move a floor within that array and change nothing else: ' +
-  'index and heightM are shown here read-only and are edited in the table above, because the ' +
-  'loader requires the two to agree (floor-height-order) and an editor that renumbered them to ' +
-  'follow a reorder would be settling a modelling error on your behalf. Whether the document is ' +
-  'legal is the loader’s answer, listed under Validation below; this list never says.';
+  'The floors array in the order the file writes it. ⇧ and ⇩ move a floor within the array and ' +
+  'change nothing else.';
+
+/** The long account behind {@link DECLARATION_NOTE}, read once: it opens from a link. */
+const DECLARATION_EXPLAINER = Object.freeze({
+  link: 'Two orders, explained',
+  title: 'Declaration order',
+  body: Object.freeze([
+    'The table above is in building order: highest index at the top, the direction the preview ' +
+      'draws. This list is the floors array in the order the file writes it, which is what the ' +
+      'Document (JSON) below shows.',
+    'Index and heightM are read-only here. Edit them in the table above: the loader requires the ' +
+      'two to agree (floor-height-order), and moving a floor here does not renumber them.',
+    'Whether the document is legal is listed under Validation below. This list never says.',
+  ]),
+});
 
 /** The declaration-order view's own nodes. Rebuilt on every edit by `renderDeclaration`. */
 interface DeclarationSection {
@@ -1075,11 +1085,11 @@ function mountDeclarationSection(floorsTable: HTMLElement): DeclarationSection {
   const box = document.createElement('fieldset');
   box.id = 'ed-declaration';
   const legend = document.createElement('legend');
-  legend.textContent = 'Declaration order — the floors array as the file writes it';
+  legend.textContent = 'Declaration order';
   const note = document.createElement('p');
   note.className = 'dim';
   note.style.margin = '0 0 6px';
-  note.textContent = DECLARATION_NOTE;
+  note.append(DECLARATION_NOTE, ' ', explainer(document, DECLARATION_EXPLAINER));
   const agreement = document.createElement('p');
   agreement.id = 'ed-declaration-agreement';
   agreement.className = 'dim';

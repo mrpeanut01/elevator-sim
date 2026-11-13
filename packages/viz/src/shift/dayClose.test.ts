@@ -362,8 +362,8 @@ describe('the call that decided today — § D1248', () => {
       clockOf,
     });
     expect(line).toBe(
-      'The call that decided today came at 09:00, where you chose spread the cars across the tower: on this crowd, ' +
-        'the day run from 09:00 with park the cars in the lobby and nothing pressed after it read Shift missed.',
+      'The call that decided today came at 09:00, where you chose spread the cars across the tower. Run again on ' +
+        'this crowd from 09:00 with park the cars in the lobby and nothing pressed after, the day read Shift missed.',
     );
   });
 
@@ -418,7 +418,7 @@ describe('the call that decided today — § D1248', () => {
     const pinned = { atS: 3600, clearedBy: 'park-cars-lobby', missedBy: 'spread-cars' };
     expect(
       decidingCallLineOf({ verdict: 'cleared', records: [], pinned: { ...pinned, answered: 'park-cars-lobby' }, verdictOf, lineOf, clockOf }),
-    ).toContain('where you chose park the cars in the lobby: on this crowd, the day run from 09:00 with spread the cars');
+    ).toContain('where you chose park the cars in the lobby. Run again on this crowd from 09:00 with spread the cars');
     expect(
       decidingCallLineOf({ verdict: 'missed', records: [], pinned: { ...pinned, answered: undefined }, verdictOf, lineOf, clockOf }),
     ).toContain('where nothing was pressed');
@@ -473,7 +473,7 @@ describe('what decided today when no call did — § D1351', () => {
   it('credits the driver where the driver run, with every press kept, reads the other verdict', () => {
     const { line, asked } = callLine({ met: true, house: 'cleared', driver: 'missed' });
     expect(line).toBe(
-      `${NO_CALL_DECIDED_LINE} Your driver did: on this crowd, the same day with the tower’s standing order picked in ` +
+      `${NO_CALL_DECIDED_LINE} Your dispatcher did: on this crowd, the same day with the tower’s standing order picked in ` +
         'place of yours and every press kept read Shift missed.',
     );
     expect(asked).toEqual([1]);
@@ -482,7 +482,7 @@ describe('what decided today when no call did — § D1351', () => {
   it('reads the house as the driver run on a day with nothing pressed, and asks for no run of its own', () => {
     const { line, asked } = callLine({ met: true, recordOf: (day) => record(day, 'eta'), house: 'missed', driver: 'cleared' });
     expect(line).toBe(
-      `${NO_CALL_DECIDED_LINE} Your driver did: on this crowd, the same day with the tower’s standing order picked in ` +
+      `${NO_CALL_DECIDED_LINE} Your dispatcher did: on this crowd, the same day with the tower’s standing order picked in ` +
         'place of yours read Shift missed.',
     );
     expect(asked).toEqual([]);
@@ -491,7 +491,7 @@ describe('what decided today when no call did — § D1351', () => {
   it('credits the presses where the driver run reads the day’s verdict and the house the other', () => {
     const { line } = callLine({ met: true, house: 'missed', driver: 'cleared' });
     expect(line).toBe(
-      `${NO_CALL_DECIDED_LINE} Your driver did not: on this crowd, the same day with the tower’s standing order ` +
+      `${NO_CALL_DECIDED_LINE} Your dispatcher did not: on this crowd, the same day with the tower’s standing order ` +
         'picked in place of yours and every press kept read Shift cleared too. Your presses did, together: left ' +
         'alone, the tower’s standing order read Shift missed.',
     );
@@ -530,7 +530,7 @@ describe('what decided today when no call did — § D1351', () => {
         'picked in place of yours and every press kept.',
     );
     expect(callLine({ met: true, house: undefined, driver: 'cleared' }).line).toBe(
-      `${NO_CALL_DECIDED_LINE} Your driver did not: on this crowd, the same day with the tower’s standing order ` +
+      `${NO_CALL_DECIDED_LINE} Your dispatcher did not: on this crowd, the same day with the tower’s standing order ` +
         'picked in place of yours and every press kept read Shift cleared too. Whether your presses did waits on ' +
         'the house, which is still being run.',
     );
@@ -538,16 +538,16 @@ describe('what decided today when no call did — § D1351', () => {
       `${NO_CALL_DECIDED_LINE} What decided it waits on the house, which is still being run.`,
     );
     /* A driver run that answers the other verdict needs no house: the driver is credited at once. */
-    expect(callLine({ met: true, house: undefined, driver: 'missed' }).line).toContain('Your driver did:');
+    expect(callLine({ met: true, house: undefined, driver: 'missed' }).line).toContain('Your dispatcher did:');
   });
 
   it('says what could not be run, and claims nothing in its place', () => {
     expect(callLine({ met: true, house: 'cleared', driver: 'unrecorded' }).line).toBe(
-      `${NO_CALL_DECIDED_LINE} What decided it is not said: the same day with the tower’s standing order picked in ` +
+      `${NO_CALL_DECIDED_LINE} What decided it can’t be said: the same day with the tower’s standing order picked in ` +
         'place of yours could not be run on this crowd.',
     );
     expect(callLine({ met: true, house: 'unrecorded', driver: 'cleared' }).line).toContain(
-      'Whether your presses did is not said: the house could not be run on this crowd.',
+      'Whether your presses did can’t be said: the house could not be run on this crowd.',
     );
   });
 
@@ -568,7 +568,7 @@ describe('what decided today when no call did — § D1351', () => {
     expect(callLine({ house: 'cleared', driver: 'ungraded' }).line).toBe(NO_CALL_DECIDED_LINE);
     /* The stage raised no call: the same decision, after the report's own sentence. */
     expect(callLine({ house: 'cleared', driver: 'missed', report: { decidingCall: NO_CALL_RAISED_LINE } }).line).toBe(
-      `${NO_CALL_RAISED_LINE} Your driver did: on this crowd, the same day with the tower’s standing order picked in ` +
+      `${NO_CALL_RAISED_LINE} Your dispatcher did: on this crowd, the same day with the tower’s standing order picked in ` +
         'place of yours and every press kept read Shift missed.',
     );
     /* A day nobody graded files no call sentence, and the close draws none. */

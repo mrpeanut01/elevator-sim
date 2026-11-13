@@ -156,12 +156,12 @@ describe('the hold line â€” forty past two minutes at once, read at the streamâ€
     const window = broke.saturation!;
     expect(window.windowEndS).toBeGreaterThan(broke.atS);
     expect(brokeView.account[1]).toContain(`the ${heldClock(broke.heldS)} this rush held`);
-    expect(brokeView.account[1]).toContain('whole generated climb');
+    expect(brokeView.account[1]).toContain('whole climb');
     expect(brokeView.account[1]).not.toMatch(/Over the [\d:]+ the trend test covers/u);
     /* Where the window ends inside the rush, the one horizon it names is inside the run. */
     const inside = { ...broke, saturation: { ...window, windowEndS: broke.atS } };
     expect(rushResultViewOf(inside, undefined).account[1]).toMatch(/Over the [\d:]+ the trend test covers/u);
-    expect(rushResultViewOf(inside, undefined).account[1]).not.toContain('generated climb');
+    expect(rushResultViewOf(inside, undefined).account[1]).not.toContain('whole climb');
     /* And the quiet verdict, fitted past the rush, says the same about its window. */
     const quiet = { ...broke, saturation: { ...window, verdict: 'stable' as const } };
     expect(rushResultViewOf(quiet, undefined).account[1]).toContain(`past the ${heldClock(broke.heldS)} this rush held`);

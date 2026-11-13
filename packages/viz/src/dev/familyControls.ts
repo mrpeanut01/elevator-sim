@@ -198,17 +198,17 @@ export const FAMILY_ORDER: readonly DispatcherFamily[] = Object.freeze([
 
 /** What each block is called on screen. One phrase, in the reader's words, naming the stage. */
 export const FAMILY_TITLES: Readonly<Record<DispatcherFamily, string>> = Object.freeze({
-  panel: 'The destination panel — who is told which car, and when',
+  panel: 'Destination panel',
   timing: 'Registration and assignment timing',
-  zoning: 'Operational zoning — splitting a landing across cars',
-  reassignment: 'Reassignment — when a promise stops being changeable',
+  zoning: 'Operational zoning',
+  reassignment: 'Reassignment',
   constraints: 'Eligibility and hard constraints',
-  auction: 'The auction — who aggregates the bids',
-  load: 'The load sensor',
+  auction: 'Auction',
+  load: 'Load sensor',
   doors: 'Doors and dwell',
   parking: 'Where an idle car waits',
-  forecast: 'The arrival forecast',
-  normalization: 'Cost normalization — the half-cost points',
+  forecast: 'Arrival forecast',
+  normalization: 'Cost normalization',
 });
 
 /**
@@ -272,10 +272,9 @@ export const REFUSED_SECTION = 'selection';
  * (*"its mid-run weight-set selection"*) left the reader to find.
  */
 export const SELECTION_REFUSAL =
-  'Its mid-run weight-set selection is not editable here, and not because nothing reads it: the ' +
-  'Selector panel owns those seven fields, and the run rebuilds selection from what that panel ' +
-  'holds — so a second copy set here would be overwritten before the shift started. Saving keeps ' +
-  'this dispatcher’s own selection block exactly as it is.';
+  'Mid-run weight-set selection is set in the Selector panel, not here: the run rebuilds it from ' +
+  'that panel, so a copy here would be overwritten. Saving keeps this dispatcher’s own selection ' +
+  'block as it is.';
 
 /* -------------------------------------------------------------------------- *
  * The partition — § 3.6's completeness clause as a value
@@ -398,24 +397,21 @@ export function familyOverridesOf(
   if (zoned) {
     notes.set(
       'dispatch.assignmentMode',
-      'A zoning control above is on — “Give each car a slice of the tower”, or the Express zoning ' +
-        'lever — and it writes split-demand into this field, so the run uses that. Turn it off and ' +
-        'this control decides again.',
+      'A zoning control above is on (“Give each car a slice of the tower” or Express zoning) and ' +
+        'writes split-demand here, so the run uses that. Turn it off to use this control.',
     );
   }
   if (parked) {
     notes.set(
       'idle.parkingStrategy',
-      'A parking control above is on — the zoning switch, Express zoning or Park in the lobby — ' +
-        'and it writes this field, so the run uses its answer. Turn them off and this control ' +
-        'decides again.',
+      'A parking control above is on (the zoning switch, Express zoning or Park in the lobby) ' +
+        'and writes this field, so the run uses that. Turn them off to use this control.',
     );
   }
   if (levers.dwell !== undefined) {
     const said =
-      'A door-dwell chip is pressed above, and the chip writes this field, so the run uses the ' +
-      'chip’s value. Press the lit chip again to return to the dispatcher’s own dwell and this ' +
-      'control decides.';
+      'A door-dwell chip above is pressed and writes this field, so the run uses the chip’s ' +
+      'value. Press the lit chip again to use this control.';
     notes.set('answer.dwellPolicy', said);
     notes.set('answer.dwellAdaptationGain', said);
     notes.set('answer.maxDwellS', said);
@@ -473,17 +469,14 @@ export const FAMILY_EYEBROW = 'THE FIVE FAMILIES';
  * which function reads it.
  */
 export const FAMILY_NOTE =
-  'Everything below is generated from the schema core declares — the same dimensions a tuning run ' +
-  'would search, with their own ranges, defaults and gates. Each block names the function that ' +
-  'reads it on a real run, so a control here is never a control over a field nothing consults. A ' +
-  'control whose gate is unmet is drawn disabled with the gate named, never hidden.';
+  'Generated from the schema core declares: the dimensions, ranges, defaults and gates a tuning ' +
+  'run would search. Each block names the function that reads it on a run. A control whose gate ' +
+  'is unmet is disabled with the gate named, never hidden.';
 
 /** The {@link FLAG_OWNED} sentence — said rather than left out. */
 export const FAMILY_ELSEWHERE =
-  'Two dimensions are missing from these blocks on purpose, and both already have a control: ' +
-  'dispatch.callType is the “Ask where they are going” switch above, and answer.bypassLoadThreshold ' +
-  'is “Read the load sensor”. Each of those switches writes its field on every save, so a second ' +
-  'control here would be a control that never wrote anything.';
+  'Two dimensions have their control above instead: dispatch.callType is the “Ask where they are ' +
+  'going” switch, and answer.bypassLoadThreshold is “Read the load sensor”.';
 
 export interface FamilyControlsInput {
   readonly space: SearchSpace;
@@ -536,7 +529,7 @@ export function familyControlsViewOf(input: FamilyControlsInput): FamilyControls
     note: FAMILY_NOTE,
     blocks,
     status:
-      `${String(drawn)} of ${String(input.space.ids.length)} declared dimensions are drawn here · ` +
+      `${String(drawn)} of ${String(input.space.ids.length)} declared dimensions drawn · ` +
       `${String(live)} live at this setting · ${String(moved)} moved from the dispatcher you opened`,
     elsewhere: FAMILY_ELSEWHERE,
   };

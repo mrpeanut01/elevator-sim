@@ -320,8 +320,8 @@ export const TUNE_CARDS: readonly TuneCard[] = Object.freeze([
       },
       {
         key: 'cars',
-        label: 'Shafts',
-        hint: 'how many cars run',
+        label: 'Cars',
+        hint: 'how many run',
         unit: '',
         min: 1,
         max: 12,
@@ -545,9 +545,9 @@ export function tuneSandboxStrip(moved: readonly TuneKey[]): TuneSandboxStrip {
    */
   if (moved.length === 0) {
     return {
-      state: 'Nothing changed yet — a sandbox day all the same',
+      state: 'Nothing changed yet. Still a sandbox day.',
       note:
-        'A run from here never counts, and your week stays where it is. The day that counts ' +
+        'A run from here never counts. The day that counts ' +
         'starts from its brief.',
     };
   }
@@ -592,7 +592,7 @@ export const TUNER_COPY = Object.freeze({
    * refuses beside such a template, so it would have been a control that changes nothing.
    */
   lobbyShareIsTheDays:
-    'Arriving at the lobby is not offered on this day: the day sets who arrives where, hour by hour.',
+    'Arriving at the lobby isn’t offered today: the day sets who arrives where, hour by hour.',
 } as const);
 
 /**

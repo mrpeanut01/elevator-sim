@@ -977,6 +977,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       ids: [
         'dev/dom.ts#chip',
         'dev/dom.ts#chipRow',
+        /*
+         * `explainer` draws a link and a popover from what its caller hands it. Its one face of
+         * its own, the close button's, is `EXPLAINER_CLOSE_LABEL`, which the `EVERYDAY_MENU`
+         * adapter drives beside the Everyday twin's.
+         */
+        'dev/dom.ts#explainer',
         'dev/dom.ts#figure',
         'dev/dom.ts#fillPlate',
         'dev/dom.ts#pick',

@@ -48,7 +48,7 @@ import type { PostedClaim, PostedResult, WatchableRun } from './types.js';
  * -------------------------------------------------------------------------- */
 
 /** The pill's verb. See the module docstring for why it is not *the server*. */
-export const REPLAY_PILL_VERB = 'VERIFIED BY RE-SIMULATION';
+export const REPLAY_PILL_VERB = 'CHECKED BY RE-RUNNING';
 
 /**
  * What a reference run says where a rank would go — § 14.1's sentence, verbatim, and § 20.11's
@@ -68,7 +68,7 @@ export const FILED_DAY_LINE = 'a day filed on this device · replayed from its r
  * (`watch/posted.ts#postedSubtitleOf`), so this line says what kind of thing the row is and who
  * vouched for it: the server, by its own replay, and then this build by another.
  */
-export const POSTED_RUN_LINE = "a run posted to today's board · verified by the server, and replayed here";
+export const POSTED_RUN_LINE = "from today's board · checked by the server and replayed here";
 /** The mean a board row could not vouch for — the row withheld it, and so does this header. */
 export const CLAIM_WITHHELD = 'withheld';
 
@@ -106,7 +106,7 @@ export const PLAY_THIS_CROWD_LABEL = 'Play this crowd yourself';
  * otherwise — so the note says which.
  */
 export const POSTED_FIGURES_NOTE =
-  'the figures above are what this record was filed with, and this replay reproduced them';
+  'These are the figures the record was filed with. This replay reproduced them.';
 
 /* -------------------------------------------------------------------------- *
  * The view
@@ -221,12 +221,12 @@ export function postedFiguresOf(posted: PostedResult): readonly PostedFigure[] {
     {
       id: 'minutePct',
       value: `${String(posted.minutePct)}%`,
-      label: `posted, away in a minute — of ${String(posted.carried)} carried`,
+      label: `posted: away in a minute, of ${String(posted.carried)} carried`,
     },
     {
       id: 'worstWaitS',
       value: `${String(posted.worstWaitS)} s`,
-      label: 'the longest wait on that record',
+      label: 'longest wait in that record',
     },
     {
       id: 'arrived',
@@ -249,8 +249,8 @@ export function claimedFiguresOf(claim: PostedClaim): readonly PostedFigure[] {
       id: 'awtS',
       value: quotable ? `${claim.awtS.toFixed(1)} s` : CLAIM_WITHHELD,
       label: quotable
-        ? `mean wait they posted — over ${String(claim.legs)} rides`
-        : 'mean wait — the server could not vouch for a quotable average on this run',
+        ? `mean wait they posted, over ${String(claim.legs)} rides`
+        : 'mean wait: the server could not confirm an average for this run',
     },
     {
       id: 'wt95S',

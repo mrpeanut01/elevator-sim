@@ -147,10 +147,9 @@ export function practiceCrowdOf(shared: bigint): bigint {
 export const PRACTICE_DAY_SENTENCES: Readonly<Record<PracticeGround, string>> = Object.freeze({
   practiceCrowd:
     'This run does not count toward the week: it is a sandbox day on a practice crowd, not the ' +
-    'day’s shared one, and your week is where you left it.',
+    'day’s shared one.',
   sandbox:
-    'This run does not count toward the week: it is a sandbox day with the changes you made, and ' +
-    'your week is where you left it.',
+    'This run does not count toward the week: it is a sandbox day with the changes you made.',
   crowd:
     'This run does not count toward the week: it meets a crowd other than the day’s shared one, ' +
     'so the day stays open for that crowd.',
