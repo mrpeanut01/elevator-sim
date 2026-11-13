@@ -424,73 +424,53 @@ directions in `traffic/transportRoute.test.ts`. Sky lobby A is the one that matt
 interchangeable, and joining them took a cross-lobby interfloor journey from **four lift legs to
 two**.
 
-### Stairs — this section carries no calibrated figure, and none has been invented
+### Stairs — the times are derived from two cited speeds, and the share who walk is an assumption
 
-`packages/core/src/config/types.ts` tells the author of a transport mode that `traversalTimeS` is a
-**reference value and must be cited** in the declaring building's `$comment`, and points here. For
-an escalator that pointer is good: the table above is a derivation from BS EN 115-1's own limits,
-and every step of it is checkable. **For a stairs mode this document has nothing to give you, and
-this subsection exists to say so rather than to let the pointer read as coverage.**
+A stairs mode declares two things an escalator does not. They stand on different footing, and a
+source for one is not a source for the other.
 
-A stairs mode declares two things an escalator does not, and neither is derivable the way 21.2 s
-was:
+| field | what it is | where the number comes from | standing |
+|---|---|---|---|
+| `traversalTimeS: { upS, downS }` | how long one person takes to walk the rise, up and down | the rise divided by a vertical walking speed: **0.155 m/s up, 0.21 m/s down** | **cited at one remove.** `data/buildings/st-jude-hospital.json` cites Fruin's stair-flow work for 0.15–0.20 m/s climbing and about 1.35 times that descending. Nobody writing this section opened Fruin; the citation is that building's |
+| `use: { up, down }` | the share of people going one floor who walk | nothing published | **an assumption.** `st-jude-hospital` states 0.35 up and 0.55 down as one, and says so in its `$comment` |
 
-| field | what kind of number it is | why the escalator derivation does not transfer |
-|---|---|---|
-| `traversalTimeS: { upS, downS }` | a **human** ascent and descent time over a known rise | EN 115-1 fixes an *escalator's* angle, nominal speed and flat-step count, so its traversal time is geometry. A stair standard governs the stair's geometry — going, riser, width — and says nothing about the speed of the person on it, still less about how much slower that person climbs than descends |
-| `use: { up, down }` | a **behavioural** probability, per building | `StairsUseConfig` requires it per building precisely because it is not a constant: a hotel's guests, an office tower's staff and a hospital's do not behave alike. There is no default in code for the same reason — a default would put an uncited behavioural claim into every study that declared a stair |
+**The derivation, for St Jude's 4.0 m floor.** 4.0 / 0.155 = 25.8 s, written as 26. 4.0 / 0.21 =
+19.05 s, written as 19. `authoring/buildingSpec.ts#stairSecondsFor` does this arithmetic to the
+whole second and never lets the climb be quicker than the descent.
 
-**Nothing here has been consulted.** No CIBSE Guide D page, no ISO 8100-32 clause, and no
-lift-engineering paper on stair uptake was opened while this subsection was written, so no figure
-is quoted and no source is named as though one had been. That is a deliberate outcome and not an
-oversight: this repository retracted **two** escalator/lobby citations in a single wave for exactly
-the fault of naming a document nobody had read (`DECISIONS.md` § D207), and the same wave's
-crowding term now cites nothing and says so. A stated *"we have no calibrated figure for this"* is
-a fact a reader can act on. A plausible number beside a plausible source is not.
+**What the building designer does with it.** A new stair's form opens on `stairSecondsFor` of the
+floor height and on St Jude's two shares, and says the shares are a starting guess. A time left at
+the derived pair follows the floor height if it changes, and is written to the document as
+`Traversal time DERIVED`. A time the author typed is left alone and written as
+`SET BY HAND and NOT cited`. The shares are written as assumed either way.
 
-**What an author of the first stairs mode must do.** In order, and all four:
+**What has not been read.** No stair-use table has been opened. CIBSE Guide D (stair usage by floor
+delta) and ISO 8100-32 are the leads `docs/14-building-behaviour-contract.md` § 3.3 names; Guide D
+was tried on 2026-11-12 and could not be read. Neither is in § Sources on this section's account.
+So `use` does not vary by building type anywhere in this repository, and it should: a hotel's
+guests, an office's staff and a hospital's do not behave alike. `core` has no default for it in
+code for that reason.
 
-1. **Open a document and record which one**, in the declaring building's `$comment`: title,
-   edition or year, and the clause, table or figure the number comes from. Not "CIBSE Guide D" —
-   the part of it you read.
-2. **Say what population it was measured on.** `use` is population-specific by construction, so a
-   figure with no stated population cannot be checked against the building it is authored on.
-3. **Show the arithmetic if the figure is derived** rather than quoted, the way the `G ↔ 2` table
-   above shows every step from inclination to landing-to-landing seconds. A derived number whose
-   derivation is not written down is a quoted number with the source removed.
-4. **If no citable figure can be found, do not declare the stair.** A building with no stairs mode
-   is a stated absence and costs nothing; a stairs mode carrying invented numbers is a fabricated
-   result that every run will happily average and no test will question.
+**What an author who changes either must do.**
 
-**What the loader will and will not do for you.** `config/schema.ts` refuses a scalar
-`traversalTimeS` on a stairs mode, refuses a directional pair on an escalator, requires `use` on a
-stairs mode, refuses `use` on an escalator, and refuses `upS < downS` as an inverted asymmetry
-rather than a declared one. Every one of those is an **internal-consistency** check. A pair of
-invented numbers that happen to satisfy `upS >= downS` passes all five, which is the whole reason
-this subsection is written as a citation requirement and not as a schema note.
+1. **Name the document and the part of it you read**: title, edition or year, and the clause,
+   table or figure. Not "CIBSE Guide D".
+2. **Say what population it was measured on.** A share with no stated population cannot be checked
+   against the building it is authored on.
+3. **Show the arithmetic if the figure is derived**, as above.
+4. **If there is no citable figure, say it is an assumption**, in the building's `$comment`, the
+   way St Jude does. An unlabelled invented number is a fabricated result that every run will
+   average and no test will question.
 
-**Where to look, offered as leads and explicitly not as citations.**
-`docs/14-building-behaviour-contract.md` § 3.3's closing note names CIBSE Guide D (stair usage by
-floor delta, lobby densities) and ISO 8100-32 (transfer times under crowding) as the documents to
-start from. Neither has been consulted for this section, so neither appears in § Sources below on
-its account. Whoever does consult one should replace this subsection with a derivation table in the
-shape of the escalator's, add the entry to § Sources, and say which of the two fields it calibrates
-— a source for `upS`/`downS` is not a source for `up`/`down`.
+**What the loader checks, and what it cannot.** `config/schema.ts` refuses a scalar
+`traversalTimeS` on a stairs mode, a directional pair on an escalator, a stairs mode without `use`,
+`use` on an escalator, and `upS < downS`. All five are internal-consistency checks. A pair of
+invented numbers with `upS >= downS` passes every one, which is why the list above is a citation
+rule and not a schema note.
 
-**Nothing in this repository depends on a stair figure today.** No shipped building in
-`data/buildings/` declares a `stairs` mode; `vertical-city` is the only building with
-`transportModes` at all, and all four of them omit `kind`, which is `escalator`. The routing and
-uptake code is exercised from test fixtures. So this is a gap in front of the first author, not
-underneath a published number.
-
-**Since then (2026-11-12): one stair is shipped and the designer suggests one.**
-`st-jude-hospital` declares a `stairs` mode and cites Fruin's stair-flow work for its two walking
-speeds, 0.155 m/s up and 0.21 m/s down. The Everyday building designer fills a new stair's times
-from those same two speeds over the building's floor height (`authoring/buildingSpec.ts`'s
-`stairSecondsFor`), and the saved document says so. No further source was read for the designer,
-so its speeds rest on the hospital's citation. Its `use` pair, 0.35 up and 0.55 down, is the
-hospital's stated assumption and is written as one. The four steps above still bind anyone who
-changes either.
+**What depends on these figures.** `st-jude-hospital` is the only shipped building with a stairs
+mode. `vertical-city`'s four transport modes omit `kind`, which is `escalator`. Any building saved
+from the designer with a stair carries the figures above.
 
 ### Escalator carrying capacity
 

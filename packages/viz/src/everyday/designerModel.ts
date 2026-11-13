@@ -70,6 +70,7 @@ import {
   stairsAbove,
   escalatorCarriesLiftJourneys,
   groupsOf,
+  HYDRAULIC_CLASS_ID,
   layoutOf,
   orphanFloorsOf,
   pairedOnlyGroupsOf,
@@ -787,6 +788,26 @@ export function designerWarnings(
 
   for (const refusal of analysis.refusals) {
     warnings.push({ severity: 'blocker', text: `This cannot be built: ${refusal}` });
+  }
+
+  /*
+   * A group that mixes a hydraulic lift with traction ones gets neither the plan's rope nor its
+   * regenerative drive (`towerPlan.ts#groupIsTraction`), so its traction lifts run without what
+   * the reader chose. Said only when a rope or a drive is chosen: otherwise nothing is lost.
+   */
+  if (plan.ropeClass !== undefined || plan.regenerativeDrive) {
+    for (const group of groups) {
+      const hydraulic = group.shafts.filter((index) => plan.shafts[index]?.machine.specClass === HYDRAULIC_CLASS_ID);
+      if (hydraulic.length === 0 || hydraulic.length === group.shafts.length) continue;
+      const letters = groupLettersOf(group);
+      const which = hydraulic.map((index) => shaftLabelOf(index)).join(' ');
+      warnings.push({
+        severity: 'class',
+        text:
+          `Group ${letters} mixes hydraulic and traction lifts, so none of it gets the rope or the regenerative drive you chose. ` +
+          `To keep them, change shaft ${which} to a traction class or give it different floors.`,
+      });
+    }
   }
 
   /* Class limits, one line per class that some shaft is outside, naming the shafts and both numbers. */
