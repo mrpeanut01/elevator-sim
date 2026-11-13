@@ -2534,7 +2534,7 @@ found unfailable at day 1, day 5 **and** day 10, and it is not in the band.
 | as shipped (5 %, as built) | 1/50 |
 | the rate swept 3 → 17 % at the shipped fabric | 0.17, 0.10, 0.03, then **0.00 at every rate from 6 up** |
 | 7 % (the profile's declared **maximum**), let at 1.95 | **0/50** |
-| 7 %, let at 1.95, **both cars at 0.5 m/s** — the bottom of the hydraulic band | **0/50** |
+| 7 %, let at 1.95, **both cars at 0.5 m/s** — the bottom of the hydraulic band when this was run (0.25 m/s since 2026-11-12, unmeasured here) | **0/50** |
 | 7 %, let at 2.0, **one** car | **0.40** at 30 seeds; **0.36** at 50 |
 
 **So one configuration reaches the band, and it is refused.** A bank with one shaft has no assignment

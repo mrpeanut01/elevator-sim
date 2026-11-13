@@ -208,12 +208,12 @@ describe('the warnings, most serious first, and the fixes some of them carry', (
     const tall = { ...SIZED, floors: 13 };
     const warnings = warningsOf(tall);
     expect(warnings[0]?.severity).toBe('blocker');
-    expect(warnings[0]?.text).toContain('No lift opens at 13');
+    expect(warnings[0]?.text).toContain('No lift stops at 13');
   });
 
   it('offers the one press that joins stranded floors to the lobby, and the press mends it', () => {
     const cut = withSkyLobbyToggled(skyLobbyPlan(), [30]);
-    const stranded = warningsOf(cut).find((warning) => warning.text.includes('nobody can board from the street'));
+    const stranded = warningsOf(cut).find((warning) => warning.text.includes('cannot be reached from the lobby'));
     expect(stranded?.severity).toBe('blocker');
     expect(stranded?.fix?.label).toBe('Make floor 30 a sky lobby');
     const mended = stranded?.fix?.apply(cut) as TowerPlan;
@@ -223,11 +223,11 @@ describe('the warnings, most serious first, and the fixes some of them carry', (
 
   it('refuses a group made only of two-car shafts, and its fix leaves one ordinary shaft', () => {
     const all = withCars(SIZED, SIZED.shafts.map((shaft) => shaft.key), 2);
-    const paired = warningsOf(all).find((warning) => warning.text.includes('holds two cars'));
+    const paired = warningsOf(all).find((warning) => warning.text.includes('Every shaft in group'));
     expect(paired?.severity).toBe('blocker');
     const mended = paired?.fix?.apply(all) as TowerPlan;
     expect(mended.shafts.map((shaft) => shaft.cars)).toEqual([2, 2, 2, 1]);
-    expect(warningsOf(mended).some((warning) => warning.text.includes('holds two cars'))).toBe(false);
+    expect(warningsOf(mended).some((warning) => warning.text.includes('Every shaft in group'))).toBe(false);
   });
 
   it('names the floor a double deck cannot pair, and its fix takes the second deck off', () => {
@@ -239,16 +239,16 @@ describe('the warnings, most serious first, and the fixes some of them carry', (
      * wrote and what the upper car cannot do, and no longer says the pair locks.
      */
     const one = withCars(SIZED, [keyAt(SIZED, 0)], 2);
-    const locked = warningsOf(one).find((warning) => warning.text.includes('a pair of cars'));
+    const locked = warningsOf(one).find((warning) => warning.text.includes('holds two cars'));
     expect(locked?.severity).toBe('comfort');
     expect(locked?.text).toContain('The lower car serves 6 and below');
     expect(locked?.text).not.toContain('locks');
     expect(warningsOf(one).some((warning) => warning.severity === 'blocker')).toBe(false);
     expect((locked?.fix?.apply(one) as TowerPlan).shafts.every((shaft) => shaft.cars === 1)).toBe(true);
-    expect(warningsOf(SIZED).some((warning) => warning.text.includes('a pair of cars'))).toBe(false);
+    expect(warningsOf(SIZED).some((warning) => warning.text.includes('holds two cars'))).toBe(false);
 
     const unpaired = warningsOf(decked).find((warning) => warning.text.includes('double-deck'));
-    expect(unpaired?.text).toContain('12 has no floor beside it');
+    expect(unpaired?.text).toContain('12 has no stop next to it');
     expect((unpaired?.fix?.apply(decked) as TowerPlan).shafts[0]?.decks).toBe(1);
   });
 
@@ -407,13 +407,13 @@ describe('what the side panel says about a floor and about a shaft’s doors', (
   });
 
   it('says a shaft’s doors in words, and a double deck’s as pairs', () => {
-    expect(designerServiceLine(SIZED, SIZED.shafts[0] as PlanShaft)).toBe('Local — doors open at G–12.');
+    expect(designerServiceLine(SIZED, SIZED.shafts[0] as PlanShaft)).toBe('Local. Doors open at G–12.');
     const closed = withStopToggled(SIZED, keyAt(SIZED, 0), 7);
-    expect(designerServiceLine(closed, closed.shafts[0] as PlanShaft)).toBe('Hand-picked — doors open at G–6, 8–12.');
+    expect(designerServiceLine(closed, closed.shafts[0] as PlanShaft)).toBe('Hand-picked. Doors open at G–6, 8–12.');
     const tall = supertallPlan();
     const shuttle = tall.shafts.find((entry) => entry.decks === 2) as PlanShaft;
     expect(designerServiceLine(tall, shuttle)).toBe(
-      'Shuttle, double-deck — doors open at G with 1, 34 with 35, 67 with 68.',
+      'Shuttle, double-deck. Doors open at G with 1, 34 with 35, 67 with 68.',
     );
   });
 });
@@ -430,7 +430,7 @@ describe('the steps, the templates and an opened building', () => {
     for (const template of PLAN_TEMPLATES) {
       const taller = withFloors(template.make(), template.make().floors + 9);
       const blockers = designerWarnings(taller, CLASSES, planAnalysisOf(taller, SPECS), 'metric').filter(
-        (warning) => warning.text.startsWith('No lift opens'),
+        (warning) => warning.text.startsWith('No lift stops'),
       );
       expect(blockers, template.id).toEqual([]);
     }
@@ -443,7 +443,7 @@ describe('the steps, the templates and an opened building', () => {
     const reading = planFromBuilding(midtown, 'midtown-office');
     const line = designerLossLine(reading.plan.name, reading.notCarried);
     expect(line).toContain('Opened from Midtown Office.');
-    expect(line).toContain('Saving makes a new building and leaves Midtown Office as it was.');
+    expect(line).toContain('Saving makes a new building; Midtown Office is unchanged.');
     expect(designerLossLine('Anything', [])).toBe('');
   });
 });

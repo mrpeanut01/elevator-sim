@@ -86,6 +86,9 @@ import {
   type SpecBelowLobbyFloor,
   type SpecMachine,
   type SpecTransportMode,
+  STAIR_CLIMB_MPS,
+  STAIR_DESCEND_MPS,
+  stairSecondsFor,
 } from './buildingSpec.js';
 
 /** What a car is for. `core`'s own closed list, read off the car record so a rename fails here. */
@@ -796,8 +799,11 @@ export function buildingFromPlan(plan: TowerPlan, specs: ElevatorSpecs): Buildin
     /* A shafts block only where some hoistway holds two cars: absent means one shaft per car, which
        is what every shipped building says by declaring none. */
     if (group.shafts.some((index) => (plan.shafts[index] as PlanShaft).cars === 2)) bank['shafts'] = shafts;
-    if (plan.regenerativeDrive) bank['regenerativeDrive'] = true;
-    if (plan.ropeClass !== undefined) bank['ropeClass'] = plan.ropeClass;
+    /* A hydraulic car is pushed by a piston: it hangs on no rope and its pump gives nothing back. */
+    if (groupIsTraction(plan, group)) {
+      if (plan.regenerativeDrive) bank['regenerativeDrive'] = true;
+      if (plan.ropeClass !== undefined) bank['ropeClass'] = plan.ropeClass;
+    }
     bank['cars'] = cars;
     return bank as unknown as BankConfig;
   });
@@ -1101,7 +1107,44 @@ export function stairsAbove(plan: TowerPlan, floor: number): SpecTransportMode |
   );
 }
 
-/** The four numbers a stair is, all of them the reader's. See {@link withStairsAdded}. */
+/**
+ * The machine class with no rope and no regenerative drive — `data/elevator-specs.json`'s id.
+ * The plan's rope and drive are written on traction banks only.
+ */
+export const HYDRAULIC_CLASS_ID = 'hydraulic';
+
+/** Whether every shaft of a group is a traction lift, so the plan's rope and drive apply to it. */
+export function groupIsTraction(plan: TowerPlan, group: PlanGroup): boolean {
+  return group.shafts.every((index) => plan.shafts[index]?.machine.specClass !== HYDRAULIC_CLASS_ID);
+}
+
+/** Whether the plan has any traction lift at all — whether a rope or a drive can be chosen for it. */
+export function planHasTraction(plan: TowerPlan): boolean {
+  return plan.shafts.some((shaft) => shaft.machine.specClass !== HYDRAULIC_CLASS_ID);
+}
+
+export { STAIR_CLIMB_MPS, STAIR_DESCEND_MPS };
+
+/**
+ * The share of people going one floor who walk, as the board first offers it. **An assumption, not a
+ * measurement**: the same pair `st-jude-hospital` states as one, more walking down than up. No
+ * published propensity has been read for any building kind, so it does not vary by kind.
+ */
+export const STAIR_USE_ASSUMED = Object.freeze({ up: 0.35, down: 0.55 });
+
+/**
+ * What the board fills a new stair's form with: the two times from {@link STAIR_CLIMB_MPS} and
+ * {@link STAIR_DESCEND_MPS} over this building's floor height, to the whole second, and
+ * {@link STAIR_USE_ASSUMED}. A starting point the reader sees and may change before adding the
+ * stair; nothing is written until they do. The owner asked for the prefill on 2026-11-12, and this
+ * docstring is the record (§ D405).
+ */
+export function stairsSuggestionFor(plan: TowerPlan): PlanStairs {
+  const { upS, downS } = stairSecondsFor(plan.floorHeightM);
+  return { upS, downS, up: STAIR_USE_ASSUMED.up, down: STAIR_USE_ASSUMED.down };
+}
+
+/** The four numbers a stair is. See {@link withStairsAdded}. */
 export interface PlanStairs {
   /** Seconds to climb one flight, landing to landing. */
   readonly upS: number;
@@ -1129,11 +1172,10 @@ export function stairsAreValid(stairs: PlanStairs): boolean {
 /**
  * Add a stair from a floor to the one above it.
  *
- * **Every number is the caller's and none is seeded**, which is the whole difference from
- * {@link withEscalatorToggled}. `docs/02` § *Stairs* carries no calibrated figure and says none has
- * been invented, and `core`'s `StairsUseConfig` has no default in code on purpose: who walks is a
- * claim about this building's people. So the board asks for all four, and
- * `buildingSpec.ts#transportModesOf` writes them into the document as set by hand and not cited.
+ * **Every number is the caller's.** `core`'s `StairsUseConfig` has no default in code on purpose:
+ * who walks is a claim about this building's people. The board offers {@link stairsSuggestionFor}
+ * in its form and the reader confirms or changes it, and `buildingSpec.ts#transportModesOf` writes
+ * the four into the document as set by hand and not cited.
  * A stair that is not {@link stairsAreValid} changes nothing.
  */
 export function withStairsAdded(plan: TowerPlan, floor: number, stairs: PlanStairs): TowerPlan {
@@ -1672,8 +1714,10 @@ export function planFromBuilding(config: BuildingConfig, id: string): PlanReadin
   }
   if ((config.serviceEvents ?? []).length > 0) notCarried.push('service-events');
   if ((config.notes ?? []).length > 0) notCarried.push('notes');
-  const ropes = new Set((carried?.banks ?? []).map((bank) => bank.ropeClass ?? ''));
-  const drives = new Set((carried?.banks ?? []).map((bank) => bank.regenerativeDrive === true));
+  /* Only traction banks are compared: {@link buildingFromPlan} writes neither field on a hydraulic one. */
+  const roped = (carried?.banks ?? []).filter((bank) => bank.cars.every((car) => car.spec !== HYDRAULIC_CLASS_ID));
+  const ropes = new Set(roped.map((bank) => bank.ropeClass ?? ''));
+  const drives = new Set(roped.map((bank) => bank.regenerativeDrive === true));
   if (ropes.size > 1 || drives.size > 1) notCarried.push('mixed-bank-equipment');
 
   return { plan: fittedPlan({ ...dense, populationByFloor, useByFloor, panelByFloor }), notCarried };

@@ -123,7 +123,7 @@ export const DESIGNER_COPY = Object.freeze({
    * as it is; this line is what stops it being read as the shuttle's share of the building.
    */
   groupsHint:
-    'Each figure counts only the people on floors where that group’s doors open. A shuttle opens only at lobbies, so its share says little.',
+    'Each figure covers only the floors that group stops at. A shuttle stops only at lobbies, so its figure says little.',
   /**
    * Drawn for a group the closed form refused. The refusal itself is the engine's sentence — it
    * names bank ids and option names — so it is printed whole in the folded document, where an
@@ -138,18 +138,18 @@ export const DESIGNER_COPY = Object.freeze({
    * model, and therefore cannot say anything about waiting.
    */
   specNote:
-    'An up-peak sizing calculation, not a simulation. It predicts an interval and a handling ' +
-    'capacity. It has no queue in it, so it cannot tell you what anybody waited.',
+    'A sizing calculation for the morning rush, not a simulation. It predicts interval and handling ' +
+    'capacity, not how long anyone waits.',
   /** § 13's own sentence, and § 3.3's note for this row. Drawn where the figures are. */
   notScored: 'Nothing here is scored. It is a drawing board.',
   savedNothing: 'Not saved yet.',
   /** Drawn for a figure the closed form refused. Never a stale number, never NaN. */
   withheld: '—',
-  machineStepsHint: 'Rated speed and rated load come in fixed steps for the class.',
+  machineStepsHint: 'Each class is built in set speeds and loads.',
   /** The massing rule, said where the shafts are drawn. */
   massingHint:
-    'The tallest shafts are the middle of the building. Shorter shafts make a lower block ' +
-    'beside it, alternating left and right. A wider floor holds more people.',
+    'The tallest shafts form the middle of the building. Shorter ones make lower blocks on ' +
+    'alternating sides. A wider floor holds more people.',
   shapeNoSelection: 'Pick a shaft in the drawing to change how far it reaches, or add one.',
   liftsNoSelection: 'Pick one or more shafts in the drawing to choose what hangs in them.',
   serviceNoSelection: 'Pick one or more shafts in the drawing to choose where their doors open.',
@@ -161,7 +161,7 @@ export const DESIGNER_COPY = Object.freeze({
   wingApart: 'Stand apart on the other side',
   wingRejoin: 'Rejoin the first block',
   wingHint:
-    'Shafts that stop at the same floor make one block. Stood apart, they are a second block with call buttons of their own.',
+    'Shafts that stop at the same floor form one block. Stood apart, they become a second block with its own call buttons.',
   copyShaft: 'Copy',
   removeShaft: 'Remove',
   selectAll: 'Pick every shaft',
@@ -169,47 +169,57 @@ export const DESIGNER_COPY = Object.freeze({
   selectNone: 'Pick none',
   decksLabel: 'Decks',
   decksHint:
-    'A double-deck car is two cabins, one above the other, that open at two floors at once. It moves twice the people through one shaft and stops at floors in pairs.',
+    'Two cabins stacked in one car, opening at two floors at once. It carries twice the people and stops at floors in pairs.',
   carsLabel: 'Cars in the shaft',
   carsHint:
-    'Two cars can share one shaft, one above the other. They can never pass, so the lower never reaches the top floor and the upper never reaches the bottom.',
+    'Two cars in one shaft cannot pass. The lower never reaches the top floor; the upper never reaches the bottom.',
   dutyLabel: 'What it is for',
-  pressureLabel: 'Cabin',
+  pressureLabel: 'Cabin pressure',
   pressureHint:
-    'Above a long travel a car may not come down faster than ears allow. A cabin that holds its pressure is let off that limit.',
-  ropeLabel: 'Rope, every shaft',
-  ropeUnmodelled: 'Not modelled',
-  driveLabel: 'Drives, every shaft',
+    'On a long run, descent speed is limited for passengers’ ears. A pressurised cabin is exempt.',
+  ropeLabel: 'Rope, every traction lift',
+  /** No rope class chosen: `BankConfig.ropeClass` is absent, so no rope mass and no travel limit. */
+  ropeUnmodelled: 'Ignore rope',
+  ropeHint: 'Rope adds weight and limits how far one shaft can run. Ignore it to count neither.',
+  driveLabel: 'Drive, every traction lift',
+  /** Said where the plan has a hydraulic lift: the two controls above write nothing on its group. */
+  tractionOnlyHint: 'Rope and drive apply to traction lifts only. A group with a hydraulic lift gets neither.',
+  /** Drawn in place of both controls when every shaft is hydraulic. */
+  tractionNone: 'Hydraulic lifts have no rope and no regenerative drive.',
   skyLobbyLabel: 'Sky lobby',
   skyLobbyHint:
-    'A sky lobby is a floor where people change lifts. Lifts that start there can only be reached by riding to it first.',
+    'A floor where people change lifts. Lifts that start here can only be reached by riding up to it first.',
   peopleLabel: 'People',
   peopleFollow: 'Follow the floor’s width',
   useLabel: 'Who is on it',
   escalatorLabel: 'Escalator up one floor',
   escalatorHint:
-    'An escalator joins two floors. A rider whose whole journey is those two floors rides it instead of calling a lift.',
+    'Joins this floor to the one above. People travelling only between those two floors ride it instead of calling a lift.',
   escalatorSecondsLabel: 'Seconds to ride it, landing to landing',
   stairsLabel: 'Stairs up one floor',
+  /**
+   * Drawn above the form. The times are `towerPlan.ts#stairsSuggestionFor`'s — typical walking
+   * speeds over this building's floor height — and the shares are an assumption, which is said.
+   */
   stairsHint:
-    'Nobody has to take the stairs, so you set all four numbers: the seconds up and down, and the share of people going one floor who walk. The document says they were set by hand.',
-  stairsUpSeconds: 'Seconds to climb',
+    'How long one flight takes on foot, and how many of the people going one floor walk instead of taking a lift. The times are typical walking speeds for this floor height. The percentages are a starting guess. Change any of them.',
+  stairsUpSeconds: 'Seconds to walk up',
   stairsDownSeconds: 'Seconds to walk down',
   stairsUpShare: 'Percent who walk up',
   stairsDownShare: 'Percent who walk down',
   stairsAdd: 'Add the stair',
   stairsRemove: 'Remove the stair',
-  stairsRefused: 'A stair needs all four: a climb no quicker than the walk down, and two shares from 0 to 100.',
+  stairsRefused: 'Fill in all four. Walking up cannot be quicker than walking down, and each percentage is 0 to 100.',
   panelLabel: 'Call panel on the landing',
   panelHint:
-    'What a rider presses here. A destination panel asks for their floor before they board. It changes only what the controller is told, and a run changes only where the panel differs from what the controller already uses.',
+    'What riders press on this floor. A destination panel asks for their floor before they board. A run changes only where this differs from what the controller already uses.',
   descentLabel: 'Coming down',
   descentSame: 'As fast as going up',
   descentHint:
-    'A car may be held to a lower speed on the way down, as two cars sharing a shaft are, and as a very tall shaft is for the sake of ears.',
+    'Some lifts come down slower than they go up: two cars sharing a shaft, or a very tall shaft, for passengers’ ears.',
   accessLabel: 'Who may come here',
   accessHint:
-    'Keep floors for one named group of people. Riders outside the group are not carried to them. It moves no lift’s doors.',
+    'Reserve these floors for a named group. Other riders are not carried to them. Where lifts stop is unchanged.',
   accessGroupName: 'Name of the group',
   accessAdd: 'Keep these floors for them',
   accessOpen: 'Anybody may travel here.',
@@ -217,19 +227,19 @@ export const DESIGNER_COPY = Object.freeze({
   escalatorCapacityLabel: 'How many it carries, each way',
   escalatorCapacityNone: 'No limit',
   escalatorCapacityIdle:
-    'A limit here changes nothing in a run. Nobody rides this escalator to or from a lift: the lifts already join its two floors, or neither floor is a sky lobby.',
+    'Nobody takes this escalator to or from a lift, so a limit here changes nothing in a run.',
   escalatorCapacityHint:
-    'With no limit, any number of riders step on at once. With one, they step on one at a time and the rest queue at the foot, so they reach the lifts later. That wait counts in their journey, never in the wait for a lift. Each figure is EN 115-1’s planning figure for that step width on a full escalator. Riders do not leave a full escalator for a lift.',
+    'With no limit, any number of riders step on at once. With a limit they board one at a time and the rest queue at the foot. That queue counts in their journey, not in their wait for a lift, and they do not leave it for a lift. The figures are EN 115-1’s planning values for each step width.',
   zoneLabel: 'First floor of its zone',
   autoZoneLabel: 'Zone the tallest shafts for me',
   autoZoneHint:
-    'Splits the shafts that reach the roof into zones. The lowest zone stops at every floor; each one above runs non-stop from the lobby to its own floors.',
+    'Splits the roof-height shafts into zones. The lowest stops at every floor; each higher one runs non-stop from the lobby to its own floors.',
   /*
    * Service zoning is not access zoning, and the board that sets one does not set the other. This
    * stands beside the control a reader would otherwise mistake for it — GitHub issue #283.
    */
   serviceScopeHint:
-    'This board sets which floors each lift physically serves. Who is allowed where is saved with the design too, and is set in the simulator’s building editor.',
+    'This sets which floors each lift stops at. Who is allowed where is saved with the design too, and is set in the simulator’s building editor.',
   documentFold: 'The engineer’s document',
   plateEyebrow: 'RATING PLATE',
   /* The key under the drawing. Colour is never the only signal: each mark is also a shape. */
@@ -263,7 +273,7 @@ export const DESIGNER_TEMPLATE_COPY: Readonly<Record<string, { readonly name: st
     'sky-lobby': { name: 'Sky lobby', blurb: 'Sixty floors, shuttles to a lobby half way up, and more lifts from there.' },
     podium: {
       name: 'Wide podium',
-      blurb: 'Low, wide and stepped, with escalators and a goods lift. Its crowd is an office crowd, not shoppers.',
+      blurb: 'Low, wide and stepped, with escalators and a goods lift. Its people are an office crowd.',
     },
     supertall: { name: 'Supertall', blurb: 'A hundred floors, two two-level sky lobbies and double-deck shuttles.' },
   });
@@ -362,15 +372,16 @@ export const DESIGNER_ABSENCES: readonly string[] = Object.freeze([
 /**
  * The rated speeds a lift is sold at, in m/s — the ladder a class's own band is cut against.
  *
- * This is the one authored list in the module and it is § 10.1's own: `0.5 · 0.75` for hydraulics,
+ * This is the one authored list in the module and it is § 10.1's own: `0.25 · 0.5 · 0.75` for hydraulics,
  * `1 · 1.6` for MRL, `2.5` for geared, `3.5 · 5 · 7` for gearless, `8 · 10` above it, plus the two
  * intermediate values `data/elevator-specs.json`'s bands name as typical (`1.75`, `4`) so that
  * every shipped class has its own typical speed on the ladder. Nothing derives it because no field
  * of the class record enumerates catalogue speeds — a class declares a band, and the band is
- * continuous.
+ * continuous. `0.25` is the hydraulic band's floor since 2026-11-12, set by the owner without a
+ * published figure behind it; `docs/02-elevator-reference.md` says so beside the class table.
  */
 export const CATALOGUE_SPEEDS_MPS: readonly number[] = Object.freeze([
-  0.5, 0.75, 1, 1.6, 1.75, 2.5, 3.5, 4, 5, 7, 8, 10, 12.5, 16, 20.5,
+  0.25, 0.5, 0.75, 1, 1.6, 1.75, 2.5, 3.5, 4, 5, 7, 8, 10, 12.5, 16, 20.5,
 ]);
 
 /**
@@ -696,8 +707,8 @@ export function designerWarnings(
       severity: 'blocker',
       text:
         orphans.length === 1
-          ? `No lift opens at ${list}. Open a shaft’s doors there.`
-          : `No lift opens at ${String(orphans.length)} floors (${list}). Open a shaft’s doors at each.`,
+          ? `No lift stops at ${list}, so nobody can get there.`
+          : `No lift stops at ${String(orphans.length)} floors (${list}), so nobody can get there.`,
     });
   }
 
@@ -710,8 +721,8 @@ export function designerWarnings(
     warnings.push({
       severity: 'blocker',
       text:
-        `${String(stranded.length)} floor${stranded.length === 1 ? ' has' : 's have'} a lift nobody can board from the street (${list}). ` +
-        'Nothing joins them to the lobby, directly or through a sky lobby, so the run sends nobody there.',
+        `${String(stranded.length)} floor${stranded.length === 1 ? '' : 's'} cannot be reached from the lobby (${list}). ` +
+        'No lift joins them to it, directly or through a sky lobby.',
       fix:
         rescue === undefined
           ? undefined
@@ -725,7 +736,7 @@ export function designerWarnings(
     const key = plan.shafts[found.shaft]?.key ?? '';
     warnings.push({
       severity: 'blocker',
-      text: `Shaft ${label} is double-deck, so it opens at two floors at once. ${list} has no floor beside it to pair with, so its doors stay shut there.`,
+      text: `Shaft ${label} is double-deck, so it opens at two floors at once. ${list} has no stop next to it, so the doors stay shut there.`,
       fix: {
         label: `Make shaft ${label} single-deck`,
         apply: (current) => withShafts(current, [key], (shaft) => ({ ...shaft, decks: 1 })),
@@ -756,8 +767,8 @@ export function designerWarnings(
     warnings.push({
       severity: 'comfort',
       text:
-        `Shaft ${label} has a pair of cars, each keeping to its own part of the shaft. The lower car serves ${at} and below; ` +
-        `the upper car serves only the floors above ${at}, so a rider crossing ${at} takes another shaft of the group.`,
+        `Shaft ${label} holds two cars. The lower car serves ${at} and below, and the upper car only the floors above ${at}, ` +
+        `so a rider crossing ${at} must use another shaft.`,
       fix: { label: `Leave one car in shaft ${label}`, apply: (current) => withCars(current, [shaft.key], 1) },
     });
   });
@@ -768,8 +779,8 @@ export function designerWarnings(
     warnings.push({
       severity: 'blocker',
       text:
-        `Every shaft of group ${letters} holds two cars. The lower car can never reach the top floor and the upper can never reach the bottom, ` +
-        'so nobody can ride the whole way. One ordinary shaft in the group fixes it.',
+        `Every shaft in group ${letters} holds two cars, so no car runs the whole height and nobody can ride top to bottom. ` +
+        'Leave one shaft with a single car.',
       fix: { label: `Leave one car in shaft ${lastLabel}`, apply: (current) => withCars(current, [lastKey], 1) },
     });
   }
@@ -798,7 +809,7 @@ export function designerWarnings(
     const limit = lengthFigure(machineClass.maxRiseM, units, 0);
     warnings.push({
       severity: 'class',
-      text: `${who} up to ${String(worstFloors)} floors and ${travel}, past what ${machineClass.name} is built for — the class is rated to ${String(machineClass.maxFloors)} floors and ${limit}.`,
+      text: `${who} up to ${String(worstFloors)} floors and ${travel}. ${machineClass.name} is rated to ${String(machineClass.maxFloors)} floors and ${limit}.`,
     });
   }
 
@@ -809,7 +820,7 @@ export function designerWarnings(
     if (figures.percentPopulation5Min < COMFORTABLE_HANDLING_PCT) {
       warnings.push({
         severity: 'comfort',
-        text: `Handling capacity${which} is ${figures.percentPopulation5Min.toFixed(1)}% of its people in five minutes, under ${String(COMFORTABLE_HANDLING_PCT)}% — an office building will feel slow every morning.`,
+        text: `Handling capacity${which} is ${figures.percentPopulation5Min.toFixed(1)}% of its people in five minutes, under ${String(COMFORTABLE_HANDLING_PCT)}%. An office would feel slow every morning.`,
       });
     }
     let longest: { intervalS: number; index: number } | undefined;
@@ -822,7 +833,7 @@ export function designerWarnings(
       const where = analysis.banks.length > 1 ? ` in group ${String(slow.index + 1)}` : '';
       warnings.push({
         severity: 'comfort',
-        text: `An interval of ${slow.intervalS.toFixed(1)} s${where} is over ${String(COMFORTABLE_INTERVAL_S)} s, which reads as a long wait.`,
+        text: `An interval of ${slow.intervalS.toFixed(1)} s${where} is over ${String(COMFORTABLE_INTERVAL_S)} s, which feels like a long wait.`,
       });
     }
   }
@@ -1163,13 +1174,13 @@ export function designerFloorFacts(plan: TowerPlan, range: readonly [number, num
 export function designerServiceLine(plan: TowerPlan, shaft: PlanShaft): string {
   const kind = DESIGNER_SERVICE_COPY[shaft.service].name;
   const stops = stopsOf(plan, shaft);
-  if (shaft.decks !== 2) return `${kind} — doors open at ${stopsSummary(plan, stops)}.`;
+  if (shaft.decks !== 2) return `${kind}. Doors open at ${stopsSummary(plan, stops)}.`;
   const pairs = deckPairingOf(stops)
     .pairs.map(([lower, upper]) => `${planFloorId(plan, lower)} with ${planFloorId(plan, upper)}`)
     .join(', ');
   return pairs === ''
-    ? `${kind}, double-deck — no two of its floors are next to each other, so no doors open.`
-    : `${kind}, double-deck — doors open at ${pairs}.`;
+    ? `${kind}, double-deck. No two of its floors are next to each other, so no doors open.`
+    : `${kind}, double-deck. Doors open at ${pairs}.`;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -1197,5 +1208,5 @@ const LOSS_COPY: Readonly<Record<PlanLoss, string>> = Object.freeze({
 export function designerLossLine(name: string, losses: readonly PlanLoss[]): string {
   if (losses.length === 0) return '';
   const list = losses.map((loss) => LOSS_COPY[loss]).join('; ');
-  return `Opened from ${name}. This board does not carry over: ${list}. Saving makes a new building and leaves ${name} as it was.`;
+  return `Opened from ${name}. Not carried over: ${list}. Saving makes a new building; ${name} is unchanged.`;
 }
