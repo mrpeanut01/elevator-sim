@@ -1229,6 +1229,23 @@ export function stageAlarmOf(o: LiveObservations, floorLabelOf: (id: string) => 
   return where === undefined ? people : `${people}, deepest at ${floorLabelOf(where)}`;
 }
 
+/**
+ * The alarm's **badge**: the head count alone, *"47 waiting"*, or `undefined` exactly when
+ * {@link stageAlarmOf} is — the same threshold, so the two cannot disagree about whether there is
+ * trouble.
+ *
+ * The playtest of 2026-11-13 found the strip, a full sentence in page flow above the building,
+ * pushing the whole stage down when it came up and letting it jump back when it cleared — motion
+ * that disturbed play, which [§ D1627](../../../../DECISIONS.md) forbids. So the picture is now a
+ * badge drawn **over** the building, in space that is always there, and it says only the count.
+ * The sentence is not lost: it is the badge's `title` and the hidden announcement, unchanged.
+ * Recorded here under [§ D405](../../../../DECISIONS.md).
+ */
+export function stageAlarmBadgeOf(o: LiveObservations): string | undefined {
+  if (o.waitingNow <= STAGE_ALARM_STANDING) return undefined;
+  return `${String(o.waitingNow)} waiting`;
+}
+
 /* -------------------------------------------------------------------------- *
  * § 7.6 — interventions
  * -------------------------------------------------------------------------- */

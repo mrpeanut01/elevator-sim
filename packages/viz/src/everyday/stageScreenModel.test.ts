@@ -48,6 +48,7 @@ import {
   DEFAULT_STAGE_SPEED_INDEX,
   MAX_CAR_RIDERS,
   MAX_LANDING_FIGURES,
+  stageAlarmBadgeOf,
   stageAlarmOf,
   stageBandOf,
   stageBarModelOf,
@@ -560,6 +561,15 @@ describe('§ 7.2 — the alarm strip', () => {
   it('names the floor the stack is actually on rather than assuming the lobby', () => {
     const line = stageAlarmOf(observationsAt(crowdOf(60), 100), () => 'Level 12');
     expect(line).toMatch(/deepest at Level 12/);
+  });
+
+  it('badges the head count alone, on exactly the threshold the sentence uses', () => {
+    const at = (size: number) => observationsAt(crowdOf(size), 100);
+    expect(stageAlarmBadgeOf(at(STAGE_ALARM_STANDING))).toBeUndefined();
+    expect(stageAlarmBadgeOf(at(STAGE_ALARM_STANDING + 7))).toBe('47 waiting');
+    for (const size of [0, STAGE_ALARM_STANDING, STAGE_ALARM_STANDING + 1, 60]) {
+      expect(stageAlarmBadgeOf(at(size)) === undefined).toBe(stageAlarmOf(at(size), (id) => id) === undefined);
+    }
   });
 });
 
