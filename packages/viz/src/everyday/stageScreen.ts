@@ -117,6 +117,7 @@ import {
   STAGE_SWITCH_PICKER_LABEL,
   STAGE_SWITCH_PICKER_NOTE,
   STAGE_FLOOR_JUMP_PLACEHOLDER,
+  stageAlarmBadgeOf,
   stageAlarmOf,
   stageBarModelOf,
   stageRunFailedViewOf,
@@ -993,17 +994,33 @@ function mountStage(
    * rather than a second number — and `AX-0` is satisfied: nothing stops being said, and nothing
    * stops being drawn.
    */
+  /*
+   * **And it is a badge over the building, not a strip in the page** — the playtest of 2026-11-13:
+   * in flow above the arrivals it pushed the whole stage down when it came up and let it jump back
+   * when it cleared, which is motion disturbing play ([§ D1627](../../../../DECISIONS.md)). It is
+   * now absolutely placed in {@link stageWrap}'s top-right corner (the replay pill holds the left),
+   * so showing or hiding it moves nothing, and it says only the count —
+   * `stageScreenModel.ts#stageAlarmBadgeOf`. The sentence stays its `title` and its announcement.
+   */
   const alarm = el(doc, 'div', 'everyday-stage-alarm');
   alarm.style.cssText = [
     'display:none',
+    'position:absolute',
+    'top:10px',
+    'right:10px',
+    'z-index:2',
     'align-items:center',
-    'gap:8px',
+    'gap:6px',
     `border:1px solid ${C.alarm}`,
-    `border-radius:${String(R.row)}px`,
+    `border-radius:${String(R.pill)}px`,
+    `background:${C.paper}`,
     `color:${C.alarm}`,
-    'padding:6px 11px',
+    'padding:3px 10px',
     'font-size:12.5px',
     'font-weight:600',
+    'font-variant-numeric:tabular-nums',
+    'white-space:nowrap',
+    'pointer-events:none',
   ].join(';');
 
   /**
@@ -1232,7 +1249,7 @@ function mountStage(
   ].join(';');
   startRow.append(startButton, quietSkip);
   status.append(statusText, quietNote, startRow, failedRow);
-  stageWrap.append(canvas, description, watchPill, status);
+  stageWrap.append(canvas, description, watchPill, alarm, status);
 
   /*
    * **Arriving next** — who is about to walk in, drawn above the building they walk into. The door
@@ -2137,7 +2154,6 @@ function mountStage(
     callRows,
     goals,
     watchBand,
-    alarm,
     alarmSay,
     arrivals,
     stageRow,
@@ -4237,7 +4253,8 @@ function mountStage(
     /* The strip: drawn only when the sentence changes, because a repaint that paints the same
        thing is work nobody asked for. It is no longer a live region — see {@link alarmSay}. */
     if (alarmLine !== undefined && alarmLine !== alarmDrawnLine) {
-      alarm.replaceChildren(breathingDot(doc), el(doc, 'span', undefined, alarmLine));
+      alarm.replaceChildren(breathingDot(doc), el(doc, 'span', undefined, stageAlarmBadgeOf(observations) ?? alarmLine));
+      alarm.title = alarmLine;
       alarmDrawnLine = alarmLine;
     }
     /*

@@ -666,6 +666,75 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
   });
 
   /**
+   * **The queue badge comes and goes without moving the page** — the playtest of 2026-11-13,
+   * [§ D1627](../../../../DECISIONS.md): motion must never disturb play.
+   *
+   * The alarm used to be a sentence in page flow above the arrivals strip, so the whole stage was
+   * pushed down when it came up and jumped back when it cleared. It is now a badge over the
+   * building. `vertical-city`'s morning raises it (the AX-3 case's measurement), so this plays that
+   * morning at the top speed and, **on every frame the badge toggles**, compares the boxes of what
+   * sits below its old place against the frame before. Comparing across the toggle only, rather
+   * than across the run, is what keeps a box that moves for some other reason out of this verdict.
+   */
+  it('shows the queue badge over the building, and toggling it moves nothing below', async () => {
+    const page = await coldLoad('vertical-city');
+    await enterEverydayStage(page);
+    await page.click(`.everyday-stage-speed[data-speed-index="${String(TOP_SPEED_INDEX)}"]`);
+    await page.click('.everyday-stage-play');
+    const seen = await page.evaluate(async () => {
+      const boxOf = (selector: string): string => {
+        const r = document.querySelector(selector)?.getBoundingClientRect();
+        return r === undefined ? 'absent' : `${String(r.top)},${String(r.height)}`;
+      };
+      const read = () => {
+        const badge = document.querySelector<HTMLElement>('.everyday-stage-alarm');
+        return {
+          up: badge !== null && badge.style.display !== 'none',
+          text: (badge?.textContent ?? '').trim(),
+          inStage: badge?.parentElement?.classList.contains('everyday-stage-wrap') ?? false,
+          arrivals: boxOf('.everyday-stage-arrivals'),
+          stage: boxOf('.everyday-stage-wrap'),
+        };
+      };
+      const toggles: { up: boolean; text: string; inStage: boolean; moved: string[] }[] = [];
+      let before = read();
+      const began = performance.now();
+      await new Promise<void>((done) => {
+        const tick = (): void => {
+          const now = read();
+          if (now.up !== before.up) {
+            const moved: string[] = [];
+            if (now.arrivals !== before.arrivals) moved.push(`arrivals ${before.arrivals} → ${now.arrivals}`);
+            if (now.stage !== before.stage) moved.push(`stage ${before.stage} → ${now.stage}`);
+            toggles.push({ up: now.up, text: now.text, inStage: now.inStage, moved });
+          }
+          before = now;
+          /* Up once and down again is the whole claim; 60 s is inside the 120 s case budget. */
+          if (toggles.length >= 2 || performance.now() - began > 60_000) {
+            done();
+            return;
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+      return toggles;
+    });
+    await page.close();
+
+    expect(
+      seen.length,
+      'the badge never came up on vertical-city, so this case is about nothing — restore a fixture ' +
+        'whose morning raises it rather than deleting this requirement',
+    ).toBeGreaterThan(0);
+    for (const toggle of seen) expect(toggle.moved, `the badge went ${toggle.up ? 'up' : 'down'}`).toEqual([]);
+    const up = seen.find((toggle) => toggle.up);
+    expect(up?.inStage, 'the badge is not drawn over the building').toBe(true);
+    /* Terse: a count, not a sentence. */
+    expect(up?.text).toMatch(/^\d+ waiting$/u);
+  });
+
+  /**
    * **The stage is readable without seeing it** — GitHub issue **#239**'s second criterion.
    *
    * A `<canvas>` has no accessible children, so this screen — the one the game is played on — was
