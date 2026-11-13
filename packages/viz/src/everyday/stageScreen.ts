@@ -118,6 +118,8 @@ import {
   STAGE_SWITCH_PICKER_NOTE,
   STAGE_FLOOR_JUMP_PLACEHOLDER,
   stageAlarmBadgeOf,
+  stageMuteTitleOf,
+  STAGE_MUTE_LABEL,
   stageAlarmOf,
   stageBarModelOf,
   stageRunFailedViewOf,
@@ -774,6 +776,72 @@ function mountStage(
     togglePlay();
   });
 
+  /*
+   * **The mute toggle** — the playtest of 2026-11-13, `stageScreenModel.ts#STAGE_MUTE_LABEL` for the
+   * words and why it is Settings' own switch. Beside Play in the header, which pins while the day
+   * plays, at a fixed 32 px square whatever its state, so a press moves nothing. The icon is drawn,
+   * not typed: an emoji's size and colour are the platform's, and this has to match the ink.
+   */
+  const muteButton = el(doc, 'button', 'everyday-stage-mute');
+  muteButton.type = 'button';
+  muteButton.setAttribute('aria-label', STAGE_MUTE_LABEL);
+  muteButton.style.cssText = [
+    'flex:0 0 auto',
+    'width:32px',
+    'height:32px',
+    'padding:0',
+    'display:inline-flex',
+    'align-items:center',
+    'justify-content:center',
+    `background:${C.paper}`,
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.row)}px`,
+    `color:${C.ink}`,
+    'cursor:pointer',
+  ].join(';');
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const muteIcon = doc.createElementNS(SVG_NS, 'svg');
+  muteIcon.setAttribute('viewBox', '0 0 20 20');
+  muteIcon.setAttribute('width', '18');
+  muteIcon.setAttribute('height', '18');
+  muteIcon.setAttribute('aria-hidden', 'true');
+  muteIcon.setAttribute('focusable', 'false');
+  const speaker = doc.createElementNS(SVG_NS, 'path');
+  speaker.setAttribute('d', 'M3 7.5h3l4-3.5v12l-4-3.5H3z');
+  speaker.setAttribute('fill', 'currentColor');
+  const waves = doc.createElementNS(SVG_NS, 'path');
+  waves.setAttribute('d', 'M13 7.2a4 4 0 0 1 0 5.6M15.2 5a7 7 0 0 1 0 10');
+  waves.setAttribute('fill', 'none');
+  waves.setAttribute('stroke', 'currentColor');
+  waves.setAttribute('stroke-width', '1.6');
+  waves.setAttribute('stroke-linecap', 'round');
+  const cross = doc.createElementNS(SVG_NS, 'path');
+  cross.setAttribute('d', 'M13 7.5l5 5M18 7.5l-5 5');
+  cross.setAttribute('fill', 'none');
+  cross.setAttribute('stroke', 'currentColor');
+  cross.setAttribute('stroke-width', '1.6');
+  cross.setAttribute('stroke-linecap', 'round');
+  muteIcon.append(speaker, waves, cross);
+  muteButton.append(muteIcon);
+  /** Paint the toggle from the store — never from its own face, the Settings row's rule. */
+  function syncMute(): void {
+    const on = everydayProfileStore().soundOn();
+    muteButton.setAttribute('aria-pressed', String(!on));
+    muteButton.title = stageMuteTitleOf(on);
+    waves.style.display = on ? '' : 'none';
+    cross.style.display = on ? 'none' : '';
+  }
+  syncMute();
+  /* Settings → Sound written anywhere repaints this toggle; released on unmount. */
+  const unsubscribeMute = everydayProfileStore().subscribe(syncMute);
+  muteButton.addEventListener('click', () => {
+    const store = everydayProfileStore();
+    store.setSoundOn(!store.soundOn());
+    syncMute();
+    /* A paused stage draws no frames, so ask for one: it builds or silences the sound now. */
+    requestFrame();
+  });
+
   const speeds = el(doc, 'div', 'everyday-stage-speeds');
   speeds.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.tight)}px`;
   const speedButtons = STAGE_SPEEDS.map((speed, index) => {
@@ -923,7 +991,7 @@ function mountStage(
    * tower whose floors all fit, a control that did nothing. It joins the header only once it has
    * floors to offer, beside the camera chips under the same gate, and leaves when it has none.
    */
-  header.append(clock, phase, nextPhase, bookedPill, driving, practiceLine, figures, playButton, speeds, cameras);
+  header.append(clock, phase, nextPhase, bookedPill, driving, practiceLine, figures, muteButton, playButton, speeds, cameras);
 
   /*
    * **Pillar 3's strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
@@ -5098,6 +5166,7 @@ function mountStage(
       view?.removeEventListener('resize', onResize);
       doc.removeEventListener('keydown', onRushEntryKey);
       unsubscribe();
+      unsubscribeMute();
       playback = undefined;
       adopted = undefined;
       /* The graph and its context go with the mount — GitHub issue #258. */
