@@ -39,6 +39,7 @@ import {
   rushModelRatePctPop5min,
   rushTopRatePctPop5min,
   rushIncidentsOf,
+  rushTrafficProfilesOf,
   type RushCard,
   type RushCards,
   type RushWaveModel,
@@ -396,7 +397,9 @@ export function rushRoundConfigFor(
     ...(round.ruleRows === undefined ? {} : { ruleRows: round.ruleRows }),
     ...(round.interventions === undefined ? {} : { interventions: round.interventions }),
   };
-  const config = configOver(run, resources, (template) => template.id === templateId, fit);
+  // A card's template is the cards' own and not the traffic profiles' (`core`'s `rushTrafficProfilesOf` says why).
+  const over = play === undefined ? resources : { ...resources, trafficProfiles: rushTrafficProfilesOf(play.cards, resources.trafficProfiles) };
+  const config = configOver(run, over, (template) => template.id === templateId, fit);
   if (typeof config === 'string' || play === undefined) return config;
   // The card's incidents ride the building's own service schedule, drawn on the building the round
   // runs on, fit included: the viewer does exactly this in `dev/state.ts#shiftRunConfigOf`, through

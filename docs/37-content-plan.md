@@ -41,7 +41,7 @@ fix cases and forty proof cases*. **Four are right and one is wrong.**
 | Fix-a-building cases | `fix-cases` | **18** | `cases` in [`data/fixit-cases.json`](../data/fixit-cases.json) |
 | Proof cases | `proof-cases` | **40** | `towers` × `crowds` in [`data/proof-cases.json`](../data/proof-cases.json) — 8 × 5 |
 | Dispatcher profiles | `dispatchers` | **13** | `profiles` in [`data/dispatcher-profiles.json`](../data/dispatcher-profiles.json) |
-| Traffic demand templates | `demand-templates` | **11** | `demandTemplates` in [`data/traffic-profiles.json`](../data/traffic-profiles.json). The eighth, `endless-rush`, is GitHub issue #220's stream and declares `selectable: false`: a mode's own record that no list offers and no rotation may draw, so it counts here and buys the daily loop nothing. The ninth to eleventh, `rush-surges`, `rush-tides` and `rush-crossfire`, are the Rush's wave models ([§ D1636](../DECISIONS.md)), generated from `data/rush-cards.json` and unselectable on the same ground |
+| Traffic demand templates | `demand-templates` | **8** | `demandTemplates` in [`data/traffic-profiles.json`](../data/traffic-profiles.json). The eighth, `endless-rush`, is GitHub issue #220's stream and declares `selectable: false`: a mode's own record that no list offers and no rotation may draw, so it counts here and buys the daily loop nothing |
 | Wrinkle templates | `wrinkles` | **25** | `templates` in [`data/wrinkles.json`](../data/wrinkles.json). Keyed here for the first time on 2026-09-19 ([§ D723](../DECISIONS.md)): the § 4.2 row's key cell read *(new)*, which the gate's `KEY` pattern does not match, so *today 0* survived twenty-five templates landing |
 
 **The correction is the contracts row: there are ten, not five.** The issue's *five* is the number
@@ -197,7 +197,7 @@ independently**.
 | Fix cases | `fix-cases` | 18 | **44** | § 10.6 of the gameplay guide names **26** further cases by name, with authoring rules; 18 + 26. **16 of the 26 are authorable today** — § 5.2 | 26 × 7.67 min = **+3.32** |
 | Proof cases | `proof-cases` | 40 | **40** | **unchanged, by rule.** A rating is only comparable if the cases never move; growing the building set must not touch this list. § 7 is the one permitted move | 0 |
 | Dispatchers | `dispatchers` | 13 | **13** | **unchanged.** `CLAUDE.md` invariant 7: only a genuinely new *cost term* justifies new dispatcher code, and a weight vector adds no run to watch | 0, by construction |
-| Demand templates | `demand-templates` | 11 | **12** | § 4.4, and four of the eleven are the Rush's unselectable streams (#220's and § D1636's three), so seven are the rotation's | 0 directly; multiplies the rotation |
+| Demand templates | `demand-templates` | 8 | **9** | § 4.4, and one of the eight is #220's unselectable stream, so seven are the rotation's | 0 directly; multiplies the rotation |
 | Wrinkle templates | `wrinkles` | **25** | **25** | § 4.3, and it was the gameplay guide's own figure of 20 — **met and exceeded**: the library ships 25 templates, so the target is restated at what ships and the row is now derived like every other | unbounded — this is the row that makes the daily loop not run out |
 
 **At the targets as first derived, 4.38 + 1.00 + 0.17 + 3.32 = 8.87 play-hours**, against a band of

@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { LoadedConfig } from '../config/index.js';
+import { resolveDemandTemplate } from '../traffic/demandTemplate.js';
 
 import { DATA_DIR, load } from './fixtures.test-helper.js';
 import { RUSH_HOLD_LINE, RUSH_STREAM, RUSH_TEMPLATE_ID, rushHoldAtLegs, rushTopRatePctPop5min, type RushHoldLeg } from './rush.js';
@@ -32,18 +33,20 @@ import {
   rushRoundLineOf,
   rushSeedOf,
   rushServiceEventsOf,
+  rushTrafficProfilesOf,
   rushWaveModelOf,
   type RushCards,
 } from './rushCards.js';
 
 const RAW = JSON.parse(readFileSync(join(DATA_DIR, 'rush-cards.json'), 'utf8')) as Record<string, unknown>;
+const TEMPLATES = JSON.parse(readFileSync(join(DATA_DIR, 'rush-wave-templates.json'), 'utf8')) as Record<string, unknown>;
 
 let config: LoadedConfig;
 let cards: RushCards;
 
 beforeAll(async () => {
   config = await load();
-  cards = parseRushCards(RAW);
+  cards = parseRushCards(RAW, TEMPLATES);
 });
 
 const buildingOf = (id: string) => {
@@ -63,14 +66,29 @@ describe('the data file', () => {
 
   it('refuses a file whose first model is not that rush', () => {
     const models = RAW['waveModels'] as Record<string, unknown>[];
-    expect(() => parseRushCards({ ...RAW, waveModels: [{ ...models[0], incidents: true }, ...models.slice(1)] })).toThrow(/first model/u);
-    expect(() => parseRushCards({ ...RAW, waveModels: [...models.slice(1), models[0]] })).toThrow(/first model/u);
-    expect(() => parseRushCards({ ...RAW, version: 2 })).toThrow(/version 1/u);
+    expect(() => parseRushCards({ ...RAW, waveModels: [{ ...models[0], incidents: true }, ...models.slice(1)] }, TEMPLATES)).toThrow(/first model/u);
+    expect(() => parseRushCards({ ...RAW, waveModels: [...models.slice(1), models[0]] }, TEMPLATES)).toThrow(/first model/u);
+    expect(() => parseRushCards({ ...RAW, version: 2 }, TEMPLATES)).toThrow(/version 1/u);
+    expect(() => parseRushCards(RAW, { version: 1, templates: [(TEMPLATES['templates'] as unknown[])[0]] })).toThrow(/does not hold/u);
   });
 
-  it('names a template the traffic profiles ship for every model, at the peak its phases reach', () => {
+  it('keeps its templates out of the traffic profiles every other run is built from', () => {
+    const shipped = config.trafficProfiles.demandTemplates.map((template) => template.id);
+    for (const template of cards.templates) expect(shipped).not.toContain(template.id);
+    const extended = rushTrafficProfilesOf(cards, config.trafficProfiles);
+    expect(extended.demandTemplates.map((template) => template.id)).toEqual([...shipped, ...cards.templates.map((template) => template.id)]);
+    expect(rushTrafficProfilesOf(cards, config.trafficProfiles)).toBe(extended);
+    expect(config.trafficProfiles.demandTemplates.map((template) => template.id)).toEqual(shipped);
+    // And each one is a phase list the resolver accepts, ninety minutes long.
+    for (const template of cards.templates) {
+      expect(resolveDemandTemplate(template.id, extended.demandTemplates).durationS, template.id).toBe(RUSH_STREAM.lengthS);
+    }
+  });
+
+  it('names a template for every model, at the peak its phases reach', () => {
+    const all = rushTrafficProfilesOf(cards, config.trafficProfiles).demandTemplates;
     for (const model of cards.waveModels) {
-      const template = config.trafficProfiles.demandTemplates.find((entry) => entry.id === model.templateId);
+      const template = all.find((entry) => entry.id === model.templateId);
       expect(template, model.id).toBeDefined();
       expect(template?.selectable, model.id).toBe(false);
       const peak = Math.max(...(template?.phases ?? []).map((phase) => Math.max(phase.startIntensity, phase.endIntensity)));
@@ -81,7 +99,7 @@ describe('the data file', () => {
 
   it('brings a wave the people the climb brings, on every model', () => {
     const peopleOf = (templateId: string, peakFactor: number): number => {
-      const template = config.trafficProfiles.demandTemplates.find((entry) => entry.id === templateId);
+      const template = rushTrafficProfilesOf(cards, config.trafficProfiles).demandTemplates.find((entry) => entry.id === templateId);
       let total = 0;
       for (const phase of template?.phases ?? []) {
         total += ((phase.startIntensity + phase.endIntensity) / 2) * (phase.endMin - phase.startMin) * peakFactor;

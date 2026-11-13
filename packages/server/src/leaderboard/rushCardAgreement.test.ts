@@ -131,8 +131,8 @@ describe('the gate reads a card strictly', () => {
     expect(replayRushSitting(sittingOf(cell()), from({ cards: undefined }))).toMatchObject({ ok: false, code: 'unknown-card', simulations: 0 });
   });
 
-  it('refuses a cards file that names a template the traffic profiles do not ship', async () => {
-    await expect(loadRushCards(DATA_DIR, new Set(['endless-rush']))).rejects.toThrow(/no demand template for surges/u);
+  it('refuses to load where the classic climb’s template is not among the traffic profiles', async () => {
+    await expect(loadRushCards(DATA_DIR, new Set())).rejects.toThrow(/no demand template for climb/u);
   });
 });
 

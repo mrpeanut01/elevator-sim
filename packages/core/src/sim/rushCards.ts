@@ -23,7 +23,7 @@
  * Invariant 3 holds: nothing here reads a clock. Invariant 7 holds: every number is the data file's.
  */
 
-import type { ResolvedBuilding, ResolvedServiceEvent } from '../config/types.js';
+import type { DemandTemplate, ResolvedBuilding, ResolvedServiceEvent, TrafficProfiles } from '../config/types.js';
 import { StreamSet } from '../random/index.js';
 
 import { RUSH_HOLD_LINE, RUSH_STREAM, RUSH_TEMPLATE_ID, rushHoldAtLegs, rushTopRatePctPop5min, type RushHoldLeg } from './rush.js';
@@ -88,6 +88,11 @@ export interface RushIncidentSchedule {
 
 export interface RushCards {
   readonly waveModels: readonly RushWaveModel[];
+  /**
+   * The wave models' own demand templates, `data/rush-wave-templates.json`. The classic climb's is
+   * `endless-rush` in `data/traffic-profiles.json` and is not here.
+   */
+  readonly templates: readonly DemandTemplate[];
   readonly incidents: RushIncidentSchedule;
 }
 
@@ -187,8 +192,14 @@ function parseKind(raw: unknown, where: string): RushIncidentKind {
   };
 }
 
-/** `data/rush-cards.json`, checked. The first model must be the classic climb on the classic line. */
-export function parseRushCards(raw: unknown): RushCards {
+/**
+ * `data/rush-cards.json` and `data/rush-wave-templates.json`, checked. The first model must be the
+ * classic climb on the classic line, and every other model must name a template the second file holds.
+ *
+ * A template is read here only far enough to find it; `traffic/demandTemplate.ts` holds a phase list
+ * to its rules when a round resolves it, and `sim/rushCards.test.ts` resolves every one.
+ */
+export function parseRushCards(raw: unknown, templatesRaw: unknown): RushCards {
   const entry = record(raw, 'rush-cards');
   if (entry['version'] !== 1) throw new RushCardsError('rush-cards.version: this reader knows version 1.');
   const waveModels = list(entry['waveModels'], 'rush-cards.waveModels').map((model, index) =>
@@ -218,6 +229,20 @@ export function parseRushCards(raw: unknown): RushCards {
   if (!deck.some((kind) => kind.cars === 1 && kind.minSpeedMps === 0 && kind.minWave <= 30)) {
     throw new RushCardsError('rush-cards.incidents.deck: at least one incident must be able to happen to any one car.');
   }
+  const templateFile = record(templatesRaw, 'rush-wave-templates');
+  if (templateFile['version'] !== 1) throw new RushCardsError('rush-wave-templates.version: this reader knows version 1.');
+  const templates = list(templateFile['templates'], 'rush-wave-templates.templates').map((entry, index) => {
+    const where = `rush-wave-templates.templates[${String(index)}]`;
+    const template = record(entry, where);
+    text(template['id'], `${where}.id`);
+    list(template['phases'], `${where}.phases`);
+    return template as unknown as DemandTemplate;
+  });
+  for (const model of waveModels.slice(1)) {
+    if (!templates.some((template) => template.id === model.templateId)) {
+      throw new RushCardsError(`rush-cards: wave model "${model.id}" names the template "${model.templateId}", which rush-wave-templates does not hold.`);
+    }
+  }
   const gapWaves = bounds(schedule['gapWaves'], 1, 30, 'rush-cards.incidents.gapWaves');
   const offsetS = bounds(schedule['offsetS'], 0, RUSH_STREAM.waveS - 1, 'rush-cards.incidents.offsetS');
   const longest = Math.max(...deck.map((kind) => kind.durationS));
@@ -229,6 +254,7 @@ export function parseRushCards(raw: unknown): RushCards {
   }
   return {
     waveModels,
+    templates,
     incidents: {
       firstWave: wholeIn(schedule['firstWave'], 1, 30, 'rush-cards.incidents.firstWave'),
       gapWaves,
@@ -255,6 +281,33 @@ export function rushCardIssueOf(cards: RushCards, card: RushCard): string | unde
     return `a roll is a whole number from 0 to ${String(RUSH_MAX_ROLL)}`;
   }
   return undefined;
+}
+
+const WITH_RUSH_TEMPLATES = new WeakMap<TrafficProfiles, WeakMap<RushCards, TrafficProfiles>>();
+
+/**
+ * **The traffic profiles a card's round runs on**: `base` with the wave models' templates added.
+ *
+ * The templates are kept out of `data/traffic-profiles.json` because that file is part of every
+ * run's configuration and of the inputs pinned measurements are hashed over
+ * (`data/scenario-survivors.json`, `data/fixit-as-built-mornings.json`); adding three records there
+ * moved every one of those hashes for runs that never read them. So only a rush round on a card sees
+ * them, through this function, on both ends. The answer is the same object for the same pair, so a
+ * caller comparing configurations by identity still can.
+ */
+export function rushTrafficProfilesOf(cards: RushCards, base: TrafficProfiles): TrafficProfiles {
+  let byCards = WITH_RUSH_TEMPLATES.get(base);
+  if (byCards === undefined) {
+    byCards = new WeakMap();
+    WITH_RUSH_TEMPLATES.set(base, byCards);
+  }
+  let extended = byCards.get(cards);
+  if (extended === undefined) {
+    const held = new Set(base.demandTemplates.map((template) => template.id));
+    extended = { ...base, demandTemplates: [...base.demandTemplates, ...cards.templates.filter((template) => !held.has(template.id))] };
+    byCards.set(cards, extended);
+  }
+  return extended;
 }
 
 /** The seed a card's run carries. Roll 0 is the rush's one seed. */

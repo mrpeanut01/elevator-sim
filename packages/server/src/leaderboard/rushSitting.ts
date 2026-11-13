@@ -246,6 +246,7 @@ export async function loadRushPurse(dataDir: string, ledger: ChimeLedgerTable): 
 
 /** What `data/` calls the price schedule. */
 const RUSH_CARDS_FILE = 'rush-cards.json';
+const RUSH_WAVE_TEMPLATES_FILE = 'rush-wave-templates.json';
 
 /**
  * `data/rush-cards.json`, parsed and held to the templates it names — § D1636. **Throws** on a wave
@@ -253,8 +254,13 @@ const RUSH_CARDS_FILE = 'rush-cards.json';
  * card could be posted and never replayed.
  */
 export async function loadRushCards(dataDir: string, templateIds: ReadonlySet<string>): Promise<RushCards> {
-  const cards = parseRushCards(JSON.parse(await readFile(join(dataDir, RUSH_CARDS_FILE), 'utf8')) as unknown);
-  const missing = cards.waveModels.filter((model) => !templateIds.has(model.templateId));
+  const cards = parseRushCards(
+    JSON.parse(await readFile(join(dataDir, RUSH_CARDS_FILE), 'utf8')) as unknown,
+    JSON.parse(await readFile(join(dataDir, RUSH_WAVE_TEMPLATES_FILE), 'utf8')) as unknown,
+  );
+  // The classic climb's template is the traffic profiles' own; every other model's is the cards'.
+  const held = new Set([...templateIds, ...cards.templates.map((template) => template.id)]);
+  const missing = cards.waveModels.filter((model) => !held.has(model.templateId));
   if (missing.length > 0) {
     throw new Error(`rush cards: no demand template for ${missing.map((model) => `${model.id} (${model.templateId})`).join(', ')}.`);
   }

@@ -113,7 +113,7 @@ import {
 } from '../shift/ladder.js';
 import { bookedOutCarsOf, carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { weekBookingsOn } from '../shift/weekLevels.js';
-import { rushCardOfRun, rushPlayOf } from '../shift/rushPlay.js';
+import { rushCardOfRun, rushPlayOf, rushTrafficProfilesFor } from '../shift/rushPlay.js';
 import { dayCallsOffered, type DayCallWrinkle } from '../shift/dayCalls.js';
 import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
@@ -2237,7 +2237,7 @@ export function weekGrowthPerDayOf(resources: BrowserResources, state: ViewerSta
  *    travels out in {@link ShiftRunConfig.withheld}.
  */
 export function shiftRunConfigOf(
-  resources: BrowserResources,
+  given: BrowserResources,
   state: ViewerState,
   /*
    * **The week level's bookings for this day** — wave AO, lane DS-1, [§ D1400](../../../../DECISIONS.md):
@@ -2250,6 +2250,28 @@ export function shiftRunConfigOf(
    */
   /* A sandbox day's copy is dealt as the week it copied (`shift/types.ts#dealtKeyOf`, § D1451). */
   weekBookings: readonly ContractIncident[] = weekBookingsOn(dealtKeyOf(state.week), state.week.day, state.week.dayIdx),
+): ShiftRunConfig {
+  return shiftRunConfigOver(rushResourcesOf(given, state), state, weekBookings);
+}
+
+/**
+ * **The resources a run is built from** — `given`, except for a rush round on a card other than the
+ * classic climb, which runs on traffic profiles that also hold the wave models' templates
+ * ([§ D1636](../../../../DECISIONS.md), `core`'s `rushTrafficProfilesOf` says why they are not in
+ * `data/traffic-profiles.json`). Every other run, the classic rush included, gets `given` by identity.
+ */
+function rushResourcesOf(given: BrowserResources, state: ViewerState): BrowserResources {
+  if (state.playMode !== 'endless') return given;
+  const templateId = state.freePlay?.demandTemplateId;
+  if (templateId === undefined || given.trafficProfiles.demandTemplates.some((template) => template.id === templateId)) return given;
+  const trafficProfiles = rushTrafficProfilesFor(given.trafficProfiles);
+  return trafficProfiles === given.trafficProfiles ? given : { ...given, trafficProfiles };
+}
+
+function shiftRunConfigOver(
+  resources: BrowserResources,
+  state: ViewerState,
+  weekBookings: readonly ContractIncident[],
 ): ShiftRunConfig {
   const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
   if (authored === undefined) {

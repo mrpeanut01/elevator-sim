@@ -1355,6 +1355,7 @@ export {
   rushRoundLineOf,
   rushSeedOf,
   rushServiceEventsOf,
+  rushTrafficProfilesOf,
   rushWaveModelOf,
 } from './sim/rushCards.js';
 export type {

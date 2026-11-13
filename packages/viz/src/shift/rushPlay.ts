@@ -18,6 +18,7 @@ import {
   parseRushCards,
   rushIncidentsOf,
   rushRoundLineOf,
+  rushTrafficProfilesOf,
   rushWaveModelOf,
   type ResolvedBuilding,
   type RushCard,
@@ -25,12 +26,19 @@ import {
   type RushIncident,
   type RushRoundLine,
   type RushWaveModel,
+  type TrafficProfiles,
 } from '@elevator-sim/core/browser';
 
 import rushCardsDocument from '../../../../data/rush-cards.json' with { type: 'json' };
+import rushWaveTemplatesDocument from '../../../../data/rush-wave-templates.json' with { type: 'json' };
 
 /** `data/rush-cards.json`, checked at load. */
-export const RUSH_CARDS: RushCards = parseRushCards(rushCardsDocument as unknown);
+export const RUSH_CARDS: RushCards = parseRushCards(rushCardsDocument as unknown, rushWaveTemplatesDocument as unknown);
+
+/** The traffic profiles a rush round on a card runs on: `base` with the wave models' templates added. */
+export function rushTrafficProfilesFor(base: TrafficProfiles): TrafficProfiles {
+  return rushTrafficProfilesOf(RUSH_CARDS, base);
+}
 
 /** A card on a building: its model, the incidents of a round, and the line that round ends on. */
 export interface RushPlay {

@@ -190,6 +190,7 @@ export {
   rushRoundLineOf,
   rushSeedOf,
   rushServiceEventsOf,
+  rushTrafficProfilesOf,
   rushWaveModelOf,
 } from './rushCards.js';
 export type {
