@@ -163,6 +163,11 @@ describe('§ 15.2’s four states, as words', () => {
     expect(consentAssertion(consentAskViewOf('unasked')?.never)).toBe(true);
   });
 
+  it('says where the answer can be changed, without a press', () => {
+    // The way to withdraw is part of what a person is agreeing to, so it is on the visible line.
+    expect(consentAskViewOf('unasked')?.never).toMatch(/change your answer in Settings/u);
+  });
+
   it('draws the row off on every state but a grant', () => {
     expect(consentRowViewOf('granted').on).toBe(true);
     expect(consentRowViewOf('granted').value).toBe(CONSENT_ROW_COPY.on);

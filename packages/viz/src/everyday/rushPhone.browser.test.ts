@@ -351,9 +351,18 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
         timeout: 30_000,
       });
       await page.locator('.everyday-stage-skip').click();
-      /* Red on the base: the result cut in on the same frame and this line was never drawn. */
+      /*
+       * Red on the base: the result cut in on the same frame and this line was never drawn. The line,
+       * the crossing's figures and no result are asked for in one read of the page, so the three hold
+       * together rather than in two reads a frame apart.
+       */
       await page.waitForFunction(
-        () => (document.querySelector('.everyday-stage-status-text')?.textContent ?? '') === '40 / 40, the building stopped draining',
+        () =>
+          (document.querySelector('.everyday-stage-status-text')?.textContent ?? '') === '40 / 40, the building stopped draining' &&
+          /past two minutes, of 40\s*4\d/u.test(
+            [...document.querySelectorAll('.everyday-stage-figure')].map((node) => node.textContent ?? '').join(' '),
+          ) &&
+          document.querySelectorAll('.everyday-rush-result').length === 0,
         undefined,
         { timeout: 30_000 },
       );

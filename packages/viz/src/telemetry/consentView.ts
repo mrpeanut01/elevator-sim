@@ -79,14 +79,16 @@ export const CONSENT_COPY = Object.freeze({
   body:
     'That’s which screens you reach, how long you play, and which building and settings each run ' +
     'used. It stays on our own server and goes nowhere else.',
-  /** Drawn under the body, without a press: the short not-recorded list, and that a no costs nothing. */
-  never: 'Never your name, your email or anything you type. Saying no changes nothing about the game.',
+  /** Drawn under the body, without a press: the short not-recorded list, that a no costs nothing, and where to change the answer. */
+  never:
+    'It doesn’t include your name, your email or anything you type. Saying no changes nothing ' +
+    'about the game, and you can change your answer in Settings.',
   no: 'No',
   yes: 'Yes',
   /** The link beside the answers, and the heading of the popover that holds the two notes below. */
   details: 'What we record',
   notCollected:
-    'We never record anything you type, your name, your email address, where you are, or what ' +
+    'We do not record anything you type, your name, your email address, where you are, or what ' +
     'you do on any other site.',
   later:
     'You can change this later in Settings. Turning it off there also asks us to delete what was ' +
