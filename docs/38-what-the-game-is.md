@@ -195,6 +195,12 @@ nothing owed: persistence was the last item and it is built.**
 
 ### 2.3 Rush
 
+**Since [§ D1636](../DECISIONS.md) a rush is a card: a wave model and a morning.** *The Climb* on
+its house morning is the rush this section describes, unchanged. *Surges*, *Tides* and *Crossfire*
+are the same climb in busy cycles, with lifts breaking down on a schedule drawn before the round and
+an end line that rises while one is out. The day's card is offered first, a card has its own board,
+and the setup screen leads with who drives.
+
 **Every scenario and every rush plays live, and this is how.** The engine runs a whole day in
 milliseconds and the stage plays the recording back
 ([`16-change-scope-contract.md`](16-change-scope-contract.md) § 0). That is not a second engine and

@@ -13,7 +13,6 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { RUSH_TUTORIAL_WHY, rushTutorialWorkedAnswerOf } from './rushScreenModel.js';
 import { TUTORIAL_COPY, tutorialWorkedAnswerOf } from './tutorialModel.js';
 import { WORKED_ANSWER_COPY, workedAnswerViewOf, type WorkedAnswerFacts } from './workedAnswer.js';
 
@@ -37,40 +36,27 @@ const FACTS: WorkedAnswerFacts = {
 };
 
 describe('§ D529 clause 2 — one component, two entry points', () => {
-  it('says the same thing from the tutorial and from Rush, except why it is saying it', () => {
+  it('is the tutorial’s alone since the Rush stopped showing it', () => {
     /*
-     * **The reuse, proved.** Both entry points are driven here, in one case, over one set of facts,
-     * and every field but the framing line is compared for equality. That is the strongest form the
-     * criterion can take without a browser: a second worked answer written for the rush would differ on
-     * a heading, a basis line or a count, and this comparison is what would see it.
+     * § D529 clause 2 reused this component on the Rush setup screen. § D1636 withdrew that on the
+     * owner's direction: the screen showed a fix and offered no way to make it. So there is one entry
+     * point, and what is held here is that it still frames the answer and still fills every field.
      */
-    const fromTutorial = tutorialWorkedAnswerOf(FACTS);
-    const fromRush = rushTutorialWorkedAnswerOf(FACTS);
-
-    // The one field they are allowed to differ on — and they must, because the reason differs.
-    expect(fromTutorial.why).toBe(TUTORIAL_COPY.workedWhy);
-    expect(fromRush.why).toBe(RUSH_TUTORIAL_WHY);
-    expect(fromTutorial.why).not.toBe(fromRush.why);
-
-    // Everything else is identical, by construction rather than by review.
-    const { why: _tutorialWhy, ...tutorialBody } = fromTutorial;
-    const { why: _rushWhy, ...rushBody } = fromRush;
-    expect(rushBody).toEqual(tutorialBody);
-
-    // And the body is not empty, so the comparison above is a comparison of something.
-    expect(Object.keys(tutorialBody).length).toBeGreaterThan(8);
-    for (const [field, text] of Object.entries(tutorialBody)) {
+    const { why, ...body } = tutorialWorkedAnswerOf(FACTS);
+    expect(why).toBe(TUTORIAL_COPY.workedWhy);
+    expect(Object.keys(body).length).toBeGreaterThan(8);
+    for (const [field, text] of Object.entries(body)) {
       expect(text.trim(), `${field} is blank`).not.toBe('');
     }
   });
 
-  it('carries the boundary on its own face, from either entry point', () => {
+  it('carries the boundary on its own face', () => {
     /*
      * § D529 clause 4 is a rule about the product, and a player who meets a worked answer once and
      * never again is owed the sentence that says so. It is on the screen rather than only in a
      * docstring for the same reason every refusal in this build is.
      */
-    for (const view of [tutorialWorkedAnswerOf(FACTS), rushTutorialWorkedAnswerOf(FACTS)]) {
+    for (const view of [tutorialWorkedAnswerOf(FACTS)]) {
       expect(view.boundary).toBe(WORKED_ANSWER_COPY.boundary);
       /*
        * The post-AH panel's H1: it said *the only place* on both of the two screens that draw it,
@@ -144,7 +130,6 @@ describe('the counts are the runs’, and the wording follows them', () => {
         false,
       );
     }
-    expect(/\d/u.test(RUSH_TUTORIAL_WHY)).toBe(false);
   });
 
   it('takes its framing from the caller and nothing else', () => {

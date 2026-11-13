@@ -21,6 +21,16 @@
  * day's kit, event and held cars among it, and the player's levers and selector — runs at a fresh
  * session's value and comes back when the player leaves (§ D548 clauses 5 and 6).
  *
+ * ## Cards
+ *
+ * Since [§ D1636](../../../../DECISIONS.md) the paragraph above describes one card of several: roll 0
+ * of *The Climb*. A rush is a wave model and a roll (`core`'s `sim/rushCards.ts`,
+ * `shift/rushPlay.ts`). {@link rushPatchOf} takes the card and writes the model's template at its own
+ * peak and the seed moved by the roll; `dev/state.ts#shiftRunConfigOf` reads the card back off those
+ * two fields and puts its breakdowns on the building; and every reader of the hold line below takes
+ * the round's own line, which defaults to the classic one. What the stage and the result say about a
+ * breakdown is {@link rushIncidentNoticeOf} and {@link rushIncidentRecapOf}.
+ *
  * ## The fail state, and the design question § D477 left open
  *
  * § D477: *the run ends when the lobby overfills*. § 20.5 and `RUSH_HOLD_LINE`: *forty people
@@ -53,16 +63,26 @@
 import {
   RUSH_NO_LEVELS,
   RUSH_PREFIT_LEVELS,
+  RUSH_CLASSIC_CARD,
+  RUSH_CLASSIC_LINE,
   RUSH_TEMPLATE_ID,
   claimsRushPrefit,
   rushFitIsAsShipped,
   rushFitOf,
-  rushHoldAtLegs,
+  rushHoldAtLegsOn,
+  rushIncidentTextOf,
+  rushLinePeopleAt,
+  rushModelRatePctPop5min,
+  rushSeedOf,
   rushTopArrivalsPerMinute,
   rushTopRatePctPop5min,
   type ResolvedBuilding,
   type RushFitLevels,
+  type RushCard,
+  type RushIncidentCar,
   type RushPrefitClaim,
+  type RushRoundLine,
+  type RushWaveModel,
   type RunInterventionConfig,
 } from '@elevator-sim/core/browser';
 
@@ -81,6 +101,7 @@ import { demandDisclosureOf, type DemandBand } from '../fixit/parse.js';
 import { waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { troubleOf } from '../shift/trouble.js';
+import { rushPlayOf, type RushPlay } from '../shift/rushPlay.js';
 import { RUSH_CONTRACT_ID, openRush, switchWeek } from '../shift/week.js';
 
 import { stampVerbOf } from '../live/interventions.js';
@@ -315,7 +336,7 @@ export type RushPatch = Pick<ViewerState, RushFieldWithRole<'rush'> | RushFieldW
  * `undefined` when no building is standing, `resolvedBuildingOf`'s own answer.
  */
 export function rushBuildingOf(resources: BrowserResources, state: ViewerState): ResolvedBuilding | undefined {
-  return resolvedBuildingOf(resources, { ...state, ...rushStandingOf(resources, state, null, RUSH_NO_LEVELS) });
+  return resolvedBuildingOf(resources, { ...state, ...rushStandingOf(resources, state, null, RUSH_NO_LEVELS, RUSH_TEMPLATE_ID, RUSH_SEED) });
 }
 
 /**
@@ -346,11 +367,25 @@ export function rushPatchOf(
   state: ViewerState,
   modifiers: readonly RushPrefitClaim[] = [],
   levels: RushFitLevels = rushStartLevelsOf(modifiers),
+  card: RushCard = RUSH_CLASSIC_CARD,
 ): RushPatch | undefined {
   const building = rushBuildingOf(resources, state);
-  return building === undefined
-    ? undefined
-    : rushStandingOf(resources, state, rushTopRatePctPop5min(building.totalPopulation), levels);
+  if (building === undefined) return undefined;
+  /*
+   * **The card** — § D1636. It writes the two fields the rush already owned, the stream and the seed,
+   * and nothing else: the model's template at the model's own peak rate, and the rush's seed moved by
+   * the roll. `dev/state.ts#shiftRunConfigOf` reads the card back off those two and puts its incidents
+   * on the building. The classic card writes what this function always wrote.
+   */
+  const { model } = rushPlayOf(building, card);
+  return rushStandingOf(
+    resources,
+    state,
+    rushModelRatePctPop5min(model, building.totalPopulation),
+    levels,
+    model.templateId,
+    BigInt(rushSeedOf(card)),
+  );
 }
 
 /**
@@ -363,6 +398,8 @@ function rushStandingOf(
   state: ViewerState,
   ratePctPop5min: number | null,
   levels: RushFitLevels,
+  templateId: string,
+  seed: bigint,
 ): RushPatch {
   const moved = switchWeek(state.week, state.parkedWeeks, RUSH_CONTRACT_ID, 'restart');
   const brought = profileById(resources, state.savedDispatchers, state.dispatcherId);
@@ -414,7 +451,7 @@ function rushStandingOf(
     playMode: 'endless',
     week: moved.week.contractId === RUSH_CONTRACT_ID ? moved.week : openRush(),
     parkedWeeks: moved.parked,
-    freePlay: { demandTemplateId: RUSH_TEMPLATE_ID, arrivalRatePctPop5min: ratePctPop5min },
+    freePlay: { demandTemplateId: templateId, arrivalRatePctPop5min: ratePctPop5min },
     shiftLengthS: RUSH_STREAM.lengthS,
     /*
      * A window from the period's own start rather than `null`: an authored phase list refuses a
@@ -422,7 +459,7 @@ function rushStandingOf(
      * `null`. The window is the whole ninety minutes, so nothing is selected out of the schedule.
      */
     windowStartS: 0,
-    seed: RUSH_SEED,
+    seed,
   };
 }
 
@@ -443,8 +480,13 @@ export function rushRestorePatchOf(state: ViewerState, before: RushBefore): Part
 }
 
 /** § D478's sentence for the rush's rate on this building, or `undefined` inside the band. */
-export function rushDisclosureOf(building: ResolvedBuilding, band: DemandBand | undefined): string | undefined {
-  return demandDisclosureOf(Math.round(rushTopRatePctPop5min(building.totalPopulation) * 10) / 10, band);
+export function rushDisclosureOf(
+  building: ResolvedBuilding,
+  band: DemandBand | undefined,
+  model?: RushWaveModel,
+): string | undefined {
+  const rate = model === undefined ? rushTopRatePctPop5min(building.totalPopulation) : rushModelRatePctPop5min(model, building.totalPopulation);
+  return demandDisclosureOf(Math.round(rate * 10) / 10, band);
 }
 
 /**
@@ -452,7 +494,10 @@ export function rushDisclosureOf(building: ResolvedBuilding, band: DemandBand | 
  * line crossed — or `undefined` when the run ends without crossing it. Read at the stream's own
  * two-second buckets from the run's start.
  */
-export function rushHoldAt(recording: Pick<VizRecording, 'legs' | 'startedAt' | 'endedAt'>): number | undefined {
+export function rushHoldAt(
+  recording: Pick<VizRecording, 'legs' | 'startedAt' | 'endedAt'>,
+  line: RushRoundLine = RUSH_CLASSIC_LINE,
+): number | undefined {
   /*
    * `core`'s reader over the recording's legs — GitHub issue #372. This was a loop over
    * `live/bands.ts#waitBandsAt`'s fourth count, and it moved so the server's replay of a posted
@@ -460,7 +505,7 @@ export function rushHoldAt(recording: Pick<VizRecording, 'legs' | 'startedAt' | 
    * `rush.test.ts` still checks the answer against `waitBandsAt` at the bucket named and the one
    * before, which is the agreement that makes the move safe.
    */
-  return rushHoldAtLegs(recording.legs, recording.startedAt, recording.endedAt);
+  return rushHoldAtLegsOn(line, recording.legs, recording.startedAt, recording.endedAt);
 }
 
 /** How many people are past the hold line's two minutes at `t`. */
@@ -501,6 +546,8 @@ export interface RushOutcome {
   readonly longestWaitS: number;
   /** People past two minutes at `atS`, against the line. */
   readonly overLine: number;
+  /** The line as it stood at `atS`: the card's own, raised while an incident was open (§ D1636). */
+  readonly linePeople: number;
   /**
    * The landings the hold was standing on, in the locator's own order — empty on a run ended by
    * hand, which crossed no line and therefore has no place to name.
@@ -513,8 +560,12 @@ export interface RushOutcome {
  * The run read at the moment it ended — the hold line if it was crossed before `stoppedAtS`, the
  * hand stop otherwise, the run's end when neither.
  */
-export function rushOutcomeOf(recording: VizRecording, stoppedAtS: number | undefined): RushOutcome {
-  const holdAtS = rushHoldAt(recording);
+export function rushOutcomeOf(
+  recording: VizRecording,
+  stoppedAtS: number | undefined,
+  line: RushRoundLine = RUSH_CLASSIC_LINE,
+): RushOutcome {
+  const holdAtS = rushHoldAt(recording, line);
   const broke = holdAtS !== undefined && (stoppedAtS === undefined || holdAtS <= stoppedAtS);
   const atS = broke ? holdAtS : Math.min(stoppedAtS ?? recording.endedAt, recording.endedAt);
   const o = observationsAt(recording, atS);
@@ -533,7 +584,8 @@ export function rushOutcomeOf(recording: VizRecording, stoppedAtS: number | unde
     carried: o.carried,
     longestWaitS: longest,
     overLine: rushOverLineAt(recording, atS),
-    where: broke ? holdPlacesOf(recording) : [],
+    linePeople: rushLinePeopleAt(line, atS - recording.startedAt),
+    where: broke ? holdPlacesOf(recording, line) : [],
     saturation: recording.summary.saturation,
   };
 }
@@ -545,9 +597,9 @@ export function rushOutcomeOf(recording: VizRecording, stoppedAtS: number | unde
  * result already says as much in its own words rather than naming the deepest landing and letting
  * a reader take it for a breaking point.
  */
-function holdPlacesOf(recording: VizRecording): readonly RushHoldPlace[] {
+function holdPlacesOf(recording: VizRecording, line: RushRoundLine): readonly RushHoldPlace[] {
   const labelOf = (id: string): string => recording.floors.find((floor) => floor.id === id)?.label ?? id;
-  return troubleOf(recording, { includeHoldLine: true }).moments
+  return troubleOf(recording, { includeHoldLine: true, holdLine: line }).moments
     .filter((moment) => moment.source === 'hold')
     .map((moment) => ({
       floorId: moment.floorId,
@@ -659,8 +711,8 @@ export function rushInterventionStampOf(
 export const RUSH_LOSS_HOLD_MS = 2_000;
 
 /** The line drawn over the building at the crossing: `40 / 40, the building stopped draining`. */
-export function rushLossLineOf(): string {
-  const people = String(RUSH_HOLD_LINE.people);
+export function rushLossLineOf(linePeople: number = RUSH_HOLD_LINE.people): string {
+  const people = String(linePeople);
   return `${people} / ${people}, the building stopped draining`;
 }
 
@@ -668,10 +720,80 @@ export const RUSH_STAGE_COPY = Object.freeze({
   drivingLabel: 'DRIVING',
   heldLabel: 'held',
   standingLabel: 'standing right now',
-  overLineLabel: 'past two minutes, of 40',
+  overLineLabel: (people: number): string => `past two minutes, of ${String(people)}`,
   overLineShortLabel: 'past two minutes',
   longestLabel: 'longest so far',
 });
+
+/* -------------------------------------------------------------------------- *
+ * Incidents — § D1636: a card's cars leaving and coming back, said as they happen
+ * -------------------------------------------------------------------------- */
+
+/** How long the all-clear stays up after the cars are back, in simulated seconds. A display dwell. */
+export const RUSH_ALL_CLEAR_S = 45;
+
+export const RUSH_INCIDENT_COPY = Object.freeze({
+  backIn: (clock: string): string => `back in ${clock}`,
+  lift: (label: string): string => `Lift ${label}`,
+  slack: (people: number): string => `The line is ${String(people)} until the lobby has had two minutes to recover.`,
+  recapNone: 'No lift broke down before the round ended.',
+  recap: (count: number, titles: string): string =>
+    `${String(count)} ${count === 1 ? 'breakdown' : 'breakdowns'} before the round ended: ${titles}.`,
+});
+
+/** What the stage says about an incident at the playhead. */
+export interface RushIncidentNotice {
+  /** `open` while the cars are out, `clear` for a moment after they are back. */
+  readonly kind: 'open' | 'clear';
+  readonly title: string;
+  readonly text: string;
+  /** `back in 2:40` while open; the line's raised figure and why. Empty on the all-clear. */
+  readonly detail: string;
+}
+
+/**
+ * **The incident on screen at `heldS`**, or `undefined` when no car is out and none has just come
+ * back. Drawn by `everyday/stageScreen.ts` under the rush header.
+ *
+ * Every word is the deck's own (`data/rush-cards.json`) with the cars' labels filled in, and every
+ * figure is the schedule's: the time left is the incident's own end against the playhead, and the
+ * line is `core`'s `rushLinePeopleAt`, the figure the round is actually ended on.
+ */
+export function rushIncidentNoticeOf(
+  play: Pick<RushPlay, 'incidents' | 'line'>,
+  heldS: number,
+  labelOf: (car: RushIncidentCar) => string,
+): RushIncidentNotice | undefined {
+  for (const incident of play.incidents) {
+    if (heldS >= incident.atS && heldS < incident.untilS) {
+      const people = rushLinePeopleAt(play.line, heldS);
+      const backIn = RUSH_INCIDENT_COPY.backIn(heldClock(incident.untilS - heldS));
+      return {
+        kind: 'open',
+        title: incident.kind.title,
+        text: rushIncidentTextOf(incident.kind.text, incident, labelOf),
+        detail: people > play.line.people ? `${backIn} · ${RUSH_INCIDENT_COPY.slack(people)}` : backIn,
+      };
+    }
+    if (heldS >= incident.untilS && heldS < incident.untilS + RUSH_ALL_CLEAR_S) {
+      return {
+        kind: 'clear',
+        title: incident.kind.title,
+        text: rushIncidentTextOf(incident.kind.allClear, incident, labelOf),
+        detail: '',
+      };
+    }
+  }
+  return undefined;
+}
+
+/** The result's line about the breakdowns that had started by `heldS`. `undefined` on a card with none scheduled. */
+export function rushIncidentRecapOf(play: Pick<RushPlay, 'incidents' | 'model'>, heldS: number): string | undefined {
+  if (!play.model.incidents) return undefined;
+  const met = play.incidents.filter((incident) => incident.atS <= heldS);
+  if (met.length === 0) return RUSH_INCIDENT_COPY.recapNone;
+  return RUSH_INCIDENT_COPY.recap(met.length, met.map((incident) => `${incident.kind.title} at ${heldClock(incident.atS)}`).join(', '));
+}
 
 /** `m:ss` of seconds held. */
 export function heldClock(heldS: number): string {
@@ -685,11 +807,14 @@ export function rushStageHeaderOf(input: {
   readonly recording: VizRecording;
   readonly simTimeS: number;
   readonly driverName: string;
+  /** The round's own line (§ D1636). Absent is the classic line. */
+  readonly line?: RushRoundLine | undefined;
 }): RushStageHeaderView {
   const heldS = input.simTimeS - input.recording.startedAt;
   const o = observationsAt(input.recording, input.simTimeS);
   const longest = o.worstWaitSoFarS;
   const over = rushOverLineAt(input.recording, input.simTimeS);
+  const linePeople = rushLinePeopleAt(input.line ?? RUSH_CLASSIC_LINE, heldS);
   return {
     held: heldClock(heldS),
     wave: `WAVE ${String(playerWaveAt(heldS))}`,
@@ -697,13 +822,13 @@ export function rushStageHeaderOf(input: {
     driverName: input.driverName,
     figures: [
       { label: RUSH_STAGE_COPY.standingLabel, value: String(o.waitingNow) },
-      { label: RUSH_STAGE_COPY.overLineLabel, value: String(over) },
+      { label: RUSH_STAGE_COPY.overLineLabel(linePeople), value: String(over) },
       {
         label: RUSH_STAGE_COPY.longestLabel,
         value: longest === undefined ? EM_DASH : `${String(Math.round(longest))} s${o.worstWaitIsCensored ? ' and counting' : ''}`,
       },
     ],
-    compactFigure: { label: RUSH_STAGE_COPY.overLineShortLabel, value: `${String(over)}/${String(RUSH_HOLD_LINE.people)}` },
+    compactFigure: { label: RUSH_STAGE_COPY.overLineShortLabel, value: `${String(over)}/${String(linePeople)}` },
   };
 }
 
@@ -774,7 +899,7 @@ export const RUSH_RESULT_COPY = Object.freeze({
       : `The trend test over the whole run doesn’t find the queue still growing (${saturation.verdict}, ${String(saturation.sampleCount)} samples). That is what a line reached and then cleared looks like.`;
   },
   beatTrendAbsent: 'This round has no trend test, so it can’t say where the queue started growing.',
-  beatBroke: (held: string): string => `At ${held}, ${String(RUSH_HOLD_LINE.people)} people had waited over two minutes at once, and the rush ended.`,
+  beatBroke: (held: string, linePeople: number): string => `At ${held}, ${String(linePeople)} people had waited over two minutes at once, and the rush ended.`,
   /**
    * **Where it broke** — the beat this result did not have, GitHub issue's L7 shape and the reason
    * `shift/trouble.ts` exists. Empty on a hand stop, where there is no line crossed to place.
@@ -804,9 +929,9 @@ export const RUSH_RESULT_COPY = Object.freeze({
     const opening = places.length === 1 ? 'They were all in one place' : 'They were not in one place';
     return `${opening}: ${parts.join(', ')}${tail} — of ${String(overLine)} past two minutes across the building.`;
   },
-  beatStopped: (over: number): string =>
-    `${String(over)} people were past two minutes when you stopped, against a line of ${String(RUSH_HOLD_LINE.people)}. Where this building breaks is not yet known.`,
-  brokeFooter: 'Everybody gets the same waves.',
+  beatStopped: (over: number, linePeople: number): string =>
+    `${String(over)} people were past two minutes when you stopped, against a line of ${String(linePeople)}. Where this building breaks is not yet known.`,
+  brokeFooter: 'Everybody on the same card gets the same crowd.',
   stoppedFooter: (wave: number): string =>
     `Ended by hand at wave ${String(wave)}, so it is not posted: a stopped run has no breaking point.`,
   furthestWave: 'furthest wave',
@@ -815,7 +940,7 @@ export const RUSH_RESULT_COPY = Object.freeze({
   longest: 'longest wait',
 });
 
-export function rushResultViewOf(outcome: RushOutcome, disclosure: string | undefined): RushResultView {
+export function rushResultViewOf(outcome: RushOutcome, disclosure: string | undefined, incidentRecap?: string): RushResultView {
   const held = heldClock(outcome.heldS);
   const broke = outcome.kind === 'broke';
   const trend = outcome.saturation === undefined ? RUSH_RESULT_COPY.beatTrendAbsent : RUSH_RESULT_COPY.beatTrend(outcome.saturation, outcome.atS, held);
@@ -828,17 +953,22 @@ export function rushResultViewOf(outcome: RushOutcome, disclosure: string | unde
       ? [
           RUSH_RESULT_COPY.beatComfortable,
           trend,
-          RUSH_RESULT_COPY.beatBroke(held),
+          RUSH_RESULT_COPY.beatBroke(held, outcome.linePeople),
           /* The fourth beat, and only when the hold could be placed — a run that broke with no
            * landing to name drops it rather than drawing an empty one. */
           ...(where === undefined ? [] : [where]),
+          ...(incidentRecap === undefined ? [] : [incidentRecap]),
         ]
-      : [RUSH_RESULT_COPY.beatComfortable, RUSH_RESULT_COPY.beatStopped(outcome.overLine)],
+      : [
+          RUSH_RESULT_COPY.beatComfortable,
+          RUSH_RESULT_COPY.beatStopped(outcome.overLine, outcome.linePeople),
+          ...(incidentRecap === undefined ? [] : [incidentRecap]),
+        ],
     figures: [
       { label: RUSH_RESULT_COPY.furthestWave, value: String(outcome.wave) },
       { label: RUSH_RESULT_COPY.howLong, value: held },
       { label: RUSH_RESULT_COPY.carried, value: String(outcome.carried) },
-      { label: RUSH_RESULT_COPY.longest, value: `${String(Math.round(outcome.longestWaitS))} s`, note: `the run ends at ${rushHoldLineFigure()}` },
+      { label: RUSH_RESULT_COPY.longest, value: `${String(Math.round(outcome.longestWaitS))} s`, note: `the run ends at ${rushHoldLineFigure(outcome.linePeople)}` },
     ],
     footer: broke ? RUSH_RESULT_COPY.brokeFooter : RUSH_RESULT_COPY.stoppedFooter(outcome.wave),
     disclosure,

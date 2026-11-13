@@ -1,0 +1,11 @@
+{
+  "$comment": "One round per cell, on a Rush card (DECISIONS.md section D1636). heldS is what the viewer's press holds (packages/viz/src/everyday/rushCards.test.ts) and what this server's replay must reproduce (packages/server/src/leaderboard/rushCardAgreement.test.ts). A cell both ends disagree on is a finding, never a number to edit on one side. prefit is the rush-prefit claim, which fits the tower before the incidents are drawn.",
+  "cells": [
+    { "buildingId": "midtown-office", "dispatcherProfileId": "collective", "card": { "model": "surges", "roll": 1 }, "heldS": 1562 },
+    { "buildingId": "midtown-office", "dispatcherProfileId": "collective", "card": { "model": "tides", "roll": 2 }, "heldS": 1812 },
+    { "buildingId": "midtown-office", "dispatcherProfileId": "eta", "card": { "model": "crossfire", "roll": 3 }, "heldS": 1996 },
+    { "buildingId": "midtown-office", "dispatcherProfileId": "collective", "card": { "model": "tides", "roll": 2 }, "prefit": true, "heldS": 1814 },
+    { "buildingId": "garden-apartments", "dispatcherProfileId": "collective", "card": { "model": "surges", "roll": 1 }, "heldS": 1138 },
+    { "buildingId": "harbour-point", "dispatcherProfileId": "nearest-car", "card": { "model": "crossfire", "roll": 20405 }, "heldS": 2504 }
+  ]
+}

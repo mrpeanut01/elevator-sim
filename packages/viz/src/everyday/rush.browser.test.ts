@@ -70,6 +70,8 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await leaveTutorialIfOffered(page);
       await page.locator('.everyday-mode[data-screen="rush"]').click();
       await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      /* § D1636: these rounds are the classic climb's, the card the house rows and the line of forty are about. */
+      await page.locator('.everyday-rush-model[data-model="climb"]').click();
       /* § D478 on the setup screen: the stream leaves this building's band, and the screen says so. */
       expect(await page.textContent('.everyday-rush-disclosure')).toContain('Busier than a building like this is sized for');
       const primary = page.locator('.everyday-bar-primary');
@@ -137,6 +139,8 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await leaveTutorialIfOffered(page);
       await page.locator('.everyday-mode[data-screen="rush"]').click();
       await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      /* § D1636: these rounds are the classic climb's, the card the house rows and the line of forty are about. */
+      await page.locator('.everyday-rush-model[data-model="climb"]').click();
       /* `#run` is the Engineer's Run button; `dev/main.ts#onRunning` labels it from the runner's own transition. */
       const idle = 'Run this shift';
       await page.waitForFunction((label) => document.getElementById('run')?.textContent === label, idle, { timeout: 60_000 });
@@ -175,6 +179,8 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await leaveTutorialIfOffered(page);
       await page.locator('.everyday-mode[data-screen="rush"]').click();
       await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      /* § D1636: these rounds are the classic climb's, the card the house rows and the line of forty are about. */
+      await page.locator('.everyday-rush-model[data-model="climb"]').click();
       await page.locator('.everyday-bar-primary').click();
       await page.waitForFunction(
         () => /^WAVE \d+$/u.test(document.querySelector('.everyday-stage-phase')?.textContent ?? ''),
@@ -236,6 +242,8 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await leaveTutorialIfOffered(page);
       await page.locator('.everyday-mode[data-screen="rush"]').click();
       await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      /* § D1636: these rounds are the classic climb's, the card the house rows and the line of forty are about. */
+      await page.locator('.everyday-rush-model[data-model="climb"]').click();
       await page.locator('.everyday-bar-primary').click(); // Start the rush
       await page.waitForFunction(
         () => /^WAVE \d+$/u.test(document.querySelector('.everyday-stage-phase')?.textContent ?? ''),
@@ -379,6 +387,8 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await leaveTutorialIfOffered(page);
       await page.locator('.everyday-mode[data-screen="rush"]').click();
       await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      /* § D1636: these rounds are the classic climb's, the card the house rows and the line of forty are about. */
+      await page.locator('.everyday-rush-model[data-model="climb"]').click();
       await page.locator('.everyday-bar-primary').click();
       await page.waitForFunction(
         () => /^WAVE \d+$/u.test(document.querySelector('.everyday-stage-phase')?.textContent ?? ''),
@@ -445,6 +455,8 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await leaveTutorialIfOffered(page);
       await page.locator('.everyday-mode[data-screen="rush"]').click();
       await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      /* § D1636: these rounds are the classic climb's, the card the house rows and the line of forty are about. */
+      await page.locator('.everyday-rush-model[data-model="climb"]').click();
       await page.locator('.everyday-bar-primary').click(); // Start the rush
       await page.waitForFunction(
         () => /^WAVE \d+$/u.test(document.querySelector('.everyday-stage-phase')?.textContent ?? ''),
@@ -503,6 +515,8 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await leaveTutorialIfOffered(page);
       await page.locator('.everyday-mode[data-screen="rush"]').click();
       await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+      /* § D1636: these rounds are the classic climb's, the card the house rows and the line of forty are about. */
+      await page.locator('.everyday-rush-model[data-model="climb"]').click();
       /* The setup screen says what the purse is for before the first round. */
       const setupLine = await page.locator('.everyday-rush-rebuild-line').textContent();
       expect(setupLine).toContain('Between rounds you can spend it rebuilding the tower');

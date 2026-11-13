@@ -96,7 +96,8 @@ describe('the split shipped two records where there was one', () => {
     // Two since GitHub issue #220: `endless-rush` is the second phase-list record, a mode's own
     // stream that `selectable: false` keeps out of every list.
     expect(shipped.filter((id) => !(DEMAND_TEMPLATE_IDS as readonly string[]).includes(id))).toEqual(
-      ['office-day', 'endless-rush'],
+      // And three more since § D1636: the Rush's wave models, generated, unselectable like the climb.
+      ['office-day', 'endless-rush', 'rush-surges', 'rush-tides', 'rush-crossfire'],
     );
   });
 

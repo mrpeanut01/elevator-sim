@@ -122,7 +122,12 @@ import type {
 import {
   RUSH_PREFIT_SINK_ID,
   careerDayTurnKeyOf,
+  RUSH_CLASSIC_CARD,
+  rushCardIsClassic,
+  rushCardIssueOf,
   rushLevelsAfter,
+  rushModelRatePctPop5min,
+  type RushCard,
   weekDayTurnKeyOf,
   type RushFitLevels,
 } from '@elevator-sim/core/browser';
@@ -324,7 +329,8 @@ import { watchingViewOf, type WatchingView } from '../watch/view.js';
 import type { DemandBand } from '../fixit/parse.js';
 import { RUSH_UNFINISHED_COPY, type RushBest, type RushFurthestStanding } from './rushScreenModel.js';
 import type { RushPostedStandings } from './rushHouse.js';
-import { heldClock, rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushStartLevelsOf, rushTopRatePctPop5min, rushWavesOutlastedOf, type RushBefore } from './rush.js';
+import { RUSH_CARDS, rushPlayOf, type RushPlay } from '../shift/rushPlay.js';
+import { heldClock, rushBeforeOf, rushBuildingOf, rushDisclosureOf, rushHoldAt, rushOutcomeOf, rushPatchOf, rushRestorePatchOf, rushStartLevelsOf, rushWavesOutlastedOf, type RushBefore } from './rush.js';
 import { rushPurseBeforeNextOf, rushRebuildPressOf, rushTopUpClaimsOf, type RushRebuildInput } from './rushRebuild.js';
 import {
   rushRoundRecordOf,
@@ -931,6 +937,8 @@ export interface EverydayWatchSession {
  * recording crosses the hold line, and whether the player ended it first.
  */
 export interface EverydayRushSession {
+  /** The card this sitting is played on, with its incidents and its line on this tower (§ D1636). */
+  readonly play: RushPlay;
   readonly topRatePctPop5min: number;
   readonly disclosure: string | undefined;
   /** The first two-second bucket with forty people past two minutes, or `undefined` before the run lands or if it never crosses. */
@@ -2404,6 +2412,15 @@ export interface EverydayHost {
    * rush it re-runs the same waves, which is § 9.3's *Run the rush again*.
    */
   startRush(): string | undefined;
+  /**
+   * The card the next sitting starts on — [§ D1636](../../../../DECISIONS.md). The classic climb until
+   * `everyday/rushScreen.ts` sets one; a sitting keeps the card it started on.
+   */
+  rushCard(): RushCard;
+  /** Choose the card the next sitting starts on. Ignored while a sitting stands, and for a card this build does not know. */
+  setRushCard(card: RushCard): void;
+  /** {@link rushCard} on the standing tower: its model, its incidents and its line. `undefined` with no building. */
+  rushPlay(): RushPlay | undefined;
   /** The rush in progress, or `undefined` — see {@link EverydayRushSession}. */
   rush(): EverydayRushSession | undefined;
   /** Record where the rush ended: the hold line the stage reached, or the player's hand. */
@@ -3616,6 +3633,7 @@ export function createEverydayHost(
   let rushSession:
     | {
         readonly before: RushBefore;
+        readonly play: RushPlay;
         readonly topRatePctPop5min: number;
         readonly disclosure: string | undefined;
         readonly hold: { readonly recording: VizRecording; readonly atS: number | undefined } | undefined;
@@ -3661,6 +3679,8 @@ export function createEverydayHost(
    * {@link EverydayHost.rushFurthest} ([§ D1515](../../../../DECISIONS.md)).
    */
   const rushBestThisVisit = new Map<string, RushBest>();
+  /** The card the next sitting starts on — {@link EverydayHost.rushCard}. */
+  let rushCardChosen: RushCard = RUSH_CLASSIC_CARD;
   /**
    * A round the last page closed on — read once, as this host starts, so a round this page plays
    * cannot be mistaken for it. Written at `pagehide` by `rushDeviceStore.ts` from what
@@ -3952,6 +3972,7 @@ export function createEverydayHost(
       endedAtS: atS,
       /* What was bought before this round, as the press that started it recorded — § D1295. */
       rebuild: rushSession.roundRebuild,
+      line: rushSession.play.line,
       /*
        * The shelf the stage's own header reads — a saved dispatcher has a name too, and the round
        * list has to say what the player drove even when that round is the reason the sitting cannot
@@ -3997,7 +4018,7 @@ export function createEverydayHost(
     if (store === undefined || rushSession === undefined || round.unpostable.length > 0) return;
     store.offerFurthest({
       buildingId: rushSession.buildingId,
-      body: rushSittingBodyOf({ buildingId: rushSession.buildingId, rounds: rushSession.rounds, modifiers: rushSession.modifiers }),
+      body: rushSittingBodyOf({ buildingId: rushSession.buildingId, rounds: rushSession.rounds, modifiers: rushSession.modifiers, card: rushSession.play.card }),
       endedAfterS: round.outcome.heldS,
       keptWave: round.outcome.wave,
       keptHeldS: round.outcome.heldS,
@@ -4016,7 +4037,13 @@ export function createEverydayHost(
   const keepRushOnDevice = (): void => {
     const store = b.rushDeviceBest;
     if (store === undefined || b.readRushPosted !== undefined || rushSession === undefined) return;
-    const check = rushSittingOf({ buildingId: rushSession.buildingId, rounds: rushSession.rounds, modifiers: rushSession.modifiers });
+    /*
+     * § D1636: the device's best sitting is drawn among the house rows as *on the same waves*, so it is
+     * kept for the classic card only. A round on any card still counts toward the furthest, which says
+     * nothing about the house.
+     */
+    if (!rushCardIsClassic(rushSession.play.card)) return;
+    const check = rushSittingOf({ buildingId: rushSession.buildingId, rounds: rushSession.rounds, modifiers: rushSession.modifiers, card: rushSession.play.card });
     const held = rushSession.rounds[rushSession.rounds.length - 1]?.holdS;
     if (!check.ok || held === null || held === undefined) return;
     store.offer(rushSession.buildingId, check.body, held);
@@ -5574,6 +5601,7 @@ export function createEverydayHost(
         buildingId: rushSession.buildingId,
         rounds: rushSession.rounds,
         modifiers: rushSession.modifiers,
+        card: rushSession.play.card,
         boughtOnDevice: rushSession.boughtOnDevice,
       });
       // All of them, joined: `rushSittingOf` reports every reason on purpose, and a press that
@@ -5598,7 +5626,7 @@ export function createEverydayHost(
         b.simulateRecord(
           replay.config,
           (recording) => {
-            const holdAtS = rushHoldAt(recording);
+            const holdAtS = rushHoldAt(recording, rushPlayOf(replay.config.building, kept.body.card ?? RUSH_CLASSIC_CARD).line);
             resolve(
               holdAtS === undefined
                 ? { kind: 'unreplayable', reason: RUSH_DEVICE_HELD_THROUGH }
@@ -5644,7 +5672,11 @@ export function createEverydayHost(
         b.simulateRecord(
           replay.config,
           (recording) => {
-            const outcome = rushOutcomeOf(recording, recording.startedAt + kept.endedAfterS);
+            const outcome = rushOutcomeOf(
+              recording,
+              recording.startedAt + kept.endedAfterS,
+              rushPlayOf(replay.config.building, kept.body.card ?? RUSH_CLASSIC_CARD).line,
+            );
             resolve({
               kind: 'row',
               best: {
@@ -5770,10 +5802,12 @@ export function createEverydayHost(
       const building = rushBuildingOf(b.resources, state);
       if (building === undefined) return 'no building is standing, so there is nothing for the stream to arrive at';
       if (rushSession === undefined) {
+        const play = rushPlayOf(building, rushCardChosen);
         rushSession = {
           before: rushBeforeOf(state),
-          topRatePctPop5min: rushTopRatePctPop5min(building.totalPopulation),
-          disclosure: rushDisclosureOf(building, bandOf(building)),
+          play,
+          topRatePctPop5min: rushModelRatePctPop5min(play.model, building.totalPopulation),
+          disclosure: rushDisclosureOf(building, bandOf(building), play.model),
           hold: undefined,
           endedAtS: undefined,
           buildingId: building.id,
@@ -5836,7 +5870,7 @@ export function createEverydayHost(
        * the same argument one line up: the set is the sitting's, read at the first press, so every
        * round of it starts from the same building whatever the account bought in between.
        */
-      const patch = rushPatchOf(b.resources, state, rushSession.modifiers, rushSession.levels);
+      const patch = rushPatchOf(b.resources, state, rushSession.modifiers, rushSession.levels, rushSession.play.card);
       if (patch !== undefined) b.applyPatch(patch);
       b.startRun();
       /*
@@ -5855,9 +5889,10 @@ export function createEverydayHost(
       const recording = b.state().recording;
       /* The hold line is read once per recording, keyed on identity — the stage asks every frame. */
       if (recording !== undefined && rushSession.hold?.recording !== recording) {
-        rushSession = { ...rushSession, hold: { recording, atS: rushHoldAt(recording) } };
+        rushSession = { ...rushSession, hold: { recording, atS: rushHoldAt(recording, rushSession.play.line) } };
       }
       return {
+        play: rushSession.play,
         topRatePctPop5min: rushSession.topRatePctPop5min,
         disclosure: rushSession.disclosure,
         holdAtS: rushSession.hold?.atS,
@@ -5874,6 +5909,7 @@ export function createEverydayHost(
           buildingId: rushSession.buildingId,
           rounds: rushSession.rounds,
           modifiers: rushSession.modifiers,
+          card: rushSession.play.card,
           boughtOnDevice: rushSession.boughtOnDevice,
         }),
       };
@@ -5931,7 +5967,17 @@ export function createEverydayHost(
     rushDisclosure: () => {
       // The rush's building, on `startRush`'s ground: the setup screen describes the stream the press sends.
       const building = rushBuildingOf(b.resources, b.state());
-      return building === undefined ? undefined : rushDisclosureOf(building, bandOf(building));
+      return building === undefined ? undefined : rushDisclosureOf(building, bandOf(building), rushPlayOf(building, rushCardChosen).model);
+    },
+    rushCard: () => rushSession?.play.card ?? rushCardChosen,
+    setRushCard: (card) => {
+      if (rushSession !== undefined || rushCardIssueOf(RUSH_CARDS, card) !== undefined) return;
+      rushCardChosen = card;
+    },
+    rushPlay: () => {
+      if (rushSession !== undefined) return rushSession.play;
+      const building = rushBuildingOf(b.resources, b.state());
+      return building === undefined ? undefined : rushPlayOf(building, rushCardChosen);
     },
     bankScenarioClear: (scenarioId, atPar = false) => {
       const cleared = bankTurn({ completion: 'scenario-cleared', scenarioId });

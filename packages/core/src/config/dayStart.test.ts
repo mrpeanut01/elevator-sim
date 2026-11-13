@@ -147,6 +147,10 @@ const SHIPPED_HOURS: Readonly<Record<string, string | null>> = {
   // clock has to open somewhere, so it opens where the office day does. No list offers it
   // (`selectable: false`), so the hour reaches a clock and never a menu.
   'endless-rush': '08:00',
+  // The Rush's wave models (§ D1636) are the climb with a different rhythm, and open where it does.
+  'rush-surges': '08:00',
+  'rush-tides': '08:00',
+  'rush-crossfire': '08:00',
 };
 
 describe('the shipped reference data authors seven hours and deliberately omits one', () => {

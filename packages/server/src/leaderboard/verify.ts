@@ -35,7 +35,13 @@ import {
   rushFitIsAsShipped,
   rushRebuiltBuilding,
   rushRebuiltProfile,
+  rushBuildingWithIncidents,
+  rushModelRatePctPop5min,
   rushTopRatePctPop5min,
+  rushIncidentsOf,
+  type RushCard,
+  type RushCards,
+  type RushWaveModel,
   type RuleRowConfig,
   type RunSummary,
   type RushFit,
@@ -369,23 +375,44 @@ export function rushRoundConfigFor(
   round: Pick<SubmittedRun, 'dispatcherProfileId' | 'ruleRows' | 'interventions'>,
   resources: VerificationResources,
   fit: RushFit = RUSH_AS_SHIPPED,
+  play?: RushRoundPlay,
 ): SimulationConfig | RejectionCode {
   const building = resources.buildingsById.get(buildingId);
   if (building === undefined) return 'unknown-building';
+  const templateId = play?.model.templateId ?? RUSH_TEMPLATE_ID;
   const run: SubmittedRun = {
     buildingId,
     dispatcherProfileId: round.dispatcherProfileId,
-    demandTemplateId: RUSH_TEMPLATE_ID,
-    arrivalRatePctPop5min: rushTopRatePctPop5min(building.totalPopulation),
+    demandTemplateId: templateId,
+    arrivalRatePctPop5min:
+      play === undefined
+        ? rushTopRatePctPop5min(building.totalPopulation)
+        : rushModelRatePctPop5min(play.model, building.totalPopulation),
     durationS: RUSH_STREAM.lengthS,
     // From the period's own start rather than `null`, for `rush.ts#rushPatchOf`'s reason: an authored
     // phase list refuses a `durationS` override (§ D275), and a window is what carries the length.
     windowStartS: 0,
-    seed: String(RUSH_STREAM.seed),
+    seed: String(play?.seed ?? RUSH_STREAM.seed),
     ...(round.ruleRows === undefined ? {} : { ruleRows: round.ruleRows }),
     ...(round.interventions === undefined ? {} : { interventions: round.interventions }),
   };
-  return configOver(run, resources, (template) => template.id === RUSH_TEMPLATE_ID, fit);
+  const config = configOver(run, resources, (template) => template.id === templateId, fit);
+  if (typeof config === 'string' || play === undefined) return config;
+  // The card's incidents ride the building's own service schedule, drawn on the building the round
+  // runs on, fit included: the viewer does exactly this in `dev/state.ts#shiftRunConfigOf`, through
+  // the same two core functions.
+  return { ...config, building: rushBuildingWithIncidents(config.building, rushIncidentsOf(play.cards, config.building, play.card)) };
+}
+
+/**
+ * What a card decides about a round — § D1636, `core`'s `sim/rushCards.ts`. Absent is the classic
+ * card, and the round is then byte for byte the one this function built before cards existed.
+ */
+export interface RushRoundPlay {
+  readonly cards: RushCards;
+  readonly card: RushCard;
+  readonly model: RushWaveModel;
+  readonly seed: number;
 }
 
 /**

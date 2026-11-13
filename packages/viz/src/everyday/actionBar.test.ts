@@ -210,7 +210,7 @@ const GUIDE_TABLE: readonly GuideRow[] = [
     back: { label: 'The day', screen: 'stage' },
     timeline: null,
     primary: ['Run the rush again'],
-    notes: ['Waves are identical for everyone.'],
+    notes: ['A card is the same waves for everyone.'],
     inverted: true,
     wayOut: '⤺ Leave the rush',
     emphasisShipsInstead: { inverted: false, wayOut: undefined },
