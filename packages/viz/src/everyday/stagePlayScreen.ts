@@ -58,7 +58,7 @@ import { fixSpentUnitsOf, progressWithFixSpent } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
 import { scenarioHubViewOf } from './scenarioModel.js';
 import { scenarioOpen } from './scenarioOpenPort.js';
-import { el } from './screenDom.js';
+import { el, explainer } from './screenDom.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
   STAGE_PLAY_COPY as COPY,
@@ -862,7 +862,14 @@ export function mountStagePlay(host: HTMLElement, context: EverydayScreenShellCo
         }
         controls.append(rungs);
       }
-      controls.append(para(doc, 'everyday-stage-play-run-note', view.runNote, `font-size:13px;line-height:1.5;color:${C.warmGrey}`));
+      /* The copy edit: how a stage is judged is read once, so it sits behind a link beside the controls. */
+      controls.append(
+        explainer(doc, {
+          link: 'How a stage is judged',
+          title: 'How a stage is judged',
+          body: [para(doc, 'everyday-stage-play-run-note', view.runNote, `font-size:13.5px;line-height:1.5;color:${C.inkSoft}`)],
+        }).root,
+      );
       /* § D1358: a stage this device has cleared says a run here is practice, before the press. */
       if (view.practice !== undefined) {
         controls.append(para(doc, 'everyday-stage-play-practice', view.practice, `font-size:13px;line-height:1.5;color:${C.inkSoft}`));

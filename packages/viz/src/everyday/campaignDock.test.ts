@@ -69,7 +69,7 @@ describe('the incident block', () => {
     expect(block.options[0]?.cost).toBe(`${String(TECHNICIAN_UNITS)} u`);
     expect(block.options[1]?.cost).toBe('free');
     expect(block.options.every((option) => option.refusal === undefined)).toBe(true);
-    expect(block.footer).toBe('Choose whenever you like — nothing changes until you do, and the day carries on without an answer.');
+    expect(block.footer).toBe('Choose when you like. Nothing changes until you do, and the day carries on.');
   });
 
   it('dims the row the purse cannot cover, and says what it is short by', () => {
@@ -94,7 +94,7 @@ describe('the incident block', () => {
     const answered = view({ answeredStamp: '09:14 · answered the incident — Call the technician out now' });
     if (answered.incident.kind !== 'answered') throw new Error('answered');
     expect(answered.incident.stamp).toContain('answered the incident');
-    expect(answered.incident.footer).toBe('Maintenance is on it. Anything temporary reverts on its own when this closes.');
+    expect(answered.incident.footer).toBe('Maintenance is on it. Anything temporary reverts when this closes.');
   });
 });
 

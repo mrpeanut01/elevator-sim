@@ -174,12 +174,12 @@ describe('everyday/postRun.ts — where the run landed is the server’s answer'
   });
 
   it('says the server replayed the seed, and says it on no other state', () => {
-    expect(textOf(postRunViewOf({ ...READY, outcome: posted }))).toContain('replayed your seed');
+    expect(textOf(postRunViewOf({ ...READY, outcome: posted }))).toContain('replayed your run');
     for (const outcome of [
       { kind: 'failed', detail: 'no.' },
       { kind: 'refused', detail: 'no.' },
     ] as const) {
-      expect(textOf(postRunViewOf({ ...READY, outcome }))).not.toContain('replayed your seed');
+      expect(textOf(postRunViewOf({ ...READY, outcome }))).not.toContain('replayed your run');
     }
   });
 

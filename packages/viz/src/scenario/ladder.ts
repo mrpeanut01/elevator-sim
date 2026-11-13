@@ -191,7 +191,7 @@ export interface ScenarioLadderRung {
 export const SCENARIO_LADDER_COPY = Object.freeze({
   heading: 'The path',
   /** Drawn over the ladder. Says what the ordering is, since the rows carry no number a player set. */
-  lede: 'Ten buildings in the order they are meant to be met, each one adding a single idea to the last.',
+  lede: 'Ten buildings in order, each adding one idea to the last.',
   /**
    * A stage that is offered. It opens **this** stage where the stages are played today.
    *
@@ -210,9 +210,9 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    * clear of it pays chimes and a second pays nothing"*.
    */
   openNote:
-    'Opens this stage in the fix-it editor, on its own building, at the budget it opens on or a wider one this device bought for it. ' +
-    `The first clear of it pays chimes, the first clear at or under a priced par pays ${String(PAR_AWARD_CHIMES)} more, and a clear after those pays nothing. ` +
-    'A clear unlocks nothing, because nothing on this path is locked: each stage is open, or held for the reason written on it.',
+    'Opens this stage on its own building, at the budget it opens on or a wider one you bought for it. ' +
+    `The first clear pays chimes, the first clear at or under a priced par pays ${String(PAR_AWARD_CHIMES)} more, and later clears pay nothing. ` +
+    'Nothing on this path is locked: each stage is open, or held for the reason written on it.',
   /** A stage held back. Never the word unwinnable — see the module docstring. */
   heldLead: 'Held back:',
   /*
@@ -327,7 +327,7 @@ function shapeOf(stage: LadderStage): string {
   const span = Number.isInteger(minutes)
     ? `${String(minutes)} min in the building`
     : `${String(stage.durationS)} s in the building`;
-  return `${span} · ${String(stage.replications)} runs behind the verdict`;
+  return `${span} · judged over ${String(stage.replications)} runs`;
 }
 
 /**

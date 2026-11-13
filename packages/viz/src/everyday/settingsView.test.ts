@@ -63,10 +63,7 @@ describe('the § 15.1 header', () => {
     const view = settingsScreenViewOf(BASE);
     expect(view.eyebrow).toBe('ELEVATOR SIM · EVERYDAY MODE');
     expect(view.title).toBe('Settings');
-    expect(view.lede).toBe(
-      'Your name and picture travel with every run you post, so somebody watching your Friday ' +
-        'sees them. Everything else here only changes how the game looks and sounds to you.',
-    );
+    expect(view.lede).toBe('Your name and account, and how the game looks and sounds.');
   });
 });
 
@@ -248,7 +245,7 @@ describe('Playing — two wired rows, never a dead toggle (§ 20.12)', () => {
     expect(untouched).toEqual({
       id: 'default-speed',
       label: 'Default speed',
-      note: 'the speed every run opens at — the chips on the stage still change it for the day',
+      note: 'the speed each run starts at',
       /* The opening rung's own label, read through the one accessor — a literal here would be a
          second place the default is written down, which is #257's defect one level up. */
       value: stageSpeedAt(DEFAULT_STAGE_SPEED_INDEX).label,
@@ -298,12 +295,9 @@ describe('Clear saved progress — the one control in This device (GitHub issue 
 describe('This device — statements of fact, and the register of refusals beside them', () => {
   it('states where progress lives and that replay verification is always on', () => {
     const facts = settingsScreenViewOf(BASE).device.facts;
-    expect(facts.map((fact) => fact.label)).toEqual([
-      'Where your progress lives',
-      'Replay verification',
-    ]);
-    expect(facts[0]?.value).toBe('this device');
-    expect(facts[1]?.value).toBe('always on');
+    expect(facts.map((fact) => fact.label)).toEqual(['Your progress', 'Posted runs']);
+    expect(facts[0]?.value).toBe('on this device');
+    expect(facts[1]?.value).toBe('always checked');
     expect(facts[1]?.note).toContain('re-simulated by the server');
   });
 

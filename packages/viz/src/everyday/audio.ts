@@ -120,7 +120,7 @@ export function isSoundPreference(value: unknown): value is SoundPreference {
  */
 export const SOUND_ROW_COPY = Object.freeze({
   label: 'Sound',
-  note: 'the stage plays its lobby — chimes and doors while the clock is slow, a crowd once it is fast; nothing is ever only heard',
+  note: 'lift chimes and doors at slow speeds, a crowd at fast ones, and everything heard is also shown',
   face: Object.freeze({ on: 'on', off: 'off' }),
 });
 

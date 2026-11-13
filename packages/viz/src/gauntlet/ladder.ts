@@ -92,8 +92,7 @@ export function sendGateOf(candidate: SendCandidate | undefined): SendGate {
     return {
       sendable: false,
       refusal:
-        'no dispatcher is open, so there is nothing to send. Pick one in the workshop and it can ' +
-        'go through the forty.',
+        'No dispatcher is open, so there is nothing to send. Pick one in the Dispatcher workshop.',
       label: 'Send it through the gauntlet',
     };
   }
@@ -101,9 +100,7 @@ export function sendGateOf(candidate: SendCandidate | undefined): SendGate {
     return {
       sendable: false,
       refusal:
-        `“${candidate.dispatcherName}” has changes that are not saved, so it cannot be sent. A ` +
-        'rating is a standing claim about one exact dispatcher — the old rating belongs to the ' +
-        'old dispatcher — and an unsaved edit is one nothing can replay. Save it, then send it.',
+        `“${candidate.dispatcherName}” has changes that are not saved. Save it, then send it.`,
       label: 'Send it through the gauntlet',
     };
   }
@@ -386,14 +383,11 @@ export const LADDER_CAVEAT = RATING_CAVEAT;
 
 /** § 12.2's labelled unavailable state for the half of this screen that needs a server. */
 export const LADDER_WORLD_ABSENCE =
-  'Every rating here was measured on this device. The world ladder — other people’s dispatchers, ' +
-  'each replayed and verified before it appears — needs a server to post and rank runs, and this ' +
-  'build has none.';
+  'Every rating here was measured on this device. Other players’ dispatchers aren’t available here.';
 
 /** What the table says before anything has been through the forty. Not a zero, not a spinner. */
 export const LADDER_EMPTY =
-  'Nothing has been through the gauntlet on this device yet. Send a dispatcher through the forty ' +
-  'and its rating stands here.';
+  'No ratings on this device yet. Send a dispatcher through the gauntlet to get one.';
 
 /* -------------------------------------------------------------------------- *
  * What are the forty? — § 14.2
@@ -455,9 +449,8 @@ export function whatAreTheFortyOf(
     crowds,
     arithmetic:
       `${String(set.towers.length)} buildings × ${String(set.crowds.length)} crowd shapes = ` +
-      `${String(total)} runs. A rating is the mean of all ${String(total)}. The cases never move, ` +
-      'so two ratings a month apart are still comparable — and a dispatcher that wins one shape ' +
-      'and loses four sits mid-table.',
+      `${String(total)} runs. A rating is the mean of all ${String(total)}. The cases never change, ` +
+      'so two ratings a month apart are still comparable.',
     basis: RATING_BASIS,
     caveat: RATING_CAVEAT,
   };

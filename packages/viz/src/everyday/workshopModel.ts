@@ -138,34 +138,30 @@ export const WORKSHOP_COPY = Object.freeze({
   eyebrow: 'DISPATCHER WORKSHOP',
   title: 'Build the thing that decides',
   lede:
-    'A dispatcher is one rule, asked thousands of times a day: which car goes to this call. Pull ' +
-    'four levers, and open as much of the rest as you want. Nothing here is held back — the ' +
-    'drawers are an order to read in, not a smaller set of controls.',
+    'A dispatcher is one rule, asked thousands of times a day: which car goes to this call.',
   /* ---- the shelf: the workshop's front door ---- */
   shelfTitle: 'Your dispatchers, and the industry’s',
   shelfLede:
-    'A dispatcher is one rule, asked thousands of times a day: which car goes to this call. Start ' +
-    'from an industry design, shape a copy of your own, and save it under a name.',
+    'A dispatcher decides which car goes to each call. Start from an industry design, change ' +
+    'it, and save it under your own name.',
   yoursHeading: 'YOURS',
-  yoursHint: 'Saved in this browser. Open one to change it, or copy it to try something else.',
+  yoursHint: 'Saved in this browser.',
   /** Drawn where the saved cards would be. It names the route to a first save, which exists now. */
   yoursEmpty:
-    'Nothing saved yet. Open an industry design below, change anything you like, and save it ' +
-    'under a name of your own.',
+    'Nothing saved yet. Open an industry design below and save it under your own name.',
   industryHeading: 'INDUSTRY DESIGNS',
   /** The heading for shipped designs `data/dispatcher-families.json` does not shelve. */
-  unfiledHeading: 'MORE THIS BUILD SHIPS',
-  unfiledLine: 'Shipped designs the library has not put on a named shelf.',
+  unfiledHeading: 'MORE DESIGNS',
+  unfiledLine: 'Designs not filed under a family.',
   /** Drawn on a design whose `role` is `baseline` — the label `nearest-car`'s own comment owes. */
   baselineTag: 'REFERENCE',
   baselineHint:
-    'A reference design. The studies behind this game hold these fixed and measure the others ' +
-    'against them.',
+    'A reference design: held fixed, and the others are measured against it.',
   openTag: 'OPEN NOW',
   aliasLead: 'Also called',
-  openIndustry: 'Make my own from this',
+  openIndustry: 'Make my own',
   openYours: 'Open',
-  keepWorking: 'Keep working on it',
+  keepWorking: 'Keep working',
   duplicate: 'Duplicate',
   remove: 'Delete',
   removeConfirm: 'Delete it',
@@ -181,36 +177,31 @@ export const WORKSHOP_COPY = Object.freeze({
   replaceConfirm: 'Replace it',
   revert: 'Discard changes',
   saveHolds:
-    'A save holds everything on this page: the levers, every weight, how it behaves, the ' +
-    'switching and the rules.',
+    'A save keeps everything on this page.',
   industryNote:
-    'An industry design is never changed. Saving files a copy of your own beside it, and the ' +
-    'original stays on the shelf.',
+    'Saving makes a copy of your own. The industry design stays as it is.',
   refusalEmpty: 'Give it a name first.',
-  refusalTaken: 'Another dispatcher already has that name. Change the name, or save a copy.',
+  refusalTaken: 'That name is taken. Change it, or save a copy.',
   showEveryTerm: 'show every term',
   behavesHeading: 'HOW IT BEHAVES',
   groupHeading: 'GROUP LEVERS — APPLY TO WHOEVER IS DRIVING',
   /** §11.4's boundary sentence, verbatim. It is also why one §11.5 action does not exist. */
   zoningBoundary:
-    'zoning and service ranges belong to the building, not the dispatcher — they live in Design a ' +
-    'building',
-  constraintsHeading: 'FILTERS NO WEIGHT CAN BUY PAST',
+    'Zoning and service ranges belong to the building. Set them in Design a building.',
+  constraintsHeading: 'FILTERS BEFORE SCORING',
   constraintsHint:
-    'These run before the scoring. A car they reject is not offered the call however the weights ' +
-    'are set.',
+    'A car these reject is not offered the call, whatever the weights.',
   /** The honest name for a constraint this build carries and has no player-facing words for. */
   constraintFallbackName: 'a filter no weight can buy past',
-  switchingHeading: 'TRAFFIC-PATTERN SWITCHING',
+  switchingHeading: 'SWITCHING WITH THE TRAFFIC',
   switchingHint:
-    'The one thing that can change mid-shift: whether the dispatcher may notice the traffic has ' +
-    'turned over and swap what it is optimising for. Which design it swaps to for each kind of ' +
-    'traffic is this dispatcher’s own choice, and is saved with it.',
-  rulesHeading: 'ADVANCED: WRITE YOUR OWN RULES',
+    'Whether the dispatcher may notice the traffic has turned over and swap what it is ' +
+    'optimising for. The design it swaps to for each kind of traffic is saved with it.',
+  rulesHeading: 'ADVANCED: YOUR OWN RULES',
   rulesHint:
-    'Read top to bottom, first match wins. A row can ask for more than one thing at once with ' +
-    '“and…”, and then fires only when all of them hold. Every row says the lever it moves, so the ' +
-    'two views can never disagree.',
+    'The first rule that matches wins. With “and…”, a rule fires only when every condition holds.',
+  /** The link under the rules, and the heading of the popover that holds the two long notes. */
+  rulesLink: 'How rules work',
   /**
    * Why the list of *then* clauses is shorter than the guide's.
    *
@@ -218,10 +209,9 @@ export const WORKSHOP_COPY = Object.freeze({
    * own reason for each omission would be a second answer to *what can a rule do*.
    */
   rulesVocabularyNote:
-    'The list of things a rule can do is the simulator’s own, so a rule you can write is a rule it ' +
-    'can run. A rule that masked off floors is not here for the reason above: which floors a shaft ' +
-    'serves is the building’s, not the dispatcher’s.',
-  rulesEmpty: 'No rules. The style above decides every call on its own.',
+    'A rule can do only what the simulator can run. No rule masks off floors: which floors a ' +
+    'shaft serves is the building’s, not the dispatcher’s.',
+  rulesEmpty: 'No rules. The settings above decide every call.',
   showTheMaths: 'show me the maths',
   mathsHeading: 'HOW A CAR IS CHOSEN',
 } as const);
@@ -415,20 +405,19 @@ export function shelfOf(
     ),
     yoursEmpty: saved.length === 0 ? WORKSHOP_COPY.yoursEmpty : undefined,
     industryHint:
-      `All ${String(file.profiles.length)} this build ships. They are never changed and never ` +
-      'locked — open one to make your own from it.',
+      `${String(file.profiles.length)} designs. Open one to make your own copy. The original never changes.`,
     families: Object.freeze(families),
   });
 }
 
 /** The sentence asked before a saved dispatcher is deleted. */
 export function removeQuestionOf(name: string): string {
-  return `Delete “${name}”? It comes off this shelf and out of every picker, and it cannot be brought back.`;
+  return `Delete “${name}”? It leaves every picker, and it cannot be brought back.`;
 }
 
 /** The sentence asked before opening another dispatcher over unsaved changes. */
 export function discardQuestionOf(openName: string): string {
-  return `“${openName}” has changes that are not saved. Opening this one discards them.`;
+  return `“${openName}” has unsaved changes. Opening this one discards them.`;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -480,8 +469,7 @@ export function saveBlockOf(open: OpenDispatcher): SaveBlock {
         label: C.save,
         enabled: open.unsaved,
         replaces:
-          `This replaces the saved “${open.savedName ?? ''}”. Anything that uses it — a run, the ` +
-          'bench, a picker in another mode — uses the new version from then on.',
+          `This replaces the saved “${open.savedName ?? ''}”. Everything that uses it gets the new version.`,
       }),
       copy: C.saveCopy,
       revert: Object.freeze({ label: C.revert, enabled: open.unsaved }),
@@ -490,7 +478,7 @@ export function saveBlockOf(open: OpenDispatcher): SaveBlock {
   }
   if (open.kind === 'gone') {
     return Object.freeze({
-      state: 'The design this was read from is no longer here',
+      state: 'The design this came from is gone',
       basedOn: undefined,
       save: Object.freeze({ label: C.saveAsMine, enabled: true, replaces: undefined }),
       copy: undefined,
@@ -596,8 +584,7 @@ export function termDisclosureOf(
   return Object.freeze({
     summary: `the ${String(rows.length)} cost terms — ${String(weighted)} weighted`,
     hint:
-      'Each one is a kind of cost, scored 0 to 100. An inked row is one this dispatcher is paying ' +
-      'attention to; a grey one it is ignoring.',
+      'Each is a kind of cost, scored 0 to 100. Dark rows count. Grey rows are ignored.',
     rows,
     weighted,
   });
@@ -667,15 +654,14 @@ export function mathsDisclosureOf(
   return Object.freeze({
     summary: WORKSHOP_COPY.showTheMaths,
     plainSentence:
-      'Every car is given a score for answering this call, and the lowest score wins. It is a way ' +
-      'of choosing between cars — it is not a measure of how the day went, and a car with a low ' +
-      'score is not a car that will be quick.',
+      'Every car gets a score for answering this call, and the lowest score wins. The score ' +
+      'chooses between cars. It is not a measure of how the day went, and a car with a low score ' +
+      'is not a car that will be quick.',
     symbols: Object.freeze(symbols),
     line: costFunctionLine(spec, (termId) => shortTermNameOf(termId, allIds)),
     signs:
       'Every term on that line is a kind of cost and they are added together, so nothing on it can ' +
-      'pull a score down: distance costs, a full car costs, a long-standing call costs. What a ' +
-      'weight decides is which kind of cost outranks which.',
+      'pull a score down. A weight decides which kind of cost outranks which.',
   });
 }
 
@@ -740,8 +726,8 @@ export function constraintCardsOf(profile: DispatcherProfile | undefined): reado
           id,
           name: `${WORKSHOP_COPY.constraintFallbackName} (${id})`,
           effect:
-            'This build has no player-facing words for this filter. It still runs, and it still ' +
-            'rejects cars before any weight is read.',
+            'This filter has no plain name yet. It still runs, and still rejects cars before any ' +
+            'weight is read.',
           unnamed: true,
         });
       }
@@ -848,8 +834,7 @@ export function switchingBlockOf(spec: SelectorSpec, context: SelectorContext): 
     ),
     policyLine: policyLine(spec, context),
     inertNote: inert
-      ? 'Inert while one setting runs all shift: the dispatcher holds a single weight vector and ' +
-        'never builds the detector. Nothing below this line reaches the run.'
+      ? 'Off while one setting runs all shift. Nothing below this line reaches the run.'
       : undefined,
     controls: Object.freeze(controls),
     patterns: patternCards(spec, context),
@@ -1020,15 +1005,13 @@ export function nameplateOf(input: {
   return Object.freeze({
     unchanged: dirty
       ? undefined
-      : `${input.startedFrom}, unchanged — move a lever or add a rule and this becomes a ` +
-        'dispatcher of your own, with a name you choose.',
+      : `${input.startedFrom}, unchanged — move a lever or add a rule to make it your own.`,
     startedFrom: `started from ${input.startedFrom}`,
     leversMoved: `levers moved ${String(moved)} of ${String(total)}`,
     rules: `rules ${String(input.ruleRows.length)}`,
     provedOnTheBench: dirty
       ? 'proved on the bench — not since your last change'
-      : 'proved on the bench — this build keeps no bench record for a dispatcher, so the bench ' +
-        'cannot say it has seen this one',
+      : 'proved on the bench — no record is kept, so it cannot say',
   });
 }
 

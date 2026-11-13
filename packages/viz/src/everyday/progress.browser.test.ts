@@ -354,7 +354,7 @@ describe.skipIf(!HAS_BROWSER)('what a player earns survives a reload — issue #
        */
       expect(rail.count).toBe(`0/${String(offeredCount(rail))} fixed`);
       expect(rail.notice).not.toBeNull();
-      expect(rail.notice ?? '').toContain('not readable text');
+      expect(rail.notice ?? '').toContain('saved progress can’t be read');
       // Never a placeholder, and never an identifier: § 13 and § 19's rule about what a player reads.
       expect(rail.notice ?? '').not.toContain('undefined');
       expect(rail.notice ?? '').not.toContain(SLOT);

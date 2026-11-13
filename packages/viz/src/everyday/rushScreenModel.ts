@@ -123,8 +123,8 @@ export function climbPerWavePct(): number {
 export function rushOpeningLine(): string {
   const opening = (RUSH_STREAM.baseRate / MORNING_RUSH_RATE) * 100;
   return (
-    `Wave 1 asks for about ${opening.toFixed(0)}% of a normal morning's rate, and every wave after ` +
-    `it adds about ${climbPerWavePct().toFixed(0)}% of that same morning again.`
+    `Wave 1 runs at about ${opening.toFixed(0)}% of a normal morning’s rate. Every wave after it ` +
+    `adds about ${climbPerWavePct().toFixed(0)}% of that morning’s rate.`
   );
 }
 
@@ -165,29 +165,41 @@ export { RUSH_HOLD_LINE };
  * wrong, because no property compares a label against whether the thing it names exists.
  */
 export const RUSH_SCREEN_COPY = Object.freeze({
-  eyebrow: 'ENDLESS RUSH',
+  eyebrow: 'RUSH',
   title: 'How long can it hold?',
-  lede:
-    'Every three minutes more people arrive than the last wave. Nothing else changes — same ' +
-    'tower, same lifts. Eventually the queue stops draining, and the only question is how far ' +
-    'your dispatcher got before it did.',
+  lede: 'More people arrive every three minutes. See how far your dispatcher gets.',
   bandsEyebrow: 'THE WAVES',
-  holdEyebrow: 'WHEN IT ENDS',
-  holdLine:
-    'The run stops when forty people have been standing for over two minutes at once. That is ' +
-    'the point where a real building would be getting phone calls, and it is the same line for ' +
-    'everybody.',
-  bestsEyebrow: 'FURTHEST ANYONE HAS HELD',
+  /** The end rule in one line, off {@link RUSH_HOLD_LINE}: change the constant and the line moves. */
+  holdLine: `Ends when ${String(RUSH_HOLD_LINE.people)} people have waited over ${String(RUSH_HOLD_LINE.overS / 60)} minutes at once.`,
+  /*
+   * **How rush works**, behind a link beside the end rule (the copy edit's `explainer`). The lede's
+   * second half, the end rule's reason, the definition of a sitting and the note on what a further
+   * run means moved here; `rushOpeningLine` and `rushGeneratedRangeLine` are drawn between them.
+   */
+  howLink: 'How rush works',
+  howWaves: 'A wave lasts three minutes, and each wave brings more people than the last. The tower and the lifts stay the same.',
+  howEnd:
+    `A round ends when ${String(RUSH_HOLD_LINE.people)} people have each waited over ` +
+    `${String(RUSH_HOLD_LINE.overS / 60)} minutes at the same moment. That is about when a real building would start ` +
+    'getting phone calls.',
+  howSitting:
+    'A sitting is every round you play since the building was as shipped. Leave the rush and the next ' +
+    'sitting starts from the building as shipped.',
+  howFurthest:
+    'Your furthest counts every round, including one you end by hand. Your best sitting only counts ' +
+    'once you play a round out.',
+  bestsEyebrow: 'HOUSE RUNS',
   drivingEyebrow: 'DRIVING',
   drivingNote:
-    'The waves are identical for everyone, so a further run is a better dispatcher — or a luckier ' +
-    'morning. The bench knows which.',
+    'Everyone gets the same waves, so a further run means a better dispatcher or a luckier morning. ' +
+    'The Test bench can tell which.',
+  rebuildLink: 'Rebuilding between rounds',
   /*
    * **The pre-run pick's two strings** — GitHub issue **#565**, second defect,
    * [§ D857](../../../../DECISIONS.md). See {@link rushDrivingLine} for why the control the
    * prototype draws here is drawn now and was not before.
    */
-  driverPickLabel: 'or pick another for this rush',
+  driverPickLabel: 'Change dispatcher',
   /**
    * What else the pick writes, said before it is pressed rather than discovered afterwards.
    *
@@ -198,9 +210,7 @@ export const RUSH_SCREEN_COPY = Object.freeze({
    * is the honest half of § D219's shape reversed: not a control that writes nothing, but one that
    * writes somewhere else as well.
    */
-  driverPickNote:
-    'This is the dispatcher you are standing with, so picking here also changes who drives your ' +
-    'next day.',
+  driverPickNote: 'This also changes who drives your next day.',
   /*
    * **`absencesEyebrow` left this table on the merge that closed GitHub issue #207.** It read
    * `WHAT THIS BUILD DOES NOT DO YET` — literal shouted caps, in source — and headed
@@ -254,8 +264,8 @@ export const RUSH_SCREEN_COPY = Object.freeze({
  * where a price belongs, and it is where this was bought.
  */
 export const RUSH_FITTED_LINE =
-  'This tower starts fitted — the doors, the control and the tenancies are already in. A fitted ' +
-  'sitting is posted to its own board rather than ranked against towers as built.';
+  'This tower starts fitted: the doors, the control and the tenancies are already in. A fitted ' +
+  'sitting posts to its own board, apart from towers as built.';
 
 /**
  * **The same disclosure where the kit was bought from this device's tally** — wave AP lane AP-D2, the
@@ -266,7 +276,7 @@ export const RUSH_FITTED_LINE =
  */
 export const RUSH_FITTED_DEVICE_LINE =
   'This tower starts fitted: the doors, the control and the tenancies are already in, bought with ' +
-  'this device’s chimes. A sitting started fitted on this device is kept here and never posted.';
+  'this device’s chimes. A sitting started this way stays on this device and is never posted.';
 
 /**
  * Which fitted line the setup screen draws, or none: {@link RUSH_FITTED_DEVICE_LINE} where the claim is
@@ -293,9 +303,9 @@ export function rushFittedLineOf(host: { rushStartsFitted(): boolean; rushBought
 export function rushRebuildLineOf(unitsPerWave: number, openingUnits: number): string {
   const units = (value: number): string => `${String(value)} ${value === 1 ? 'unit' : 'units'}`;
   const base =
-    `Each wave a round outlasts pays ${units(unitsPerWave)} into a purse, and between rounds you can ` +
-    'spend it rebuilding the tower: doors, control, car size and queue marshalling. What you buy stays ' +
-    'for the rest of the sitting.';
+    `Each wave a round outlasts pays ${units(unitsPerWave)} into your purse. Between rounds you can spend ` +
+    'it rebuilding the tower: doors, control, car size and queue marshalling. What you buy stays for the ' +
+    'rest of the sitting.';
   return openingUnits > 0 ? `${base} This sitting opens with ${units(openingUnits)} you bought with chimes.` : base;
 }
 
@@ -311,7 +321,7 @@ export function rushHoldLineFigure(): string {
  * as a claim about a run that stops.
  */
 export function rushGeneratedRangeLine(): string {
-  return `The generated climb runs ${String(Math.round(RUSH_STREAM.lengthS / 60))} minutes and reaches wave ${String(LAST_GENERATED_WAVE)}, from one seed (${String(RUSH_STREAM.seed)}). Everybody faces the same waves.`;
+  return `The waves run for ${String(Math.round(RUSH_STREAM.lengthS / 60))} minutes and reach wave ${String(LAST_GENERATED_WAVE)}. Everybody gets the same waves (seed ${String(RUSH_STREAM.seed)}).`;
 }
 
 /**
@@ -419,35 +429,35 @@ export const RUSH_BANDS: readonly RushBandSpec[] = Object.freeze([
   {
     waves: 'waves 1–4',
     rate: 'a normal day',
-    note: 'Comfortable. Any dispatcher looks competent here.',
+    note: 'Comfortable.',
     fromWave: 1,
     toWave: 4,
   },
   {
     waves: 'waves 5–8',
     rate: 'a busy Monday',
-    note: 'The lobby starts holding a queue between cars.',
+    note: 'A queue forms in the lobby.',
     fromWave: 5,
     toWave: 8,
   },
   {
     waves: 'waves 9–12',
     rate: 'above design',
-    note: 'Beyond what the lifts were built for. Choices start to show.',
+    note: 'More than the lifts were built for.',
     fromWave: 9,
     toWave: 12,
   },
   {
     waves: 'waves 13–16',
     rate: 'unreasonable',
-    note: 'Only a dispatcher that groups people well gets through here.',
+    note: 'Needs a dispatcher that groups people well.',
     fromWave: 13,
     toWave: 16,
   },
   {
     waves: 'wave 17+',
     rate: 'absurd',
-    note: 'Nobody holds this. The question is how gracefully you lose.',
+    note: 'Nobody holds this.',
     fromWave: 17,
     toWave: undefined,
   },
@@ -552,10 +562,10 @@ export type RushFurthestStanding =
 export const RUSH_FURTHEST_COPY = Object.freeze({
   kept: (driverName: string): string => `your furthest on this tower, kept on this device, driven by ${driverName}`,
   visit: (driverName: string): string => `your furthest on this tower this visit, driven by ${driverName}`,
-  none: 'your furthest on this tower: no round has finished here on this device yet',
+  none: 'your furthest on this tower: no round finished on this device yet',
   pending: 'your furthest on this tower, kept on this device',
   unreplayable: (reason: string): string =>
-    `your furthest on this tower is kept on this device, and it is not drawn because ${reason}`,
+    `your furthest on this tower is kept on this device but can’t be shown: ${reason}`,
   checking: '…',
 });
 
@@ -614,7 +624,7 @@ export function rushFactViews(
     ...kept,
     {
       value: `+${climbPerWavePct().toFixed(0)}%`,
-      label: 'more arrivals every wave, forever — of a normal morning’s rate',
+      label: 'more arrivals each wave, of a normal morning’s rate',
       withheld: false,
     },
   ];
@@ -676,7 +686,7 @@ export function rushFactViews(
  * now asserts what the line claims rather than how it is shaped.
  */
 export function rushDrivingLine(name: string): string {
-  return `${name} would drive it, from the rush’s first second.`;
+  return `${name} drives from the first second.`;
 }
 
 /**
@@ -810,7 +820,7 @@ export function rushBarModel(base: ActionBarModel): ActionBarModel {
  * first-time rush player nothing else to have learned it from.
  */
 export const RUSH_TUTORIAL_WHY =
-  'Rush is one building losing, on purpose. Before it starts, here is a smaller one losing and the change that stopped it — the last answer this game gives you.';
+  'Before you start: a smaller building losing, and the change that stopped it.';
 
 /**
  * **The Rush entry point into the worked answer** — the second of the two § D529 clause 2 names.
@@ -832,7 +842,7 @@ export function rushTutorialWorkedAnswerOf(facts: WorkedAnswerFacts): WorkedAnsw
  */
 export const RUSH_END_ASK_COPY = Object.freeze({
   question: 'End the rush here?',
-  consequence: 'The round stops now and is not ranked. It still counts toward your furthest on this device.',
+  consequence: 'This round won’t be ranked. It still counts toward your furthest.',
   end: 'End it',
   keep: 'Keep playing',
 });
@@ -848,4 +858,4 @@ export const RUSH_END_ASK_COPY = Object.freeze({
  * under the same wave count. Saying it was not kept is the honest, cheap half.
  */
 export const RUSH_UNFINISHED_COPY =
-  'Your last rush round was still running when the page closed, so it was not kept. A round is kept on this device once it ends.';
+  'Your last round was still running when the page closed, so it was not kept.';

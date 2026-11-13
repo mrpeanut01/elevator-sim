@@ -110,7 +110,7 @@ export const FIXIT_PAR_COPY = Object.freeze({
    * A case fixed before its cost was kept on this device (lane AL-B, seat C D5): the par is still
    * drawn, and the comparison is withheld rather than guessed.
    */
-  unrecorded: 'What your fix cost was not kept on this device, so it is not compared.',
+  unrecorded: 'The cost of your fix was not kept, so it is not compared.',
   /* The case list's short form, on a fixed row. */
   tagPar: 'par',
   tagYours: 'yours',

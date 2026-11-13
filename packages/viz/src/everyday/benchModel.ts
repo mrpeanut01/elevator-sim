@@ -68,16 +68,18 @@ import {
 export const BENCH_COPY = Object.freeze({
   eyebrow: 'TEST BENCH',
   title: 'Find out whether it actually helps',
-  lede:
-    'Two to four dispatchers, the same crowds for every one of them, and a plain answer — ' +
-    'including the answer that there is no difference worth the name. Nothing here is posted and ' +
-    'nothing here is scored.',
-  fieldHeading: 'THE FIELD',
-  fieldNote: 'Two at least, four at most.',
-  testsHeading: 'THE TESTS',
-  testsHint:
-    'Ticked independently, because a dispatcher that wins one can lose another. These are the ' +
-    'forty proof cases the ladder rates on — every building, every crowd shape, fixed forever.',
+  lede: 'Run two to four dispatchers against the same crowds and see whether they really differ.',
+  /** The link beside the lede, and the heading of the popover it opens. */
+  howLink: 'How the bench decides',
+  fieldHeading: 'Dispatchers',
+  fieldNote: 'Pick two to four.',
+  testsHeading: 'Tests',
+  testsHint: 'Tick the tests to run. A dispatcher that wins one can lose another.',
+  /** The link under the tests' heading, and the first paragraph of its popover. */
+  testsLink: 'About these tests',
+  testsAbout:
+    'These are the forty cases the ladder rates on: every building with every crowd shape. They ' +
+    'never change.',
   /**
    * Why the bench's crowds are not the ladder's crowds, said on the screen.
    *
@@ -89,61 +91,53 @@ export const BENCH_COPY = Object.freeze({
    * measurement.
    */
   testsSeedNote:
-    'Same buildings and same crowd shapes as the ladder, different crowds. The bench is where you ' +
-    'try things out and the ladder is what rates them, so they must not share their arrivals — a ' +
-    'dispatcher tuned against the exact runs it is about to be rated on would look better here ' +
-    'than it will anywhere else.',
+    'Same buildings and crowd shapes as the ladder, different crowds. A dispatcher tuned against ' +
+    'the exact runs it is about to be rated on would look better here than it will anywhere else.',
   /** The two §12.1 shapes that are not proof cases — named rather than invented. */
   testsAbsent:
-    'Two of the shapes the design asks for — a building short a lift, and a sky-lobby transfer — ' +
-    'are not among the forty, because each changes the building rather than the crowd and a crowd ' +
-    'shape is a property of the people. An invented case would be a test whose answer nobody has ' +
-    'checked, and one the ladder could not rate.',
-  noTests: 'No tests ticked. Pick at least one.',
+    'Two shapes are not among the forty: a building short a lift, and a sky-lobby transfer. Each ' +
+    'changes the building rather than the crowd.',
+  noTests: 'Tick at least one test.',
   /**
    * The labelled state between the screen painting and the forty arriving.
    *
    * § 12.2's rule about the withheld matrix is the local one and it is general: *"every combination
    * renders `—` or a labelled unavailable state; none renders a zero, a spinner or a stale figure"*.
    * The tick list is fetched (§ D445), so there is a beat where it is empty — and an empty list
-   * under *"No tests ticked. Pick at least one."* is a small lie, because it says there is something
+   * under *"Tick at least one test."* is a small lie, because it says there is something
    * to tick. This is drawn instead, and `benchTestsRefusal` is not: a reader is told what is
    * happening rather than blamed for it.
    */
-  testsLoading: 'Fetching the forty proof cases…',
+  testsLoading: 'Loading the forty tests…',
   /**
    * Why the § 3.3 primary cannot be pressed while the suite is in flight — `BarPrimary.inert`'s
    * sentence, not a status line. The matrix's own cells report progress; this answers the other
    * question a dead button raises (GitHub issue #262).
    */
-  runningSuite: 'The suite is running. Every cell finishes before another can start.',
-  repsHeading: 'DAYS PER DISPATCHER, PER TEST',
+  runningSuite: 'The suite is running.',
+  repsHeading: 'Days per dispatcher, per test',
   /** §12.1's honest note about the low end. Drawn whenever the chosen budget is under thirty. */
   repsBelowThirty:
-    'Below thirty days the bench can rarely tell anything apart. It will still run, and it will ' +
-    'mostly answer “no difference I can see” — which is an honest answer about the instrument, ' +
-    'not about the dispatchers.',
+    'Under thirty days the bench can rarely tell anything apart. It will still run, and will ' +
+    'mostly answer “no difference I can see”.',
   /** Drawn from thirty up to the published floor. Distinct from the sentence above on purpose. */
   repsBelowBudget:
-    'Under fifty days no row here will name a winner, however far apart the two look. That is the ' +
-    'same floor every published figure in this project was measured against.',
+    'Under fifty days no row here will name a winner, however far apart the two look.',
   matrixCaption:
     'away in a minute, and the longest anybody stood · green is the best in that test',
   standingNoteCrowds:
-    'The same crowds for everyone — every dispatcher in the field meets the identical arrivals in ' +
-    'each test, so the crowd cancels out and only the decisions differ.',
+    'Same crowds for everyone. Every dispatcher meets identical arrivals in each test, so only ' +
+    'the decisions differ.',
   standingNoteShrug:
-    'Sometimes the answer is a shrug — a field can be genuinely hard to separate. When the tests ' +
-    'disagree the bench shows you that rather than crowning a winner, and you have saved yourself ' +
-    'a week of chasing a difference that was never there.',
+    'Sometimes the answer is a shrug. When the tests disagree, the bench shows you that rather ' +
+    'than crowning a winner.',
   standingNoteBoard:
-    'Only benched dispatchers reach the board — a dispatcher you have never run here can still ' +
-    'play any day you like; it just cannot be posted until the bench has seen it work.',
+    'Only benched dispatchers reach the board. One you have never run here can still play any ' +
+    'day, but it cannot be posted until the bench has seen it work.',
   /** §12's closing rule, said on the screen and not only in a docstring. */
   neverASubtraction:
-    'A single day against a single day is not a comparison, whatever the two numbers do. What the ' +
-    'bench reports is the difference across matched crowds, with the range that difference was ' +
-    'measured to lie in.',
+    'One day against one day is not a comparison. The bench reports the difference across ' +
+    'matched crowds, with the range that difference was measured to lie in.',
   tooCloseHeading: 'Too close to call',
 } as const);
 
@@ -201,7 +195,7 @@ export function benchEntrantsOf(
         refusal:
           picked || !full
             ? undefined
-            : `The field is full at ${String(BENCH_FIELD_MAX)}. Take one out to put this one in.`,
+            : `Full at ${String(BENCH_FIELD_MAX)}. Remove one to add this one.`,
       });
     }),
   );
@@ -215,13 +209,10 @@ export function benchEntrantsOf(
  */
 export function benchFieldRefusal(pickedIds: readonly string[]): string | undefined {
   if (pickedIds.length < BENCH_FIELD_MIN) {
-    return (
-      `Pick at least ${String(BENCH_FIELD_MIN)} dispatchers. One on its own has nothing to be ` +
-      'compared with, and a run against itself is not a comparison.'
-    );
+    return `Pick at least ${String(BENCH_FIELD_MIN)} dispatchers to compare.`;
   }
   if (pickedIds.length > BENCH_FIELD_MAX) {
-    return `At most ${String(BENCH_FIELD_MAX)} — beyond that the matrix stops being readable.`;
+    return `Pick at most ${String(BENCH_FIELD_MAX)} dispatchers.`;
   }
   return undefined;
 }
@@ -379,15 +370,15 @@ export function benchPlanOf(
 ): readonly BenchCasePlan[] {
   if (request.caseIds.length === 0) {
     throw new SuiteError(
-      'no tests are ticked: a suite is one comparison over at least one of the forty, so there is nothing to run.',
+      'No tests are ticked, so there is nothing to run.',
     );
   }
   if (new Set(request.caseIds).size !== request.caseIds.length) {
-    throw new SuiteError('a test is ticked twice; a suite runs each ticked case once.');
+    throw new SuiteError('A test is ticked twice. Untick it and tick it once.');
   }
   if (request.field.length < 2) {
     throw new SuiteError(
-      `a suite compares a field of at least two dispatchers; this one carries ${String(request.field.length)}.`,
+      `Pick at least two dispatchers. ${String(request.field.length)} picked.`,
     );
   }
   const byId = new Map<string, ProofCase>(
@@ -398,8 +389,8 @@ export function benchPlanOf(
       const proofCase = byId.get(caseId);
       if (proofCase === undefined) {
         throw new SuiteError(
-          `no proof case "${caseId}" — this build's forty do not include it, and running the suite ` +
-            'without it would report on a different set of crowds than the one ticked.',
+          `The test "${caseId}" is not one of the forty, so the suite did not run. ` +
+            'Untick it and run again.',
         );
       }
       return Object.freeze({
@@ -485,12 +476,10 @@ export function benchBudgetNoteOf(replications: number): string | undefined {
  */
 export function benchVerdictNoteOf(fieldSize: number): string {
   return fieldSize === 2
-    ? 'A field of two gets the pairwise answer below each test: the difference across matched ' +
-        'crowds, the range that difference was measured to lie in, and whether that range ' +
-        'contains zero.'
-    : `A field of ${String(fieldSize)} gets no single pairwise answer — there is no “the” ` +
-        'difference between more than two things. Each test still reports every dispatcher’s own ' +
-        'figures, and where the tests disagree is the finding.';
+    ? 'With two, each test reports the difference between them across matched crowds, the range ' +
+        'that difference was measured to lie in, and whether that range contains zero.'
+    : `With ${String(fieldSize)}, there is no single head-to-head answer. Each test still reports ` +
+        'every dispatcher’s own figures.';
 }
 
 /**

@@ -546,7 +546,7 @@ describe('a stage sells a rung only where the census adds a way through — § D
         if (rung.sold) {
           sold += 1;
           expect(row?.offer, `${stage.id} ${rung.stepId}`).toBe(rung.next ? 'buy' : 'later');
-          expect(row?.text).toContain(`The census found ${String(at)} ways through at ${String(rung.units)} units`);
+          expect(row?.text).toContain(`${String(at)} ways through counted at ${String(rung.units)} units`);
           expect(row?.text).toContain('this device');
         } else {
           unsold += 1;
@@ -555,7 +555,7 @@ describe('a stage sells a rung only where the census adds a way through — § D
           expect(row?.buyLabel).toBeUndefined();
           if (adds) {
             unreached += 1;
-            expect(row?.text).toContain(`The census found ${String(at)} ways through at ${String(rung.units)} units`);
+            expect(row?.text).toContain(`${String(at)} ways through counted at ${String(rung.units)} units`);
             expect(row?.text).toContain('The rung below it is not sold');
             expect(row?.text).not.toContain(STAGE_PLAY_COPY.rungAboveUnbought);
           } else {
@@ -726,7 +726,7 @@ describe('a first-time player reads the stage before running it — GitHub issue
     const last = stagePlayViewOf(facts, { kind: 'running', seedSet: 'tuning', completed: total, total }).status;
     expect(last).toContain(`${String(stage.replications)} of ${String(stage.replications)}`);
     const holdout = stagePlayViewOf(facts, { kind: 'running', seedSet: 'holdout', completed: 1, total }).status;
-    expect(holdout).toContain(`Now 0 of ${String(stage.replications)} crowds`);
+    expect(holdout).toContain(`Running 0 of ${String(stage.replications)} crowds`);
   });
 
   it('names no count of cars or shafts its building does not have (item 10)', () => {
@@ -762,8 +762,8 @@ describe('a press plays one of the stage’s crowds, and the words over it carry
     const judged = stagePlayViewOf(facts, { kind: 'judged', verdict, stale: false });
     for (const view of [running, judged]) {
       expect(view.watch).toEqual({
-        eyebrow: 'One of the stage’s crowds, watched',
-        note: 'The verdict is all of them, both settings on the same passengers.',
+        eyebrow: 'Watching one of the stage’s crowds',
+        note: 'The verdict uses all of them, with both settings on the same passengers.',
         skip: STAGE_PLAY_COPY.watchSkip,
         baselineCaption: STAGE_PLAY_COPY.watchBaselineCaption,
         candidateCaption: STAGE_PLAY_COPY.watchCandidateCaption,

@@ -96,7 +96,7 @@ import {
 } from './rushScreenModel.js';
 
 /** The bar's refusal between the press and the landing — a run on a worker arrives as a notification. */
-export const RUSH_NOT_LANDED = 'the stream has not landed yet — the waves are being generated';
+export const RUSH_NOT_LANDED = 'the waves are still being generated';
 
 /*
  * The template id, wave 30's rate and the rate converted to a building's own population are
@@ -734,7 +734,7 @@ export interface RushResultView {
 }
 
 /** The result screen before any rush has landed. */
-export const RUSH_RESULT_EMPTY_LEDE = 'A rush has not run yet, so there is no furthest wave to report. Start one from the Endless rush screen.';
+export const RUSH_RESULT_EMPTY_LEDE = 'No rush played yet. Start one from the Rush screen.';
 
 /**
  * How many landings the *where* beat names before it starts counting instead.
@@ -745,13 +745,13 @@ export const RUSH_RESULT_EMPTY_LEDE = 'A rush has not run yet, so there is no fu
 export const RUSH_WHERE_NAMED = 3;
 
 export const RUSH_RESULT_COPY = Object.freeze({
-  eyebrow: 'ENDLESS RUSH · THE RESULT',
-  brokeHead: (wave: number): string => `Wave ${String(wave)} is where it stopped draining`,
+  eyebrow: 'RUSH · RESULT',
+  brokeHead: (wave: number): string => `It stopped draining in wave ${String(wave)}`,
   stoppedHead: (wave: number): string => `You stopped at wave ${String(wave)}, still holding`,
   brokeLede: (held: string, arrived: number): string =>
-    `It held for ${held} before forty people had been standing over two minutes at once; ${String(arrived)} had arrived by then.`,
-  stoppedLede: 'This run does not have a breaking point to report. It was ended by hand while the building was still clearing what arrived.',
-  beatComfortable: 'The first waves cleared between cars, the way a normal morning does.',
+    `It held for ${held}. ${String(arrived)} people had arrived by then.`,
+  stoppedLede: 'You ended it while the building was still clearing what arrived, so there is no breaking point.',
+  beatComfortable: 'The first waves cleared between cars.',
   /**
    * **The trend beat names the horizon it was fitted over, and the rush's own beside it** — lane
    * AL-B, the post-AK panel's seat D H7. `core`'s trend test is fitted over the recording's whole
@@ -766,15 +766,15 @@ export const RUSH_RESULT_COPY = Object.freeze({
     const pastTheRun = saturation.windowEndS > endedS;
     if (saturation.verdict === 'diverging-queue') {
       return pastTheRun
-        ? `Then the queue stopped emptying between cars. The sheet's trend test is fitted over the whole generated climb, ${fitted}, which runs on past the ${held} this rush held: over that climb the queue grew ${saturation.slopePersonsPerMinute.toFixed(1)} people a minute, read at ${String(saturation.sampleCount)} samples.`
-        : `Then the queue stopped emptying between cars: over the ${fitted} the sheet's trend test measures, it grew ${saturation.slopePersonsPerMinute.toFixed(1)} people a minute, read at ${String(saturation.sampleCount)} samples.`;
+        ? `Then the queue stopped emptying between cars. The trend test covers the whole generated climb, ${fitted}, past the ${held} this rush held. Over that climb the queue grew ${saturation.slopePersonsPerMinute.toFixed(1)} people a minute (${String(saturation.sampleCount)} samples).`
+        : `Then the queue stopped emptying between cars. Over the ${fitted} the trend test covers, it grew ${saturation.slopePersonsPerMinute.toFixed(1)} people a minute (${String(saturation.sampleCount)} samples).`;
     }
     return pastTheRun
-      ? `The sheet's trend test, fitted over the whole generated climb (${fitted}, past the ${held} this rush held), does not call the queue divergent (${saturation.verdict}, ${String(saturation.sampleCount)} samples).`
-      : `The sheet's trend test over the whole run does not call the queue divergent (${saturation.verdict}, ${String(saturation.sampleCount)} samples), which is what a line reached and then cleared looks like.`;
+      ? `The trend test covers the whole generated climb, ${fitted}, past the ${held} this rush held. It does not call the queue divergent (${saturation.verdict}, ${String(saturation.sampleCount)} samples).`
+      : `The trend test over the whole run does not call the queue divergent (${saturation.verdict}, ${String(saturation.sampleCount)} samples). That is what a line reached and then cleared looks like.`;
   },
-  beatTrendAbsent: 'This recording carries no trend test, so where the queue began to diverge is not on it.',
-  beatBroke: (held: string): string => `At ${held} held, forty people had been over two minutes at once, and the rush ended there.`,
+  beatTrendAbsent: 'This round has no trend test, so it can’t say where the queue began to diverge.',
+  beatBroke: (held: string): string => `At ${held}, ${String(RUSH_HOLD_LINE.people)} people had waited over two minutes at once, and the rush ended.`,
   /**
    * **Where it broke** — the beat this result did not have, GitHub issue's L7 shape and the reason
    * `shift/trouble.ts` exists. Empty on a hand stop, where there is no line crossed to place.
@@ -805,14 +805,14 @@ export const RUSH_RESULT_COPY = Object.freeze({
     return `${opening}: ${parts.join(', ')}${tail} — of ${String(overLine)} past two minutes across the building.`;
   },
   beatStopped: (over: number): string =>
-    `${String(over)} people were past two minutes when it stopped, against a line of ${String(RUSH_HOLD_LINE.people)}. Where this building breaks is not yet known.`,
-  brokeFooter: `Waves are identical for everyone, generated once from seed ${String(RUSH_STREAM.seed)}.`,
+    `${String(over)} people were past two minutes when you stopped, against a line of ${String(RUSH_HOLD_LINE.people)}. Where this building breaks is not yet known.`,
+  brokeFooter: 'Everybody gets the same waves.',
   stoppedFooter: (wave: number): string =>
-    `Ended by hand at wave ${String(wave)} — not posted, because a stopped run has no breaking point.`,
+    `Ended by hand at wave ${String(wave)}, so it is not posted: a stopped run has no breaking point.`,
   furthestWave: 'furthest wave',
   howLong: 'how long it held',
   carried: 'people carried',
-  longest: 'longest anybody waited',
+  longest: 'longest wait',
 });
 
 export function rushResultViewOf(outcome: RushOutcome, disclosure: string | undefined): RushResultView {

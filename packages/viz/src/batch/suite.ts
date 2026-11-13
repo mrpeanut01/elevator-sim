@@ -257,9 +257,9 @@ export function suiteCellViewOf(
       verdictShown: false,
       answer: null,
       verdictRefusal:
-        `this suite draws a pairwise verdict only for a field of two: this cell's batch produced ` +
-        `${String(report.comparisons.length)} comparisons rather than 1, so no verdict is drawn ` +
-        'here and each arm answers only for itself above.',
+        `A head-to-head verdict is drawn only for a field of two. This test produced ` +
+        `${String(report.comparisons.length)} comparisons rather than 1, so each dispatcher ` +
+        'answers only for itself above.',
       arms,
       rows: [],
     };

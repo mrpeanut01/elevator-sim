@@ -173,7 +173,7 @@ describe('the triage screen (§ 8.1)', () => {
 
   it('reads a quiet building as running itself, and one with a decision by what it wants', () => {
     const view = towersView(inputOf(twoTowers()));
-    expect(view.rows[0]?.status).toBe('Nothing — it is running itself');
+    expect(view.rows[0]?.status).toBe('Nothing today');
     expect(view.rows[0]?.cta).toBe('Look in');
     expect(view.rows[0]?.needsDecision).toBe(false);
     // Day 20 has closed, so it is a renewal and the button says the word the destination contains (§ 16 rule 4).
@@ -188,7 +188,7 @@ describe('the triage screen (§ 8.1)', () => {
     expect(order.dispatchers.map((entry) => entry.id)).toEqual(['eta', 'collective', 'mine']);
     expect(order.builds.map((entry) => entry.id)).toContain('doors-first');
     // No trade line ships, so the picker says that rather than inventing one.
-    expect(order.note).toContain('no one-line trade ships');
+    expect(order.note).toContain('No summary yet');
   });
 
   it('emits the calendar’s columns and its cells from one value (§ 8.7)', () => {
@@ -386,7 +386,7 @@ describe('the month’s end, once day 20 has closed (§ D1357)', () => {
     expect(view.shop.eyebrow).toBe('SPEND BEFORE THE NEXT MONTH’S DAY 1 RUNS');
     const all = JSON.stringify(view);
     expect(all).not.toMatch(/day 21|DAY 21|21 of/u);
-    expect(CONTRACT_COPY.renewalFirst).toContain('day 20 has closed');
+    expect(CONTRACT_COPY.renewalFirst).toContain('Day 20 has closed');
   });
 });
 
@@ -430,7 +430,7 @@ describe('a filed day keeps its own verdict on the month and the rolling calenda
     const row = calendarView(inputOf(career)).rows[0]!;
     const byDay = new Map<number, (typeof row.cells)[number]>();
     for (const cell of row.cells) {
-      const day = /its day (\d+) of/u.exec(cell.tip)?.[1];
+      const day = /· day (\d+) of/u.exec(cell.tip)?.[1];
       if (day !== undefined) byDay.set(Number(day), cell);
     }
     for (let day = 1; day <= 18; day += 1) {
@@ -626,9 +626,9 @@ describe('the Career sheets say what the contract and the tower are — § D1377
   });
 
   it('says a renewal rate rose only where it rose', () => {
-    expect(renewalRateHeadOf(4, 3)).toBe('a day, up from 3 — their offer, not yours to set');
-    expect(renewalRateHeadOf(3, 3)).toBe('a day, the same as this month — their offer, not yours to set');
-    expect(renewalRateHeadOf(2, 3)).toBe('a day, down from 3 — their offer, not yours to set');
+    expect(renewalRateHeadOf(4, 3)).toBe('a day, up from 3 · the agent’s offer');
+    expect(renewalRateHeadOf(3, 3)).toBe('a day, the same as this month · the agent’s offer');
+    expect(renewalRateHeadOf(2, 3)).toBe('a day, down from 3 · the agent’s offer');
   });
 
   it('names twenty career days Monday to Friday, never Saturday or Sunday', () => {
@@ -812,7 +812,7 @@ describe('one record, three screens (§ 16 rule 14)', () => {
     expect(towersView(inputOf(after)).rows[0]?.order.dispatcherId).toBe('mine');
     expect(buildingView(inputOf(after))?.order.view.dispatcherId).toBe('mine');
     // A saved dispatcher gets the prototype's own line for one of yours.
-    expect(buildingView(inputOf(after))?.order.view.note).toContain('one of yours');
+    expect(buildingView(inputOf(after))?.order.view.note).toContain('One of yours');
   });
 });
 
@@ -1039,7 +1039,7 @@ describe('§ 8.8’s offers, and the gate on ambition', () => {
      * claim is *this many rows are drawn*, and that is what is asserted; the non-vacuity beside it
      * is what stops the pair passing over an empty table.
      */
-    expect(view.offers.caption).toBe(`${String(offerable.length)} offers`);
+    expect(view.offers.caption).toBe(`${String(offerable.length)} buildings`);
     expect(offerable.length).toBeGreaterThan(5);
     expect(view.offers.empty).toBeUndefined();
     for (const row of view.offers.rows) {
@@ -1055,7 +1055,7 @@ describe('§ 8.8’s offers, and the gate on ambition', () => {
     for (const row of view.offers.rows) {
       expect(row.takeable).toBe(false);
       expect(row.cta).toBe('Not yet');
-      expect(row.refusal).toBe('No free slot — 14 more standing opens the next one.');
+      expect(row.refusal).toBe('No free slot. 14 more standing opens the next one.');
     }
     expect(applyCampaignAction(opening, { kind: 'take-offer', contractId: 'c2' }, shippedPriceSchedule())).toBe(opening);
   });
@@ -1084,7 +1084,7 @@ describe('§ 8.8’s offers, and the gate on ambition', () => {
     const risky = { ...earned, towers: [{ ...earned.towers[0]!, missed: 3, day: 16 }] };
     const blocked = towersView(inputOf(risky)).offers.rows.find((row) => row.contractId === 'c2');
     expect(blocked?.takeable).toBe(false);
-    expect(blocked?.refusal).toBe('A tower is one miss from ending. Fix that before adding another.');
+    expect(blocked?.refusal).toBe('A building is one miss from losing its contract. Steady it before adding another.');
     expect(applyCampaignAction(risky, { kind: 'take-offer', contractId: 'c2' }, shippedPriceSchedule())).toBe(risky);
   });
 });

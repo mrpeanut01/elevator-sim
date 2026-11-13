@@ -92,7 +92,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday test bench', () => {
   it('refuses an empty tick list in § 12.1’s words, and leaves the primary inert', async () => {
     const page = await openBench();
     expect(await page.textContent('.everyday-bench-tests-refusal')).toBe(
-      'No tests ticked. Pick at least one.',
+      'Tick at least one test.',
     );
     expect(await page.locator('.everyday-bar-primary').isDisabled()).toBe(true);
 
@@ -141,20 +141,20 @@ describe.skipIf(!HAS_BROWSER)('the Everyday test bench', () => {
    */
   it('changes what it promises about verdicts when a third entrant joins the field', async () => {
     const page = await openBench();
-    expect(await page.textContent('.everyday-bench-verdict-note')).toContain('pairwise answer');
+    expect(await page.textContent('.everyday-bench-verdict-note')).toContain('difference between them');
 
     const unpicked = page.locator('.everyday-bench-entrant[aria-pressed="false"]').first();
     await unpicked.click();
     await page.waitForFunction(
       () =>
-        /no single pairwise answer/.test(
+        /no single head-to-head answer/.test(
           document.querySelector('.everyday-bench-verdict-note')?.textContent ?? '',
         ),
       undefined,
       { timeout: 15_000 },
     );
     expect(await page.textContent('.everyday-bench-verdict-note')).toContain(
-      'no single pairwise answer',
+      'no single head-to-head answer',
     );
     expect(await page.locator('.everyday-bench-entrant[aria-pressed="true"]').count()).toBe(3);
     await page.close();
@@ -169,7 +169,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday test bench', () => {
     expect(await page.locator('.everyday-bench-entrant[aria-pressed="true"]').count()).toBe(4);
     const refused = page.locator('.everyday-bench-entrant[aria-pressed="false"]').first();
     expect(await refused.isDisabled()).toBe(true);
-    expect(await refused.getAttribute('title')).toContain('The field is full at 4');
+    expect(await refused.getAttribute('title')).toContain('Full at 4');
     await page.close();
   }, 120_000);
 

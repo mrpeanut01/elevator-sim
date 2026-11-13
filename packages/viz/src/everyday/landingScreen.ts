@@ -57,7 +57,7 @@ import { landingViewOf, type LandingMotionState, type LandingView } from './land
 import { everydayProfileStore } from './profileStore.js';
 import { filedDaysOf, tutorialIsDue } from './tutorialModel.js';
 import type { EverydayScreenModule } from './screens.js';
-import { el } from './screenDom.js';
+import { el, explainer } from './screenDom.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import { stageGeometryOf } from './stageScreenModel.js';
 import { EVERYDAY_COLORS as C, EVERYDAY_RADII as R, EVERYDAY_TYPE as TYPE } from './tokens.js';
@@ -448,30 +448,39 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     root.append(cta, ctaNote);
 
     /* -------------------------------------------------------------- claims */
-    const hook = el(doc, 'p', 'everyday-landing-hook', view.hook);
-    hook.style.cssText = `font-size:16px;line-height:1.55;color:${C.ink};margin:34px 0 0;padding:18px 0 0;border-top:1px solid ${C.rule};max-width:62ch;text-wrap:pretty`;
-    const claimsHeading = el(doc, 'h2', 'everyday-landing-claims-heading', view.claimsHeading);
-    claimsHeading.style.cssText = `font-family:${TYPE.heading};font-size:24px;font-weight:650;letter-spacing:-.02em;margin:26px 0 0;max-width:28ch`;
-    root.append(hook, claimsHeading);
-
+    /*
+     * The copy edit: five one-line claims on the page, and what stands behind them one press away.
+     * The hook, each claim's mechanism and the closing line are the popover's body, so every word
+     * the view carries is still in the document.
+     */
     const claims = el(doc, 'ul', 'everyday-landing-claims');
-    claims.style.cssText = 'list-style:none;margin:16px 0 0;padding:0;display:grid;gap:16px;max-width:62ch';
+    claims.setAttribute('aria-label', view.claimsHeading);
+    claims.style.cssText = `list-style:none;margin:34px 0 0;padding:18px 0 0;border-top:1px solid ${C.rule};display:grid;gap:8px;max-width:62ch`;
+    const detail: Node[] = [];
+    const hook = el(doc, 'p', 'everyday-landing-hook', view.hook);
+    hook.style.cssText = `font-size:14px;line-height:1.55;color:${C.ink};margin:0 0 14px;text-wrap:pretty`;
+    detail.push(hook);
     for (const claim of view.claims) {
-      const row = el(doc, 'li', 'everyday-landing-claim');
+      const row = el(doc, 'li', 'everyday-landing-claim', claim.claim);
       row.dataset.claim = claim.id;
-      row.style.cssText = 'min-width:0';
-      const line = el(doc, 'div', 'everyday-landing-claim-line', claim.claim);
-      line.style.cssText = `font-size:15.5px;font-weight:600;line-height:1.45;color:${C.ink}`;
-      const because = el(doc, 'div', 'everyday-landing-claim-because', claim.because);
-      because.style.cssText = `font-size:13.5px;line-height:1.55;color:${C.inkSoft};margin:5px 0 0;text-wrap:pretty`;
-      row.append(line, because);
+      row.style.cssText = `min-width:0;font-size:15.5px;font-weight:600;line-height:1.45;color:${C.ink}`;
       claims.append(row);
-    }
-    root.append(claims);
 
+      const line = el(doc, 'p', 'everyday-landing-claim-line', claim.claim);
+      line.style.cssText = `font-size:13.5px;font-weight:600;line-height:1.45;color:${C.ink};margin:0 0 3px`;
+      const because = el(doc, 'p', 'everyday-landing-claim-because', claim.because);
+      because.style.cssText = `font-size:13.5px;line-height:1.55;color:${C.inkSoft};margin:0 0 12px;text-wrap:pretty`;
+      detail.push(line, because);
+    }
     const closing = el(doc, 'p', 'everyday-landing-closing', view.closing);
-    closing.style.cssText = `font-size:13.5px;line-height:1.55;color:${C.warmGrey};margin:26px 0 0;max-width:62ch;text-wrap:pretty`;
-    root.append(closing);
+    closing.style.cssText = `font-size:13.5px;line-height:1.55;color:${C.warmGrey};margin:0 0 10px;text-wrap:pretty`;
+    detail.push(closing);
+    const how = explainer(doc, { link: view.claimsHeading, title: view.claimsHeading, body: detail });
+    how.root.classList.add('everyday-landing-claims-heading');
+    const howLine = el(doc, 'div');
+    howLine.style.cssText = 'margin:14px 0 0';
+    howLine.append(how.root);
+    root.append(claims, howLine);
 
     host.append(root);
   };

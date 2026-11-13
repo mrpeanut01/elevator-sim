@@ -55,6 +55,7 @@ import {
   type BenchCasePlan,
   type BenchSuiteRequest,
 } from './benchModel.js';
+import { explainer } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
@@ -239,17 +240,17 @@ function mountBench(
         const message = event.data as BatchWorkerMessage;
         if (message.kind === 'progress') {
           state.status =
-            `${plan.test.label} — ${String(message.progress.completed)} of ` +
-            `${String(request.replications * request.field.length)} days, and ` +
-            `${String(plans.length - index - 1)} tests after this one.`;
+            `${plan.test.label}: ${String(message.progress.completed)} of ` +
+            `${String(request.replications * request.field.length)} days · ` +
+            `${String(plans.length - index - 1)} more to run`;
           renderStatus();
           return;
         }
         if (message.kind === 'failed') {
           state.running = false;
           state.error =
-            `“${plan.test.label}” could not be run: ${message.message}. Nothing is reported — a ` +
-            'suite with a missing test would be a different suite.';
+            `“${plan.test.label}” could not run: ${message.message}. The suite stopped with no ` +
+            'results. Run it again.';
           stopWorker();
           render();
           return;
@@ -261,7 +262,7 @@ function mountBench(
       next.addEventListener('error', (event: ErrorEvent) => {
         if (token !== runToken || !alive) return;
         state.running = false;
-        state.error = `the bench could not start: ${event.message}`;
+        state.error = `The bench could not start: ${event.message}`;
         stopWorker();
         render();
       });
@@ -360,9 +361,21 @@ function mountBench(
     hint.style.cssText = `${NOTE};margin:0 0 10px`;
     wrap.append(head, hint);
 
+    /* The two long notes about the forty, behind one link beside the list they are about. */
     const seedNote = el(doc, 'p', 'everyday-bench-tests-seed-note', COPY.testsSeedNote);
     seedNote.style.cssText = `${NOTE};margin:0 0 10px`;
-    wrap.append(seedNote);
+    const absent = el(doc, 'p', 'everyday-bench-tests-absent', COPY.testsAbsent);
+    absent.style.cssText = `${NOTE};margin:0 0 10px`;
+    const about = el(doc, 'div');
+    about.style.cssText = 'margin:0 0 10px';
+    about.append(
+      explainer(doc, {
+        link: COPY.testsLink,
+        title: COPY.testsLink,
+        body: [COPY.testsAbout, seedNote, absent],
+      }).root,
+    );
+    wrap.append(about);
 
     /*
      * Tower-major, with a heading where the tower changes. `proofCasesOf` guarantees that order —
@@ -395,10 +408,6 @@ function mountBench(
       row.append(box, doc.createTextNode(test.label));
       wrap.append(row);
     }
-
-    const absent = el(doc, 'p', 'everyday-bench-tests-absent', COPY.testsAbsent);
-    absent.style.cssText = `${NOTE};margin:9px 0 0`;
-    wrap.append(absent);
 
     const refusal = benchTestsRefusal(state.tickedIds, tests.length);
     if (refusal !== undefined) {
@@ -572,18 +581,25 @@ function mountBench(
     return wrap;
   }
 
+  /**
+   * § 12's three standing notes and its closing rule, behind the *How the bench decides* link
+   * under the lede. Still in the document on every draw: a closed popover is not removed.
+   */
   function drawStandingNotes(): HTMLElement {
-    const wrap = el(doc, 'section', 'everyday-bench-standing');
-    wrap.style.cssText = `margin-top:${String(GAP.wide)}px;border-top:1px solid ${C.ruleLight};padding-top:${String(GAP.block)}px`;
-    const list = el(doc, 'ul');
-    list.style.cssText = `margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;${NOTE}`;
+    const list = el(doc, 'ul', 'everyday-bench-standing');
+    list.style.cssText = `margin:0 0 10px;padding-left:18px;${NOTE}`;
     for (const note of benchResultViewOf(state.cells).standingNotes) {
-      list.append(el(doc, 'li', undefined, note));
+      const item = el(doc, 'li', undefined, note);
+      item.style.cssText = 'margin-bottom:6px';
+      list.append(item);
     }
-    wrap.append(list);
     const never = el(doc, 'p', 'everyday-bench-never', COPY.neverASubtraction);
-    never.style.cssText = `${NOTE};margin:10px 0 0`;
-    wrap.append(never);
+    never.style.cssText = `${NOTE};margin:0 0 10px`;
+    const wrap = el(doc, 'div');
+    wrap.style.cssText = 'margin:8px 0 0';
+    wrap.append(
+      explainer(doc, { link: COPY.howLink, title: COPY.howLink, body: [list, never] }).root,
+    );
     return wrap;
   }
 
@@ -618,7 +634,7 @@ function mountBench(
     title.style.cssText = `font-family:${TYPE.heading};font-size:32px;font-weight:700;letter-spacing:-.02em;margin:10px 0 0`;
     const lede = el(doc, 'p', undefined, COPY.lede);
     lede.style.cssText = `font-size:16px;line-height:1.55;color:${C.inkSoft};margin:12px 0 0;max-width:64ch;text-wrap:pretty`;
-    root.append(eyebrow, title, lede);
+    root.append(eyebrow, title, lede, drawStandingNotes());
     root.append(drawField(), drawTests(), drawBudget());
     if (state.error !== undefined) {
       const failure = el(doc, 'p', 'everyday-bench-error', state.error);
@@ -627,7 +643,7 @@ function mountBench(
     }
     renderStatus();
     root.append(statusLine);
-    root.append(drawResult(), drawStandingNotes());
+    root.append(drawResult());
     context.refreshBar();
   }
 
@@ -649,9 +665,9 @@ function mountBench(
     },
     (error: unknown) => {
       if (!alive) return;
-      state.error = `The forty proof cases could not be loaded, so there is nothing to test against: ${
+      state.error = `The tests could not be loaded. Reload to try again. (${
         error instanceof Error ? error.message : String(error)
-      }`;
+      })`;
       render();
     },
   );
@@ -700,7 +716,7 @@ function benchBar(state: Parameters<NonNullable<EverydayScreenModule['bar']>>[0]
       /* Not mounted yet: the shell can ask for a row before the screen exists, and a filled
        * primary over no screen is the same dead control with no sentence. */
       ...(here === undefined
-        ? { inert: 'The bench has not finished loading.' }
+        ? { inert: 'The bench is still loading.' }
         : here.refusal === undefined
           ? {}
           : { inert: here.refusal }),

@@ -159,8 +159,8 @@ export const SHARE_COPY = Object.freeze({
    */
   brand: 'Elevator Sim',
   /* The control, on the daily tab. */
-  eyebrow: 'SHOW SOMEBODY',
-  button: 'Copy the result',
+  eyebrow: 'SHARE',
+  button: 'Copy result',
   /*
    * The confirmation, and it is a **line** rather than a face on the button.
    *
@@ -173,7 +173,7 @@ export const SHARE_COPY = Object.freeze({
    * *what would happen if I pressed that again* always has the same answer; and a `role="status"`
    * line is **announced**, where a silently swapped button label is not.
    */
-  copied: 'Copied — the result is on your clipboard.',
+  copied: 'Copied to your clipboard.',
   /*
    * The standing note under the button, before any press. Three claims, because a player who did
    * not know them would read the press as something else: what goes (observations and the seed),
@@ -188,8 +188,8 @@ export const SHARE_COPY = Object.freeze({
    * every surface in the same commit, and *the copy table* is a surface.
    */
   note:
-    'Copies what happened to the people, the building and the seed — as text, to your clipboard. ' +
-    'How you ran it does not travel. Nothing is sent anywhere by this button.',
+    'Copies the result as text: what happened to the people, the building and the seed. ' +
+    'How you ran it isn’t included, and nothing is sent anywhere.',
   /*
    * The clipboard refused. § D227 both ways: a control that cannot write must say so, and it must
    * say what to do instead. A browser denies the clipboard for reasons the player did not cause
@@ -197,19 +197,18 @@ export const SHARE_COPY = Object.freeze({
    * which the screen puts on the page on the same press.
    */
   refused:
-    'This browser would not let the page write to the clipboard. The result is below instead — ' +
-    'select it and copy it by hand.',
+    'Your browser blocked the clipboard. The result is below. Select it and copy it by hand.',
   /** No run has landed on this device yet, so there is nothing to copy. Said, never greyed silently. */
   noRun:
-    'Nothing to copy yet. Play a day and this copies what happened in it.',
+    'Nothing to copy yet. Play a day first.',
   /* The strip's caption and legend. */
-  stripCaption: 'the shift in twelve equal slices · the worst wait anybody had in each',
+  stripCaption: 'the shift in twelve equal slices · the worst wait in each',
   quietLegend: 'nobody called',
   /*
    * The censoring note. A leg that never boarded has a wait the run cut short, so its band is the
    * least it could have been and the strip says which slices that is true of. Omitted at zero.
    */
-  censoredNote: 'slices end on somebody who never boarded — their wait is at least the band shown',
+  censoredNote: 'slices end on somebody who never boarded, so their wait is at least the band shown',
   /*
    * The closing line, and it is addressed to the recipient rather than to the sharer. It states the
    * spoiler rule on the face of the artefact, because a recipient who does not know the dispatcher

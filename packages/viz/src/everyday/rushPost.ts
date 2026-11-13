@@ -61,10 +61,10 @@ import type { RushPostedRound, RushRoundRecord, RushSittingCheck } from './rushS
  * meet it.
  */
 export const RUSH_POST_COPY = Object.freeze({
-  eyebrow: 'PUT THE SITTING ON THE BOARD',
+  eyebrow: 'POST TO THE BOARD',
   roundsHeading: 'THIS SITTING',
   button: 'Post this sitting',
-  posting: 'Posting this sitting…',
+  posting: 'Posting…',
   /*
    * The standing note. Four claims, each there because a player who did not know it would read the
    * press as something else: what is sent (every round, not the one on screen), what is not sent
@@ -72,11 +72,10 @@ export const RUSH_POST_COPY = Object.freeze({
    * what it is ranked on.
    */
   note:
-    'Posting sends every round of this sitting — what you drove each one with and every change you ' +
-    'made while it played. The waves are not sent: they are the same climb from one seed for ' +
-    'everybody, and the server replays each round from its own copy of the reference data. The ' +
-    'sitting is ranked on how long its last round held.',
-  posted: 'Posted. The server replayed every round of this sitting and they reproduced.',
+    'Posting sends every round of this sitting: what drove each one and every change you made while ' +
+    'it played. The server replays each round to check it. The sitting is ranked on how long its ' +
+    'last round held.',
+  posted: 'Posted. The server replayed every round and they matched.',
   /**
    * Where it went, without naming a board. `everyday/postRun.ts#placementLineOf` turns a placement
    * token into prose because the day's server answers one; the rush route answers a `boardKey` and
@@ -85,16 +84,14 @@ export const RUSH_POST_COPY = Object.freeze({
    * nothing here parses a key or decides which board a sitting belongs on.
    */
   placement:
-    'It is ranked against everyone else who played this tower today with the same modifiers. The ' +
+    'It ranks against everyone else who played this tower today with the same modifiers. The ' +
     'board resets tomorrow.',
   refusedNote:
-    'This is checked here rather than on the server, so nothing was sent. The sitting is still on ' +
-    'screen and you can keep playing rounds into it.',
+    'Nothing was sent. You can keep playing rounds in this sitting.',
   /** Under the round list once a post has come back — see the module docstring. */
   purseNote:
-    'The purse figures are the server’s own, from its replay of each round: what each round earned ' +
-    'and what each rebuild between rounds spent. The server replays a rebuilt round on the tower it ' +
-    'was rebuilt to.',
+    'The purse figures are the server’s, from its replay of each round: what each round earned and ' +
+    'what each rebuild spent.',
   /**
    * What a round was rebuilt with before it began — GitHub issue #372, § D1295. The names are the
    * shop's, and the line is on every rebuilt round so a sitting's rounds do not read as one tower.
@@ -119,7 +116,7 @@ export const RUSH_POST_COPY = Object.freeze({
   heldTo: (held: string, wave: number): string => `held ${held}, into wave ${String(wave)}`,
   stoppedAt: (held: string, wave: number): string => `ended by hand at ${held}, in wave ${String(wave)}`,
   presses: (count: number): string => `${String(count)} ${count === 1 ? 'change' : 'changes'} while it played`,
-  noPresses: 'nothing changed while it played',
+  noPresses: 'no changes while it played',
   /**
    * One press, with its clock and what it was — `4:21 · switched to Predictive balanced`.
    *
@@ -151,9 +148,8 @@ export const RUSH_POST_COPY = Object.freeze({
    * comparison from two figures on adjacent lines.
    */
   changesNote:
-    'Each change is shown with the clock it landed on and what the round did after it. What it was ' +
-    'worth is not measured — that would take the same waves played again without it, and this ' +
-    'sitting has only the round you played.',
+    'Each change shows when it landed and what the round did after it. What it was worth is not ' +
+    'measured: that would take the same waves played again without it.',
   /*
    * **The same note once the sitting holds more than one round** — wave AJ, § D1099. The line above
    * says *this sitting has only the round you played*, and it stayed on round 1 after round 2 was
@@ -163,13 +159,13 @@ export const RUSH_POST_COPY = Object.freeze({
    * ended by hand, which crossed no line and so holds no figure to set beside this one.
    */
   changesNoteNoTwin:
-    'Each change is shown with the clock it landed on and what the round did after it. What it was ' +
-    'worth is not measured — that would take the same waves played again from the same start with ' +
-    'nothing changed, and no other round of this sitting is that.',
+    'Each change shows when it landed and what the round did after it. What it was worth is not ' +
+    'measured: no other round of this sitting played the same waves from the same start with ' +
+    'nothing changed.',
   changesNoteTwinByHand: (label: string): string =>
-    `Each change is shown with the clock it landed on and what the round did after it. ${label} met ` +
-    'the same waves from the same start with nothing changed, but one of the two was ended by hand, ' +
-    'so the two holds are not set side by side.',
+    `Each change shows when it landed and what the round did after it. ${label} met the same waves ` +
+    'from the same start with nothing changed, but one of the two was ended by hand, so the two ' +
+    'holds are not compared.',
   /**
    * The measured arm. Both rounds met this sitting's crowd from one start and the rush is simulated
    * deterministically, so the round with no press **is** this round without its changes, and the
@@ -177,10 +173,10 @@ export const RUSH_POST_COPY = Object.freeze({
    * crowd is one sample of the building's rushes.
    */
   changesNoteTwin: (label: string, twinHeld: string, twinWave: number, gap: string): string =>
-    `Each change is shown with the clock it landed on and what the round did after it. ${label} met ` +
-    `the same waves from the same start with nothing changed and held ${twinHeld}, into wave ` +
-    `${String(twinWave)}; with the changes this round ${gap}. That is one crowd, and another rush's ` +
-    'waves could answer differently.',
+    `Each change shows when it landed and what the round did after it. ${label} met the same waves ` +
+    `from the same start with nothing changed and held ${twinHeld}, into wave ${String(twinWave)}. ` +
+    `With the changes, this round ${gap}. That is one crowd, and another rush’s waves could answer ` +
+    'differently.',
   /** The gap in {@link RUSH_POST_COPY.changesNoteTwin}'s own words, signed from this round's side. */
   twinGap: (deltaS: number, clock: string): string =>
     deltaS > 0 ? `held ${clock} longer` : deltaS < 0 ? `held ${clock} less` : 'held exactly as long',
@@ -199,7 +195,7 @@ export const RUSH_POST_COPY = Object.freeze({
     `${waves === 1 ? 'wave' : 'waves'}, which paid ${String(paid)} ${paid === 1 ? 'unit' : 'units'} into a ` +
     `purse of ${String(after)}`,
   /** The list before a rush has been played at all. Never empty: a list with no words lies. */
-  noRounds: 'No round of this sitting has finished yet.',
+  noRounds: 'No round finished yet.',
 } as const);
 
 /* -------------------------------------------------------------------------- *

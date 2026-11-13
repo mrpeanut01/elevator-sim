@@ -272,7 +272,7 @@ const ABSENCE_TRIAGE: readonly TriagedAbsence[] = Object.freeze([
    * across the shipped buildings is what would draw a tower a day, and **#553**, the play-time
    * tracker for the rung in force that #367's survivor table did not include.
    */
-  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'your week’s after that', issue: 248 },
+  { register: 'EVERYDAY_SHELL_ABSENCES', fragment: 'rather than the day’s draw', issue: 248 },
   { register: 'STAGE_ABSENCES', fragment: 'no works to buy while the day plays', issue: 553 },
   /*
    * **The rush's row left with its entry, on the commit that built what it was waiting for.** It

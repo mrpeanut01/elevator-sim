@@ -148,7 +148,7 @@ async function press(page: Page, kind: 'park-cars-lobby' | 'spread-cars'): Promi
   }
   await button.click();
   await page.waitForFunction(
-    () => !(document.body.textContent ?? '').includes('recomputing the day'),
+    () => !(document.body.textContent ?? '').includes('Rerunning the day'),
     undefined,
     { timeout: 240_000 },
   );
@@ -340,7 +340,7 @@ describe.skipIf(!HAS_BROWSER)('§ D1004 — a closed today opens tomorrow from t
       await page.waitForSelector('.everyday-week-strip', { timeout: 15_000 });
       const strip = await textOf(page, '.everyday-week-strip');
       expect(strip, 'Your week said a banked day was not closed').not.toContain('not closed yet');
-      expect(await textOf(page, '.everyday-week')).not.toContain('No day of this week has been closed yet');
+      expect(await textOf(page, '.everyday-week')).not.toContain('No days closed yet this week');
 
       /* And the door's press opens tomorrow — the door then stands on day 2. */
       await toModes(page);

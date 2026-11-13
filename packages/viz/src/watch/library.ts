@@ -76,8 +76,7 @@ import type { WatchableRun } from './types.js';
  * arm has its own sentence — {@link refusalForDay} — and names what fired.
  */
 export const DAY_HAS_NO_RECORD =
-  'this day was filed by a build that kept no record of what it ran, so there is nothing to ' +
-  're-simulate';
+  'This day was filed without a record of what it ran, so there is nothing to replay.';
 
 /**
  * What a day says when its record was **refused**, naming the issue that refused it.
@@ -93,8 +92,8 @@ export const DAY_HAS_NO_RECORD =
  */
 export function refusalForDay(reason: string): string {
   return (
-    `this day cannot be re-simulated exactly, so it is not offered as a replay — ${reason}. ` +
-    'The day itself is filed and counted; it is the replay that is refused'
+    `This day can’t be replayed exactly, so it isn’t offered: ${reason}. ` +
+    'The day itself is still filed and counted.'
   );
 }
 

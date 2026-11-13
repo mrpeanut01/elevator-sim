@@ -726,6 +726,7 @@ import {
 } from '../everyday/landingView.js';
 import { GAME_FLOORS } from '../everyday/floors.js';
 import { TEST_SIMULATION_LABEL } from '../everyday/types.js';
+import { EXPLAINER_CLOSE_LABEL } from '../everyday/screenDom.js';
 import { LOBBY_COPY, LOBBY_INITIAL, lobbyPoint, lobbyViewOf, type LobbyState } from '../everyday/lobbyModel.js';
 import {
   SURVIVOR_COPY,
@@ -10409,6 +10410,7 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     'everyday/rail.ts#RAIL_DRAWER_COPY',
     /* The shell's skip link, GitHub issue #404 — chrome the shell draws and does not author. */
     'everyday/types.ts#SHELL_SKIP_LABEL',
+    'everyday/screenDom.ts#EXPLAINER_CLOSE_LABEL',
     'everyday/rail.ts#sublineFor',
     /* Wave AS, lane AS-4 (#636 item 6): the played day's subline with the stage's clock. */
     'everyday/rail.ts#stageSublineOf',
@@ -10598,6 +10600,8 @@ const EVERYDAY_MENU: SurfaceAdapter = {
      * makes it exactly the kind of chrome string this adapter exists to hold accountable.
      */
     seeds.push({ field: 'shell.skip.label', text: SHELL_SKIP_LABEL, role: 'label' });
+    /* The close button on every explainer popover: one face, shared by every screen that folds help away. */
+    seeds.push({ field: 'shell.explainer.close', text: EXPLAINER_CLOSE_LABEL, role: 'label' });
 
     /*
      * § 3.2's footer, once — it does not vary by campaign shape.
@@ -10975,7 +10979,7 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
          * read a label read it as a caption.
          */
         role:
-          key === 'holdLine' || key === 'lede' || key === 'drivingNote' || key === 'driverPickNote'
+          key === 'holdLine' || key === 'lede' || key === 'drivingNote' || key === 'driverPickNote' || (key.startsWith('how') && key !== 'howLink')
             ? 'prose'
             : 'label',
       });
@@ -11192,6 +11196,11 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
        * or absent depending on which dispatcher a case happened to open on.
        */
       seeds.push({ field: 'rush.house.standingTag', text: RUSH_HOUSE_COPY.standingTag, role: 'label' });
+      /* The long account behind the caption's link, which no view carries: seeded by key. */
+      seeds.push({ field: 'rush.house.aboutLink', text: RUSH_HOUSE_COPY.aboutLink, role: 'label' });
+      for (const key of ['aboutRuns', 'aboutOrder', 'aboutStart', 'aboutHandover'] as const) {
+        seeds.push({ field: `rush.house.${key}`, text: RUSH_HOUSE_COPY[key], role: 'prose' });
+      }
     }
 
     /* ------------------------------------------------------- § 13 designer */

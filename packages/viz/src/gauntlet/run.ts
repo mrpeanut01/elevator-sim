@@ -104,8 +104,7 @@ export interface GauntletHandle {
 
 /** The message a cancelled gauntlet stops with. Named so the screen and the tests agree on it. */
 export const GAUNTLET_CANCELLED =
-  'Stopped. Nothing is rated — a rating is the mean of all forty, so a part of them is a ' +
-  'different figure rather than a smaller one.';
+  'Stopped. Nothing is rated: a rating needs all forty cases.';
 
 /**
  * Run the forty and hand back a rating, or stop and hand back nothing.
@@ -159,8 +158,8 @@ export function runGauntlet(options: GauntletOptions): GauntletHandle {
         stopWorker();
         stopped = true;
         options.onStopped(
-          `${nameOf(proofCase)} could not run: ${message.message}. Nothing is rated — a rating ` +
-            'over thirty-nine cases is not the rating the forty define.',
+          `${nameOf(proofCase)} could not run: ${message.message}. Nothing is rated: a rating ` +
+            'needs all forty cases.',
         );
         return;
       }
@@ -172,7 +171,7 @@ export function runGauntlet(options: GauntletOptions): GauntletHandle {
       if (stopped || worker !== next) return;
       stopWorker();
       stopped = true;
-      options.onStopped(`the gauntlet worker failed to start: ${event.message}. Nothing is rated.`);
+      options.onStopped(`The gauntlet could not start: ${event.message}. Nothing is rated. Reload the page to try again.`);
     });
     next.postMessage({
       kind: 'run',

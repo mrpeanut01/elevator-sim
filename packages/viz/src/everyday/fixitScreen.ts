@@ -219,7 +219,7 @@ import { DEFAULT_DOOR_TARGET, mountFixitFamilies } from './fixitFamilies.js';
 import { editorInputsOf, withPrunedDials } from '../fixit/editorInputs.js';
 import { createOffThreadRunner } from '../dev/offThreadRuns.js';
 import { actionBarFor } from './actionBar.js';
-import { sideBySide } from './screenDom.js';
+import { explainer, sideBySide } from './screenDom.js';
 import type { ActionBarModel } from './actionBar.js';
 import {
   buildingLineOf,
@@ -764,6 +764,12 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label}`;
+
+/** The links the long explanations sit behind. */
+const WHY_WRONG_LINK = 'Why it went wrong';
+const HOW_JUDGED_LINK = 'How this was judged';
+/** A basis line longer than this many characters goes behind {@link HOW_JUDGED_LINK}. */
+const BASIS_INLINE_MAX = 140;
 const MONO = (size: number, color: string): string =>
   `font:500 ${String(size)}px ${TYPE.mono};color:${color}`;
 
@@ -823,7 +829,7 @@ function mountFixit(
     if (loadFailure !== undefined) {
       // Mount status text, the one sentence this file authors — see the module docstring.
       const failed = el(doc, 'p', 'everyday-fixit-failure');
-      failed.textContent = `The case file could not be loaded: ${loadFailure}`;
+      failed.textContent = `The cases could not be loaded: ${loadFailure}`;
       failed.style.cssText = `color:${C.alarm};font-size:13px;max-width:70ch`;
       root.append(failed);
       return;
@@ -1206,7 +1212,17 @@ function mountFixit(
       dText.style.cssText = `font:600 ${view.state === 'explained' ? '19px' : '16px'} ${TYPE.heading};line-height:1.3;margin-top:4px`;
       diagnosis.append(dText);
     }
-    const dNote = el(doc, 'p', 'everyday-fixit-diagnosis-note', view.note);
+    /*
+     * The explained state's note is the case's full reasoning, which is read once: it sits behind a
+     * link under the diagnosis. The other two states' notes are a sentence the player acts on.
+     */
+    const dNote =
+      view.state === 'explained'
+        ? el(doc, 'div', 'everyday-fixit-diagnosis-note')
+        : el(doc, 'p', 'everyday-fixit-diagnosis-note', view.note);
+    if (view.state === 'explained') {
+      dNote.append(explainer(doc, { link: WHY_WRONG_LINK, title: WHY_WRONG_LINK, body: [view.note] }).root);
+    }
     dNote.style.cssText = `font-size:13.5px;line-height:1.55;color:${C.inkSoft};margin:6px 0 0`;
     diagnosis.append(dNote);
     if (view.because !== undefined) {
@@ -1924,7 +1940,17 @@ function mountFixit(
     }
     card.append(rows);
 
-    const basis = el(doc, 'p', undefined, outcome.basis);
+    /*
+     * A one-line basis stays on the card. The long account of the forty-nine mornings is read once,
+     * so it sits behind a link under the rows, word for word.
+     */
+    const basisIsLong = outcome.basis.length > BASIS_INLINE_MAX;
+    const basis = basisIsLong
+      ? el(doc, 'div', 'everyday-fixit-outcome-basis')
+      : el(doc, 'p', 'everyday-fixit-outcome-basis', outcome.basis);
+    if (basisIsLong) {
+      basis.append(explainer(doc, { link: HOW_JUDGED_LINK, title: HOW_JUDGED_LINK, body: [outcome.basis] }).root);
+    }
     basis.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.warmGrey};margin:12px 0 0`;
     card.append(basis);
     return card;

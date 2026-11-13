@@ -694,20 +694,17 @@ export interface EverydayProgressStatus {
  */
 export const PROGRESS_REFUSALS = Object.freeze({
   unavailable:
-    'This browser will not let the game read what it saved, so nothing is marked solved and no ' +
-    'rating is standing. Everything else works; what you do now lasts until this tab closes.',
+    'This browser won’t let the game read what it saved, so nothing shows as solved or rated. ' +
+    'Everything else works, and what you do now lasts until this tab closes.',
   parse:
-    'The progress saved in this browser is not readable text, so nothing is marked solved and no ' +
-    'rating is standing. What was saved is left where it is until you fix a building or run the ' +
-    'gauntlet again.',
+    'Your saved progress can’t be read, so nothing shows as solved or rated. It is left where it ' +
+    'is until you fix a building or run the gauntlet again.',
   version:
-    'The progress saved in this browser was written by a different version of the game, so this ' +
-    'build will not read it. It is left where it is until you fix a building or run the gauntlet ' +
-    'again.',
+    'Your saved progress is from a different version of the game, so it can’t be read. It is ' +
+    'left where it is until you fix a building or run the gauntlet again.',
   shape:
-    'The progress saved in this browser is not in a shape this build can vouch for, so nothing is ' +
-    'marked solved and no rating is standing. It is left where it is until you fix a building or ' +
-    'run the gauntlet again.',
+    'Your saved progress isn’t in a form the game can trust, so nothing shows as solved or rated. ' +
+    'It is left where it is until you fix a building or run the gauntlet again.',
 } as const);
 
 /**
@@ -842,16 +839,15 @@ export interface EverydaySave {
 
 /** A store that would not take the bytes — a full origin, or one that refuses writes outright. */
 const STORE_REFUSED =
-  'This device is not keeping what you earn, so the buildings you fix and the ratings you run ' +
-  'for last until this tab closes.';
+  'This browser isn’t saving, so the buildings you fix and your ratings last until this tab closes.';
 
 /** The budget's own sentence, composed so the two counts and the ceiling are all in it. */
 function oversizeNoticeOf(progress: EverydayProgress, characters: number): string {
   return (
-    `What you have earned was not saved: ${String(progress.ratings.length)} ratings and ` +
+    `Your progress was not saved: ${String(progress.ratings.length)} ratings and ` +
     `${String(progress.solvedCaseIds.length)} solved buildings come to ${String(characters)} ` +
-    `characters, and this build keeps at most ${String(PROGRESS_BUDGET_CHARACTERS)}. What was ` +
-    'saved before is untouched, and everything on screen still stands until this tab closes.'
+    `characters, and the game keeps at most ${String(PROGRESS_BUDGET_CHARACTERS)}. What was ` +
+    'saved before is untouched, and what is on screen lasts until this tab closes.'
   );
 }
 
@@ -992,8 +988,7 @@ export interface EverydayProfileStore {
  * not the same news even though the player's afternoon ends the same way.
  */
 const PROGRESS_MEMORY_ONLY =
-  'This page has no storage to keep what you earn in, so the buildings you fix and the ratings ' +
-  'you run for last until this tab closes.';
+  'This page has no storage, so the buildings you fix and your ratings last until this tab closes.';
 
 /**
  * Build a store over a backing slot — or over nothing, which is a browser whose storage refuses

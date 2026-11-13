@@ -45,8 +45,8 @@ export const CAMPAIGN_DOCK_COPY = Object.freeze({
   ifTodayClears: 'if today clears',
   spentToday: 'spent today',
   happeningNow: 'HAPPENING NOW',
-  quietHeading: 'NOTHING HAPPENING',
-  quietNote: 'The building is running on the order you gave it this morning. If that changes, it appears here with a clock on it.',
+  quietHeading: 'ALL QUIET',
+  quietNote: 'Running on your standing order. Anything that needs you appears here, with the time.',
   /**
    * **Once the day has run out** — wave AR, lane AR-4, GitHub issue #633. The dock read *NOTHING
    * HAPPENING* over a finished day, so the stage never said the day was over. The dock is drawn on a
@@ -55,22 +55,22 @@ export const CAMPAIGN_DOCK_COPY = Object.freeze({
   overHeading: 'DAY OVER',
   overNote: 'The day is over. Close it to file.',
   /** § 7.5's footer, verbatim. */
-  footerOpen: 'Choose whenever you like — nothing changes until you do, and the day carries on without an answer.',
+  footerOpen: 'Choose when you like. Nothing changes until you do, and the day carries on.',
   /** § 7.5's footer once answered, verbatim. */
-  footerAnswered: 'Maintenance is on it. Anything temporary reverts on its own when this closes.',
+  footerAnswered: 'Maintenance is on it. Anything temporary reverts when this closes.',
   answeredEyebrow: 'ANSWERED',
   /** Where the parking and the handover live, so the dock does not duplicate them as options. */
-  otherLevers: 'Parking the cars and handing the day to another dispatcher are the arms under the stage.',
-  optionsHint: 'options, with what each costs and when it takes effect',
+  otherLevers: 'To park the cars or hand the day to another dispatcher, use the arms under the stage.',
+  optionsHint: 'Options, with cost and when each takes effect',
   /*
    * `everyday/host.ts#answerIncident`'s refusals, authored here rather than in the façade so they
    * reach the corpus with the rest of the dock's words. Each is § 7.6's fourth rule at press scope.
    */
-  refusedNoIncident: 'no incident is open on this day',
-  refusedAnswered: 'the incident has been answered — one answer a day, stamped where it was given',
-  refusedUnknownOption: 'that option is not one this incident offers',
-  refusedNoRun: 'no day is running',
-  refusedPurse: 'the purse refused it',
+  refusedNoIncident: 'No incident is open today.',
+  refusedAnswered: 'Already answered. An incident takes one answer a day.',
+  refusedUnknownOption: 'This incident doesn’t offer that option.',
+  refusedNoRun: 'No day is running.',
+  refusedPurse: 'The purse can’t cover it.',
 });
 
 /** `everyday/host.ts#answerIncident`'s purse refusal, worded once with the figure in it. */
@@ -161,7 +161,7 @@ function optionViewOf(
   purse: number,
 ): CampaignDockOptionView {
   const refusal = !input.hasRun
-    ? 'no day is running — nothing to answer yet'
+    ? 'No day is running yet.'
     : option.units > purse
       ? purseRefusalOf(option.units)
       : (() => {

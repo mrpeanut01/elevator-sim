@@ -181,8 +181,9 @@ describe('§ 20.5’s hold line', () => {
   it('prints the rule as a figure beside the sentence that spells it out', () => {
     expect(rushHoldLineFigure()).toBe('120 s × 40 people');
     // The prose says the same thing in words — § 9.1's copy, and § 9.2's rule.
-    expect(RUSH_SCREEN_COPY.holdLine).toContain('forty people');
-    expect(RUSH_SCREEN_COPY.holdLine).toContain('over two minutes');
+    expect(RUSH_SCREEN_COPY.holdLine).toContain(`${String(RUSH_HOLD_LINE.people)} people`);
+    expect(RUSH_SCREEN_COPY.holdLine).toContain(`over ${String(RUSH_HOLD_LINE.overS / 60)} minutes`);
+    expect(RUSH_SCREEN_COPY.holdLine).toBe('Ends when 40 people have waited over 2 minutes at once.');
   });
 });
 

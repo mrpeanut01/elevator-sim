@@ -276,7 +276,7 @@ describe('End the day', () => {
       label: 'End the day',
       note:
         'The landing-queue goal is already past its bar, and it cannot come back under it today. Ending now ' +
-        'files the whole day as it runs from here, with nothing more pressed.',
+        'files the whole day as it runs from here.',
     });
     expect(stageEndDayOf(readingsWith('worst-wait', 'missed'))?.note).toMatch(/^The worst-wait goal is already past its bar/u);
   });
@@ -520,8 +520,8 @@ describe('the lost day’s card — § D1435', () => {
     const card = stageLostCardOf(at(29, 200), '08:49');
     expect(card?.heading).toBe(STAGE_LOST_COPY.heading);
     expect(card?.fact).toBe(
-      'The deepest landing reached 29 by 08:49, past its bar of 28. A maximum past its bar stays past it, and the ' +
-        'stage asks nothing more today.',
+      'The deepest landing reached 29 by 08:49, past its bar of 28. It can’t come back under it, so no more calls ' +
+        'are asked today.',
     );
     expect(stageLostCardOf(at(10, 412), '12:37')?.fact).toMatch(/^The longest wait reached 412 s by 12:37, past its bar of 380 s\./u);
     /* It offers ending and watching and promises nothing about the rest of the day. */

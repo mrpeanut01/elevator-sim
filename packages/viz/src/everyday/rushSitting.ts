@@ -338,7 +338,7 @@ function wireRoundInterventions(
      * an incident answer and the two bought changes — and each is refused on its own ground, which
      * is what `interventionWire.ts` built the table for.
      */
-    refusals.push(interventionKindRefusal(change.kind) ?? `this build cannot post a “${change.kind}” press`);
+    refusals.push(interventionKindRefusal(change.kind) ?? `a “${change.kind}” change can’t be posted`);
   }
   return { log: refusals.length > 0 ? undefined : Object.freeze(carried), refusals: Object.freeze(refusals) };
 }
@@ -417,28 +417,26 @@ export type RushSittingCheck =
 export const RUSH_SITTING_COPY = Object.freeze({
   /** § D515's rule, from the client's side: the player ended it, so there is no breaking point. */
   handStopped:
-    'This sitting cannot be posted: its last round was ended by hand, so it has no breaking point ' +
-    'to rank. Play a round out to the line and the whole sitting goes up with it.',
+    'Can’t post yet: the last round was ended by hand, so it has no breaking point to rank. Play a ' +
+    'round out and the whole sitting posts with it.',
   /** The stream ran the full ninety minutes and the line never held. */
   neverBroke:
-    'This sitting cannot be posted: its last round held every wave to the end of the stream, so ' +
-    'there is no moment where it broke. A rush posts how far it got before it stopped draining.',
+    'Can’t post: the last round held every wave to the end, so it never broke. A rush posts how far ' +
+    'it got before it stopped draining.',
   tooLong: (rounds: number): string =>
-    `This sitting cannot be posted: a sitting carries at most ${String(MAX_SITTING_ROUNDS)} rounds ` +
-    `and this one has ${String(rounds)}. Leave the rush and start a new sitting — the next one ` +
-    'begins from the building as shipped.',
+    `Can’t post: a sitting holds at most ${String(MAX_SITTING_ROUNDS)} rounds and this one has ` +
+    `${String(rounds)}. Leave the rush to start a new sitting from the building as shipped.`,
   /** Nothing has been played yet. Not a refusal a player can act on wrongly: it names the act. */
   noRounds:
-    'There is no finished round to post yet. Run the rush and play a round out — a sitting is ' +
-    'every round you have played since the building was as shipped.',
+    'No finished round to post yet. Play a round out first.',
   /**
    * **A sitting started with something bought from this device's tally** — [§ D1418](../../../../DECISIONS.md).
    * A device spend is for play on this device, and the server refuses a modifier the account did not
    * buy (`chimes/ledger.ts#unbackedModifiers`), so this one is refused before anything is sent.
    */
   boughtOnDevice:
-    'This sitting cannot be posted: it started with something bought from this device\u2019s chimes, and ' +
-    'a device purchase stays on this device. It is kept here as your best on this device if it is one.',
+    'Can’t post: this sitting started with something bought with this device\u2019s chimes, and a ' +
+    'device purchase stays on this device. It is kept here as your best on this device if it is one.',
 });
 
 /**

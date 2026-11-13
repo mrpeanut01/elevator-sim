@@ -222,7 +222,7 @@ describe.skipIf(!HAS_BROWSER)('the stage calls a pinned day — § D1029', () =>
       /* ---- before the call: both parking presses held, with the reason drawn ---- */
       const before = await parkingHeld(page);
       expect(before.held, 'the parking presses are pressable before the call').toBe(true);
-      expect(before.reason).toContain('held until the stage stops for this day’s call');
+      expect(before.reason).toContain('held until today’s call');
       /*
        * **And the handover is held with them** — § D1029 clause 6, checked for § D1048's new kind.
        * A mid-day handover of the whole dispatcher clears every whole-day press day the week swarm

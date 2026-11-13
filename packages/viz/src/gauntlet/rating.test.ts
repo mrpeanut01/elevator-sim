@@ -139,7 +139,7 @@ describe('what is published beside the number', () => {
 
   it('refuses to let a gap between two rows be read as a measured difference', () => {
     expect(RATING_CAVEAT).toContain('not a measured difference');
-    expect(RATING_CAVEAT).toContain('bench');
+    expect(RATING_CAVEAT).toContain('Test bench');
   });
 
   it('is folded from an observation, so a saturated run still scores', () => {

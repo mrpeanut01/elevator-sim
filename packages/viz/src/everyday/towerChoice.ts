@@ -133,6 +133,10 @@ export interface PressDayChoiceRow {
 
 export interface PressDayChoiceView {
   readonly heading: string;
+  /** The one line the card shows above its rows. */
+  readonly summary: string;
+  /** The link that opens {@link lede} and {@link note}. */
+  readonly howLink: string;
   readonly lede: string;
   readonly note: string;
   readonly rows: readonly PressDayChoiceRow[];
@@ -153,14 +157,12 @@ export interface TowerChoiceView {
 
 export const TOWER_CHOICE_COPY = Object.freeze({
   heading: 'THIS WEEK’S TOWER',
-  lede: 'Your week runs on one building. Pick the one you want to play.',
-  note:
-    'Moving parks the week you are on rather than ending it, so you can come back to it. The day ' +
-    'you have not closed yet stays unclosed on the week you leave.',
+  lede: 'Pick the building your week runs on.',
+  note: 'Switching parks your current week so you can come back to it. A day you haven’t closed stays unclosed.',
   incidentTag: 'a lift goes out mid-shift',
-  standing: 'the week you are playing',
-  resume: 'you have a week going here — this picks it back up',
-  open: 'you have not played here — this opens a fresh week',
+  standing: 'your current week',
+  resume: 'picks your week here back up',
+  open: 'opens a fresh week',
 });
 
 /**
@@ -204,32 +206,31 @@ export const TOWER_CHOICE_COPY = Object.freeze({
  */
 export const PRESS_DAY_CHOICE_COPY = Object.freeze({
   heading: 'DAYS A PRESS DECIDES',
+  /** The one line the card shows; the measured account below sits behind {@link howLink}. */
+  summary: 'A lift goes out on the first day, and the stage stops to ask you for a press.',
+  howLink: 'How these days work',
   /** The lede's two halves either side of the derived window — see {@link pressDayLedeOf}. */
   ledeBefore:
-    'On each of these a lift goes out part-way through the first day, and the stage stops to ' +
+    'On each of these, a lift goes out part-way through the first day and the stage stops to ' +
     'call for a press. Measured on one crowd under the tower’s standing order, that day misses as ' +
-    'built; from the call, one of the two parking presses cleared it and the other did not at every ' +
+    'built. From the call, one of the two parking presses cleared it and the other did not, at every ' +
     'moment tried over the ',
   ledeAfter: ' after it. Which one is for you to find.',
   /** Drawn in place of the lede when no row is admitted — a list with nothing to offer says so. */
   ledeNone:
-    'No tower has a first day that holds for long enough after the stage’s call to be offered here.',
+    'No tower has a first day that holds long enough after the stage’s call to offer here.',
   notAdmitted:
-    'measured on one crowd, the press did not hold for long enough after the stage’s call to be a ' +
-    'day you can play for, so it is not offered',
+    'not offered: measured on one crowd, the press did not hold for long enough after the stage’s call',
   note:
-    'Choosing one moves your week there the way the list above does, sets its first day up on the ' +
-    'crowd it was measured on rather than today’s, and hands the day back to the tower’s standing ' +
-    'order. Choosing a tower from the list above puts your crowd back.',
-  available: 'sets this tower’s first day up on the crowd it was measured on',
-  standing: 'the day you are set up to play',
-  pastFirstDay:
-    'your week here is past its first day, and this is a first day, so it cannot be set up on it',
-  notAsMeasured:
-    'the first day here would not run the way it was measured, so it is not offered',
+    'Choosing one moves your week there, sets up its first day on the crowd it was measured on ' +
+    '(not today’s), and hands the day to the tower’s standing order. Choosing a tower from the ' +
+    'list above puts your crowd back.',
+  available: 'sets up this tower’s first day on the crowd it was measured on',
+  standing: 'the day you’re set up to play',
+  pastFirstDay: 'not available: your week here is past its first day',
+  notAsMeasured: 'not offered: the first day here would not run the way it was measured',
   otherHorizon:
-    'measured on a different length of day from the one this tower plays, so it is not offered ' +
-    'until it is measured on the day you would play',
+    'not offered: it was measured on a different length of day from the one this tower plays',
 });
 
 /** Minutes in words, for a surface that may carry no digit. */
@@ -412,6 +413,8 @@ export function towerChoiceViewOf(input: TowerChoiceInput): TowerChoiceView {
     incidentTag: TOWER_CHOICE_COPY.incidentTag,
     pressDays: {
       heading: PRESS_DAY_CHOICE_COPY.heading,
+      summary: PRESS_DAY_CHOICE_COPY.summary,
+      howLink: PRESS_DAY_CHOICE_COPY.howLink,
       lede: pressDayLedeOf(),
       note: PRESS_DAY_CHOICE_COPY.note,
       rows: Object.freeze(pressRows),

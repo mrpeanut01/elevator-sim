@@ -197,7 +197,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       }));
       expect(back).toEqual({ setup: true, stage: false, primary: 'Start the rush' });
       /* And the row said so before it was pressed. */
-      expect(note).toContain('ends the rush first');
+      expect(note).toContain('Ends the rush first');
     } finally {
       await page.close();
     }
@@ -252,8 +252,8 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
        * *nothing stops* one — is the one drawn on the **result** screen too.
        */
       const note = await page.textContent('.everyday-engineer-swap');
-      expect(note).toContain('ends the rush first');
-      expect(note).not.toContain('nothing stops');
+      expect(note).toContain('Ends the rush first');
+      expect(note).not.toContain('Nothing stops');
 
       await page.locator('.everyday-engineer-swap').click();
       await page.waitForFunction(
@@ -274,7 +274,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       }));
       expect(back.result).toBe(0);
       expect(back.setup).toBe(true);
-      expect(back.swapNote).toContain('nothing stops');
+      expect(back.swapNote).toContain('Nothing stops');
 
       /* And the week the rush parked is back: the door names the address's tower and crowd. */
       await page.locator('.everyday-bar-leave').click();
@@ -505,7 +505,7 @@ describe.skipIf(!HAS_BROWSER)('Endless rush — GitHub issue #220', () => {
       await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
       /* The setup screen says what the purse is for before the first round. */
       const setupLine = await page.locator('.everyday-rush-rebuild-line').textContent();
-      expect(setupLine).toContain('between rounds you can spend it rebuilding the tower');
+      expect(setupLine).toContain('Between rounds you can spend it rebuilding the tower');
       /* No menu before a round has finished: a sitting's first round is the building as shipped. */
       await page.locator('.everyday-bar-primary').click(); // Start the rush
       await page.waitForFunction(

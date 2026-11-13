@@ -124,10 +124,10 @@ describe('a fresh career opens on an intro to the career and to chimes — #536'
     const fresh = towersView(inputOf(openingCareer('collective')));
     expect(fresh.intro?.heading).toBe(CAREER_INTRO_COPY.heading);
     expect(fresh.intro?.paragraphs.join(' ')).toContain('twenty working days');
-    expect(fresh.intro?.paragraphs.join(' ')).toContain('Nothing files a day without you');
+    expect(fresh.intro?.paragraphs.join(' ')).toContain('You run and close each day yourself');
     /* The second slot's standing is read from SLOTS, never typed. */
     expect(fresh.intro?.paragraphs.join(' ')).toContain('the second opens at 14.');
-    expect(fresh.intro?.chimesHeading).toBe('CHIMES');
+    expect(fresh.intro?.chimesHeading).toBe('How chimes work');
     /*
      * § D1382, the post-AN panel's seat D (D9): it read *Chimes are what finishing something pays
      * you* while a cleared Saturday and every practice paid nothing. The Career states Settings' own

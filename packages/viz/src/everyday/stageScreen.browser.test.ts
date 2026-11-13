@@ -1326,7 +1326,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
      */
     expect(await page.locator('.everyday-bar-primary').isDisabled()).toBe(true);
     expect(await page.textContent('.everyday-bar-note')).toBe(
-      'the day is filed — its report is written',
+      'The day is filed.',
     );
     await page.close();
   }, 300_000);

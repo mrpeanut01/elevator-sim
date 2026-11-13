@@ -22,6 +22,11 @@
  * `shift/contracts.ts#statLineOf` is where it is generated) and every unit, day and percentage
  * comes from `campaign/economy.ts`.
  *
+ * **The wording has since been shortened from the prototype's** by the owner's copy edit of
+ * 2026-11-12: a screen says what a player needs in order to act, and an explanation sits behind a
+ * link that opens a popover (`screenDom.ts#explainer`). The rules, the figures and what each one
+ * counts are unchanged; where a sentence below is no longer the handoff's, that edit is why.
+ *
  * ## Nothing here is refused any more, and this section is the record of two that were
  *
  * This header carried two refusals for weeks after both stopped being true, which is GitHub issue
@@ -307,8 +312,7 @@ export function censusVerdictOf(tower: CampaignTower, recording: VizRecording): 
  */
 export const DAY_CENSUS_COPY = Object.freeze({
   allClear:
-    'Measured on this day’s crowd before you run it: every driver on the list clears it with no ' +
-    'press at all.',
+    'Tested on today’s crowd: every dispatcher on the list clears it with no presses.',
   /**
    * **Where the census leads** — wave AR, lane AR-4, GitHub issue #633, [§ D1543](../../../../DECISIONS.md).
    * The bar's note under *Watch a day here* on a day {@link allClear} is drawn: the playtest ran this
@@ -322,7 +326,7 @@ export const DAY_CENSUS_COPY = Object.freeze({
    * end*, only where {@link allClear} is drawn. It restates the census and promises nothing about a
    * call: it says what the measured runs did, not that the day raises none.
    */
-  quietStage: 'A quiet day: every driver on the list clears it with no press. Watch how the cars answer, or skip to the end.',
+  quietStage: 'A quiet day: every dispatcher on the list clears it with no presses. Watch, or skip to the end.',
 } as const);
 
 /**
@@ -370,7 +374,7 @@ export interface FiledDayRecord {
 export const UNFINISHED = PENDING_DISPLAY;
 
 /** A building the campaign holds but this build could not resolve — named, never blanked. */
-const UNKNOWN_BUILDING: BuildingFacts = Object.freeze({ name: 'a building this build does not ship', spec: undefined });
+const UNKNOWN_BUILDING: BuildingFacts = Object.freeze({ name: 'an unknown building', spec: undefined });
 
 function factsFor(input: CampaignInput, tower: CampaignTower): BuildingFacts {
   return input.buildings.get(tower.buildingId) ?? UNKNOWN_BUILDING;
@@ -463,9 +467,8 @@ function contractDayLabelOf(tower: CampaignTower): string {
  * subject onto it would put two arguments in one sentence for the next lane to separate again.
  */
 export const CONTRACT_ASKS_DECIDES =
-  'These four are the contract’s: they file a day cleared or missed against it, and the day’s report ' +
-  'is graded on them. The stage also shows the week’s five, under WHAT TODAY ASKS, and the contract ' +
-  'counts none of those.';
+  'These four decide if the day is cleared or missed, and the day’s report is graded on them. The ' +
+  'week’s five, under WHAT TODAY ASKS on the stage, don’t count toward the contract.';
 
 /**
  * **All four** of § 8.6's tests, as `ShiftGoal`s.
@@ -541,16 +544,16 @@ export function campaignTestGoals(difficulty: Difficulty): readonly ShiftGoal[] 
  * the control.
  */
 export const BUILD_REFUSAL =
-  'kept for your own records — the day is built from what this building has actually had fitted, so picking a shape here changes nothing about how the lifts run. Buying the shape on the contract sheet is what changes that.';
+  'For your notes only. Buy a shape on the contract sheet to change the lifts.';
 
 /** § 8.6's tension sentence for each test — the prototype's own, in its order. */
 export const TEST_TENSIONS: Readonly<Record<string, string>> = Object.freeze({
-  away: 'Rewards sending a car the moment anyone presses. Fuller cars and fewer trips both work against it.',
+  away: 'Rewards sending a car the moment anyone presses. Fuller cars and fewer trips work against it.',
   worst:
-    'This is the one that fails when you optimise the average. One forgotten landing breaks it on an otherwise good day.',
+    'Fails when you chase the average. One forgotten landing breaks it on an otherwise good day.',
   queue:
-    'Wants a car parked downstairs, which is exactly the car the upper floors were waiting for.',
-  trips: 'A wear budget, not a score. It punishes running half-empty cars up and down to look responsive.',
+    'Wants a car parked downstairs, which is the car the upper floors were waiting for.',
+  trips: 'A wear budget, not a score. Running half-empty cars up and down uses it up.',
 });
 
 /** One test row. `reading` is `undefined` before any run today. */
@@ -686,18 +689,16 @@ export function testsHeldLine(rows: readonly CampaignTestRow[]): string {
 /** The authored chrome of the triage screen, one frozen object so the sweep renders every line. */
 export const TOWERS_COPY = Object.freeze({
   title: 'Career',
-  lede:
-    'You are the supervisor, not the operator. Each building runs on the standing order you gave it ' +
-    'and maintenance gets on with the rest — you hear from them when a lift fails, a crowd is booked, ' +
-    'or a tenant moves in. Open the ones asking for a decision; leave the rest alone.',
+  lede: 'Open the buildings that need a decision. The rest run on your standing orders.',
   standingHeading: 'STANDING',
-  calendarHeading: 'YOUR SCHEDULE, ROLLING',
-  tableHeadings: Object.freeze(['BUILDING', 'MONTH', 'STANDING ORDER', 'BUILD', 'WANTS YOU FOR']),
-  quietStatus: 'Nothing — it is running itself',
+  calendarHeading: 'SCHEDULE',
+  /* Four headings over five columns: the last column is the row's button and needs none. */
+  tableHeadings: Object.freeze(['BUILDING', 'MONTH', 'STANDING ORDER', 'NEEDS YOU FOR']),
+  quietStatus: 'Nothing today',
   quietCta: 'Look in',
   openCta: 'Open',
   renewCta: 'Renew',
-  offersHeading: 'ON THE TABLE',
+  offersHeading: 'OFFERS',
   /*
    * § 8.8's offers — GitHub issue #169 item 3, § D510. The refusal that stood here (*"no offers
    * here yet — a building is offered on a complexity and a fee, and taking one moves a week between
@@ -707,9 +708,9 @@ export const TOWERS_COPY = Object.freeze({
    */
   offersTake: 'Take it',
   offersNotYet: 'Not yet',
-  offersNone: 'Every building the agency offers is one you already hold.',
-  offersNoSlot: 'No free slot — {n} more standing opens the next one.',
-  offersAtRisk: 'A tower is one miss from ending. Fix that before adding another.',
+  offersNone: 'You hold every building on offer.',
+  offersNoSlot: 'No free slot. {n} more standing opens the next one.',
+  offersAtRisk: 'A building is one miss from losing its contract. Steady it before adding another.',
   /* `offersUnpriced` (*complexity unpublished — not offered until somebody measures one*) left on
      the commit that priced the last two buildings — GitHub issue #169 item 4, § D519, § D227. */
   /*
@@ -717,11 +718,11 @@ export const TOWERS_COPY = Object.freeze({
    * read *taking it starts a fresh week on this building; the week you are on is parked, not lost*,
    * and the take moved the Scenario week to the offered building.
    */
-  offersKeepsWeek: 'taking it adds the building to your career on a month of its own; your Scenario week stays where you left it',
-  incidentsHeading: 'WHAT HAS HAPPENED LATELY',
-  incidentsSub: 'none of it was your doing',
-  incidentsRefusal:
-    'nothing to report — this build draws no feed, because every entry in one would be an event it did not simulate',
+  offersKeepsWeek: 'Taking an offer adds the building on a month of its own. Your Scenario week stays as it is.',
+  /* One line: the heading and the sub are drawn together, then the refusal. */
+  incidentsHeading: 'LATELY',
+  incidentsSub: 'at your buildings',
+  incidentsRefusal: 'Nothing to report. There is no news feed in this game.',
   /**
    * § 8.11's footnote, **reworded from the design file's own sentence and stated as a frequency**.
    *
@@ -734,10 +735,12 @@ export const TOWERS_COPY = Object.freeze({
    * rather than to a preference.
    */
   oddsFootnote:
-    'Failures come from the building, not from your performance — but the rate is not flat: every ' +
-    'trip since the last service window raises how often one falls, so a tower you have run hard hands ' +
-    'you more of them. A tower you have never mismanaged can still hand you a bad week — which is ' +
-    'why a spare slot is worth more than a spare unit.',
+    'Lifts fail because of the building, not because of how you play. Every trip since the last ' +
+    'service window raises how often one fails, so a building you run hard fails more often. A ' +
+    'building you have run well can still have a bad week, which is why a spare slot is worth more ' +
+    'than a spare unit.',
+  /** The link over {@link oddsFootnote}, which is drawn in a popover rather than in the page. */
+  oddsLink: 'Why lifts fail',
   /*
    * **`absencesHeading` left this copy table on the merge that closed GitHub issue #207.**
    *
@@ -753,8 +756,9 @@ export const TOWERS_COPY = Object.freeze({
  * understand description of what the campaign is"*, and its chimes ask, *"from the start, the idea
  * of Chimes needs to be explained"*. Wave AN lane AP-3, [§ D1301](../../../../DECISIONS.md).
  *
- * Drawn on the triage screen while the career is fresh (career day 1, nothing filed), which is the
- * screen a new career opens on (`everyday/modes.ts`). Every clause is a rule this build enforces,
+ * Drawn on the triage screen (`everyday/modes.ts` opens a new career there) behind two links,
+ * *How a career works* and *How chimes work*, that open popovers: as a row of their own while the
+ * career is fresh (career day 1, nothing filed), and beside the title after that. Every clause is a rule this build enforces,
  * and each one names where: twenty days is `economy.ts#CONTRACT_DAYS`; *nothing files a day without
  * you* is `career.ts#CAMPAIGN_ABSENCES`' first entry and § D716's ruling on the tower cards below;
  * the four tests and the unread day are {@link BUILDING_COPY.testsNote}; two for a cleared day and
@@ -770,29 +774,29 @@ export const TOWERS_COPY = Object.freeze({
  * Settings panel's own lede, so the two places a player meets chimes open the same way.
  */
 export const CAREER_INTRO_COPY = Object.freeze({
-  heading: 'HOW A CAREER WORKS',
+  /* The two headings are the links' words and their popovers' titles: nothing here is in the page flow. */
+  heading: 'How a career works',
   contracts:
-    'You run buildings on contracts. A contract is one building for twenty working days, and each ' +
-    'day is one you run, watch and close yourself. Nothing files a day without you.',
+    'A contract is one building for twenty working days. You run and close each day yourself.',
   clearing:
-    'A day clears when the building meets the contract’s four tests, and a day the run could not ' +
-    'read is not filed at all. A cleared day pays the contract’s fee into that building’s own ' +
-    'purse, and the purse buys that building its kit, fitted on nights you book.',
+    'A day clears when the building passes the contract’s four tests. A cleared day pays the ' +
+    'contract’s fee into that building’s purse, and the purse buys that building its kit.',
   missing:
     'A missed day pays nothing and costs three standing. Miss more days than the contract allows ' +
-    'and the contract is lost; lose three contracts and the career ends.',
+    'and you lose it. Lose three contracts and the career ends.',
   /** `{n}` is `SLOTS[1].standing`, substituted by {@link careerIntroOf}. */
-  standing:
-    'Standing is two for every cleared day, less three for every missed one. It opens slots, which ' +
-    'is how you come to hold more than one building: the second opens at {n}.',
-  chimesHeading: 'CHIMES',
+  standing: 'Standing opens slots for more buildings: the second opens at {n}.',
+  chimesHeading: 'How chimes work',
   /* § D1382: the one rule Settings states too, then what it means on a contract. */
   chimesEarn: `${CHIMES_EARN_RULE} Here, each day the contract pays for earns some.`,
   chimesSpend:
-    'You can spend them from Settings to top up the purse of the building your desk is open on. ' +
-    'Signed out, that comes from the chimes on this device and stays with this device\u2019s career. ' +
-    'They never open a slot and never buy back a missed day: standing opens slots, and a missed day ' +
-    'stays missed.',
+    'Spend them in Settings to top up the purse of the building you have open. Signed out, they ' +
+    'come from this device and stay with this device’s career. They never open a slot and ' +
+    'never buy back a missed day.',
+  /** The standing rule, behind its own link beside the standing figure (`economy.ts#standingOf`). */
+  standingHeading: 'How standing works',
+  standingRule: 'A cleared day adds 2 standing. A missed day takes away 3.',
+  standingSlots: 'Standing opens slots, and each slot lets you hold one more building.',
 } as const);
 
 export interface CareerIntroView {
@@ -802,9 +806,8 @@ export interface CareerIntroView {
   readonly chimes: readonly string[];
 }
 
-/** The intro, or `undefined` once the career has filed a day — see {@link CAREER_INTRO_COPY}. */
-export function careerIntroOf(career: CampaignCareer): CareerIntroView | undefined {
-  if (career.today !== 1) return undefined;
+/** The career and chimes rules, whatever the career day. {@link careerIntroOf} and {@link careerHelpOf} both read it. */
+function careerRulesOf(): CareerIntroView {
   const second = SLOTS[1]?.standing;
   return {
     heading: CAREER_INTRO_COPY.heading,
@@ -820,6 +823,47 @@ export function careerIntroOf(career: CampaignCareer): CareerIntroView | undefin
 }
 
 /**
+ * The intro, or `undefined` once the career has filed a day — see {@link CAREER_INTRO_COPY}.
+ *
+ * Its words are behind two links now ({@link careerHelpOf}), which every career day draws. What this
+ * still decides is where: a fresh career draws them as a row of their own under the lede, and a
+ * career that has filed a day draws them beside the title.
+ */
+export function careerIntroOf(career: CampaignCareer): CareerIntroView | undefined {
+  if (career.today !== 1) return undefined;
+  return careerRulesOf();
+}
+
+/** One explanation behind a link: the link's words, which are also the popover's title, and its paragraphs. */
+export interface CareerHelpView {
+  readonly link: string;
+  readonly body: readonly string[];
+}
+
+/**
+ * **The triage screen's four explanations**, each drawn as a link that opens a popover
+ * (`screenDom.ts#explainer`) rather than as paragraphs in the page. Module-private, so its words are
+ * {@link towersView}'s: `campaignScreens.ts#mountTowers` draws them from `view.help`.
+ */
+function careerHelpOf(): {
+  readonly career: CareerHelpView;
+  readonly chimes: CareerHelpView;
+  readonly standing: CareerHelpView;
+  readonly failures: CareerHelpView;
+} {
+  const rules = careerRulesOf();
+  return {
+    career: { link: rules.heading, body: rules.paragraphs },
+    chimes: { link: rules.chimesHeading, body: rules.chimes },
+    standing: {
+      link: CAREER_INTRO_COPY.standingHeading,
+      body: [CAREER_INTRO_COPY.standingRule, CAREER_INTRO_COPY.standingSlots],
+    },
+    failures: { link: TOWERS_COPY.oddsLink, body: [TOWERS_COPY.oddsFootnote] },
+  };
+}
+
+/**
  * **The tower cards' chrome** — GitHub issue #536's *"graphics to depict buildings under contract
  * with status colors. They automatically run while on this screen"*, in the one form
  * [§ D716](../../../../DECISIONS.md) permits: a presentation control over a recording the day
@@ -827,16 +871,11 @@ export function careerIntroOf(career: CampaignCareer): CareerIntroView | undefin
  * ([§ D1301](../../../../DECISIONS.md)).
  */
 export const TOWER_CARD_COPY = Object.freeze({
-  heading: 'YOUR BUILDINGS',
-  sub:
-    'Each card plays the last day its building filed, over and over, coloured by the longest wait ' +
-    'anybody stood that day. Watching a card files nothing and changes nothing; only closing a day ' +
-    'does that.',
+  heading: 'LAST DAY, REPLAYED',
+  sub: 'Colour shows the longest wait that day.',
   /** No filed day this sitting. The career persists and its mornings do not. */
-  nothingFiled:
-    'No day filed here since this page opened, so there is nothing to play yet. Close a day and it ' +
-    'plays here.',
-  nobodyCame: 'Nobody arrived that day, so it has no colour.',
+  nothingFiled: 'Close a day to see it replay here.',
+  nobodyCame: 'No colour: nobody arrived that day.',
   open: 'Open',
 } as const);
 
@@ -937,7 +976,7 @@ export const CALENDAR_LEGEND: readonly { readonly glyph: string; readonly label:
        and half the shipped bookings take a car rather than bring people. */
     Object.freeze({ glyph: '⚑', label: 'booked day' }),
     Object.freeze({ glyph: '▢', label: 'today' }),
-    Object.freeze({ glyph: '', label: 'blank = not yours yet, or the contract has finished' }),
+    Object.freeze({ glyph: '', label: 'blank = no contract that day' }),
   ]);
 
 /** The glyph for a mark. One table, so the grid and the legend cannot drift. */
@@ -1039,6 +1078,8 @@ export interface TowersView {
   readonly offers: OffersView;
   /** {@link careerIntroOf} — present on a fresh career only. */
   readonly intro: CareerIntroView | undefined;
+  /** {@link careerHelpOf} — the four explanations behind links, on every career day. */
+  readonly help: ReturnType<typeof careerHelpOf>;
   /** One {@link TowerCardView} per tower held, in the table's order. */
   readonly cards: { readonly heading: string; readonly sub: string; readonly rows: readonly TowerCardView[] };
   readonly lately: { readonly heading: string; readonly sub: string; readonly refusal: string };
@@ -1108,7 +1149,7 @@ export function offersView(career: CampaignCareer, buildingNameOf: (id: string) 
   }
   return {
     heading: TOWERS_COPY.offersHeading,
-    caption: `${String(rows.length)} ${rows.length === 1 ? 'offer' : 'offers'}`,
+    caption: `${String(rows.length)} ${rows.length === 1 ? 'building' : 'buildings'}`,
     rows,
     empty: rows.length === 0 ? TOWERS_COPY.offersNone : undefined,
     note: TOWERS_COPY.offersKeepsWeek,
@@ -1132,13 +1173,13 @@ export function careerStageLabel(today: number): string {
 function standingNote(standing: number, open: number, atRisk: number): string {
   const next = nextSlot(standing);
   if (next === undefined) {
-    return 'Every slot open. Nothing left to unlock — only buildings left to keep.';
+    return 'Every slot is open.';
   }
   if (atRisk > 0) {
-    const towers = atRisk > 1 ? 'towers are' : 'tower is';
+    const towers = atRisk > 1 ? 'buildings are' : 'building is';
     return `Slot ${String(open + 1)} is paid for, but ${String(atRisk)} ${towers} one miss from ending. Steady those first.`;
   }
-  return `${String(next.standing - standing)} more to open slot ${String(open + 1)} · a cleared day is worth 2, a missed one costs 3`;
+  return `${String(next.standing - standing)} more to open slot ${String(open + 1)} · cleared day +2, missed day −3`;
 }
 
 /** The status of a quiet tower's contract — § 8.1's `statusSub`, derived from the allowance. */
@@ -1177,11 +1218,11 @@ function standingOrderView(input: CampaignInput, tower: CampaignTower): Standing
      */
     note:
       picked === undefined
-        ? 'nobody is assigned — pick who drives this building every day'
+        ? 'Pick a dispatcher to drive this building every day.'
         : (picked.note ??
           (picked.saved
-            ? 'one of yours — the workshop knows what it does'
-            : 'no one-line trade ships with this style yet — what it does is its weights, and the workshop is where they are readable')),
+            ? 'One of yours, from the Dispatcher workshop.'
+            : 'No summary yet. Its weights are in the Dispatcher workshop.')),
   };
 }
 
@@ -1220,7 +1261,7 @@ export function calendarView(input: CampaignInput): CalendarView {
   const from = calendarFrom(today);
   return {
     heading: TOWERS_COPY.calendarHeading,
-    note: `working days ${String(from)}–${String(from + CALENDAR_SPAN - 1)} · contracts renew, expire and appear as you go, each twenty days from wherever it starts`,
+    note: `working days ${String(from)}–${String(from + CALENDAR_SPAN - 1)} · each contract runs twenty days from its start`,
     columns,
     rows: input.career.towers.map((tower): CalendarRowView => {
       const facts = factsFor(input, tower);
@@ -1250,8 +1291,8 @@ export function calendarView(input: CampaignInput): CalendarView {
           mark: cell.mark,
           tip:
             cell.towerDay === undefined
-              ? `${facts.name} · not yours on working day ${String(cell.careerDay)}`
-              : `${facts.name} · its day ${String(cell.towerDay)} of ${String(CONTRACT_DAYS)}${tipSuffix(cell.mark, bookedNameFor(tower.id, cell.towerDay))}`,
+              ? `${facts.name} · no contract on working day ${String(cell.careerDay)}`
+              : `${facts.name} · day ${String(cell.towerDay)} of ${String(CONTRACT_DAYS)}${tipSuffix(cell.mark, bookedNameFor(tower.id, cell.towerDay))}`,
         })),
       };
     }),
@@ -1292,9 +1333,9 @@ function tipSuffix(mark: CalendarCell['mark'], booked?: string): string {
     case 'today':
       return ' · today';
     case 'due':
-      return ' · a decision is due';
+      return ' · decision due';
     case 'works':
-      return ' · works are booked, one car out for the day';
+      return ' · works booked, one car out for the day';
     case 'flagged':
       /*
        * **The event's own name, not a category** — GitHub issue #564. Every contract books
@@ -1353,12 +1394,12 @@ export function towersView(input: CampaignInput): TowersView {
       {
         value: `day ${String(career.today)}`,
         label: 'of your career',
-        note: 'contracts start and end around you — nothing resets',
+        note: 'It never resets.',
       },
       {
         value: String(career.monthsWorked),
         label: 'months worked',
-        note: 'across every building you have held',
+        note: 'across all your buildings',
       },
       {
         value: String(standing),
@@ -1374,7 +1415,7 @@ export function towersView(input: CampaignInput): TowersView {
       {
         value: `${String(dueService)} of ${String(held)}`,
         label: 'due a service window',
-        note: 'machines are counted in trips, not days',
+        note: 'Wear counts trips, not days.',
       },
       {
         value: `${String(career.lost)} of 3`,
@@ -1385,18 +1426,19 @@ export function towersView(input: CampaignInput): TowersView {
          * still on the screen is included before anybody clears it away.
          */
         note: careerIsOver(career)
-          ? 'the agency has stopped calling'
+          ? 'The career is over.'
           : career.lost >= 2
-            ? 'one more and the agency stops calling'
-            : 'lose three and the career ends',
+            ? 'One more ends the career.'
+            : 'Three ends the career.',
       },
     ],
     calendar: calendarView(input),
     headings: TOWERS_COPY.tableHeadings,
     rows: career.towers.map((tower) => towerRowView(input, tower)),
-    footer: `${String(wanting)} of ${String(held)} buildings want a decision · the rest need nothing from you today`,
+    footer: `${String(wanting)} of ${String(held)} buildings want a decision`,
     offers: offersView(career, (id) => input.buildings.get(id)?.name),
     intro: careerIntroOf(career),
+    help: careerHelpOf(),
     cards: {
       heading: TOWER_CARD_COPY.heading,
       sub: TOWER_CARD_COPY.sub,
@@ -1416,34 +1458,28 @@ export function towersView(input: CampaignInput): TowersView {
  * -------------------------------------------------------------------------- */
 
 export const BUILDING_COPY = Object.freeze({
-  incidentEyebrow: 'THEY NEED A DECISION',
-  optionsEyebrow: 'WHAT DO YOU WANT DONE',
-  optionsNote: 'maintenance can handle any of it — they need you to choose',
-  optionsNoteRenewal: 'a finished contract frees its slot — that is how you move up',
+  incidentEyebrow: 'NEEDS A DECISION',
+  optionsEyebrow: 'YOUR OPTIONS',
+  optionsNote: 'Pick one. Maintenance does the rest.',
+  optionsNoteRenewal: 'A finished contract frees its slot.',
   /* § D1392: the desk's note over a lost contract's one answer. */
-  optionsNoteLost: 'a lost contract counts toward the three that end the career',
+  optionsNoteLost: 'A lost contract counts toward the three that end the career.',
   quietHeading: 'Running itself',
-  quietBody:
-    'Your standing order is holding and nothing is booked. Maintenance will carry on without you, and ' +
-    'you will hear from them when something changes.',
-  orderHeading: 'DISPATCHER STANDING ORDER',
-  orderSub: 'What this building does every day without asking you.',
-  orderDrives: 'DRIVES EVERY DAY',
+  quietBody: 'Nothing needs you today.',
+  orderHeading: 'STANDING ORDER',
+  orderSub: 'What this building does every day.',
+  orderDrives: 'DISPATCHER',
   buildingHeading: 'BUILDING',
-  fittedHeading: 'WHAT IS INSTALLED',
-  purseHeading: "THIS BUILDING'S PURSE",
-  purseNote:
-    'Each building keeps its own purse, fed by its daily fee. Kit is fitted on nights you book, and it ' +
-    'belongs to the building — hand the contract back and it stays behind.',
-  purseLink: 'Buy and book the nights in the contract →',
-  quirkHeading: "THE BUILDING'S HABIT",
-  quirkSub: 'the thing that will catch you out',
+  fittedHeading: 'INSTALLED',
+  purseHeading: 'PURSE',
+  purseNote: 'This building’s own, fed by its daily fee. Kit you buy stays with the building.',
+  purseLink: 'Buy kit on the contract sheet',
+  quirkHeading: 'THIS BUILDING’S HABIT',
+  quirkSub: 'Watch out for this.',
   conditionHeading: 'CONDITION',
   oddsHeading: 'HOW OFTEN A LIFT FAILS',
   temporaryHeading: 'TEMPORARY CHANGES',
-  temporaryEmpty:
-    'Nothing temporary in place. Anything you set for an incident reverts on its own when the incident ' +
-    'closes, so a bad week cannot quietly become your standing order.',
+  temporaryEmpty: 'None. Anything you set for an incident reverts when the incident closes.',
   monthHeading: 'THIS MONTH',
   /*
    * **This read *"all four, or the day is missed"* when the fourth graded nothing**, and it is left
@@ -1458,16 +1494,16 @@ export const BUILDING_COPY = Object.freeze({
    * have, which is the defect this line was rewritten for.
    */
   testsNote:
-    'every one this run can read, or the day is missed — and a day it could not read is not filed at all',
+    'Pass every test the day can be read on, or the day is missed. A day that can’t be read isn’t filed.',
+  /** The link over {@link testsNote} and each test's tension, drawn in a popover beside the tests. */
+  testsHelpLink: 'How a day clears',
   asBuilt: 'as built',
   /**
    * The badge and the sentence over today's works — GitHub issue #353. Not first-person about the
    * car and not a count of peaks: one car, today, back when the nights are done.
    */
   worksBadge: 'UNDER WORKS',
-  worksToday:
-    'Works are on today, so one car is out of service for the whole day. It comes back the day ' +
-    'the kit goes live; the building you run today is a car short.',
+  worksToday: 'Works today: one car is out all day. It’s back the day the kit goes live.',
 } as const);
 
 /** § 8.3's three wear heads, in the design file's own words. */
@@ -1567,6 +1603,8 @@ export interface BuildingView {
     /** {@link CONTRACT_ASKS_DECIDES} — which of the career flow's two goal sets this is. */
     readonly decides: string;
     readonly note: string;
+    /** {@link BUILDING_COPY.testsHelpLink} — the link over the note and the tensions. */
+    readonly helpLink: string;
     readonly held: string;
     readonly rows: readonly CampaignTestRow[];
   };
@@ -1582,12 +1620,12 @@ function wearNote(tower: CampaignTower): string {
   const left = serviceDaysLeft(tower);
   const head = wearHeadOf(tower);
   if (head === 'due') {
-    return `Roughly ${String(left)} working days before the machines are due. Maintenance will take one lift a night for three nights — better to book it in a quiet week than have it fall due during a rush.`;
+    return `Roughly ${String(left)} working days before service is due. It takes one lift a night for three nights, so book it in a quiet week.`;
   }
   if (head === 'wearing') {
-    return `About ${String(left)} working days of trips before the next window. Faster doors and fuller cars both slow this clock down.`;
+    return `About ${String(left)} working days of trips before the next service window. Faster doors and fuller cars both slow this down.`;
   }
-  return `About ${String(left)} working days of trips before the next window. Recently serviced, so a failure would be genuine bad luck rather than something you let build up.`;
+  return `About ${String(left)} working days of trips before the next service window.`;
 }
 
 /**
@@ -1596,9 +1634,9 @@ function wearNote(tower: CampaignTower): string {
  */
 function failureRateNote(tower: CampaignTower): string {
   if (wearHeadOf(tower) === 'due') {
-    return `Past the window this climbs fast, against ${FRESH_RATE_TEXT} on freshly serviced machines.`;
+    return `Past the service window this climbs fast. Freshly serviced machines fail on ${FRESH_RATE_TEXT}.`;
   }
-  return `Every trip adds to this. Booking the service window takes it back to ${FRESH_RATE_TEXT}.`;
+  return `Every trip adds to this. A service window takes it back to ${FRESH_RATE_TEXT}.`;
 }
 
 /** § 8.3's `freshOdds`, worded once — the figure is `economy.ts`'s and this is its sentence. */
@@ -1663,7 +1701,7 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
                 : {
                     rate: units(offer.offered),
                     head: renewalRateHeadOf(offer.offered, offer.wasRate),
-                    why: `${recordLine(tower)}. A harder building pays more because it will cost you more days; a record like yours moves the rate by ${offer.bonus >= 0 ? '+' : ''}${String(offer.bonus)}.`,
+                    why: `${recordLine(tower)}. A harder building pays more. Your record moves the rate by ${offer.bonus >= 0 ? '+' : ''}${String(offer.bonus)}.`,
                   },
           },
     options:
@@ -1769,6 +1807,7 @@ export function buildingView(input: CampaignInput): BuildingView | undefined {
       eyebrow: contractAsksEyebrow(tower.day),
       decides: CONTRACT_ASKS_DECIDES,
       note: BUILDING_COPY.testsNote,
+      helpLink: BUILDING_COPY.testsHelpLink,
       held: testsHeldLine(rows),
       rows,
     },
@@ -1801,7 +1840,7 @@ export const CONTRACT_COPY = Object.freeze({
    * 20 has closed, so the day it holds back is the next month's first and the sentence says so.
    */
   renewalFirst:
-    'day 20 has closed and the contract is up for renewal, so the next month’s day 1 runs only once it is answered on the building’s desk',
+    'Day 20 has closed. Answer the renewal on the building’s desk before the next month’s day 1 runs.',
   /*
    * *"Only part of the shop"* read *"about a third of the shop"* until § D1312 priced a shaft per
    * shaft at its bank's band, which made the shop's worth the tower's own. The fraction was then
@@ -1809,19 +1848,20 @@ export const CONTRACT_COPY = Object.freeze({
    * figures, and `campaign/shaftPlan.test.ts` holds this sentence against every difficulty on every
    * contract tower.
    */
-  lede:
-    'One building for twenty days. You are paid for each day you clear, more as the month goes on, and ' +
-    'you spend it on the tower itself. A perfect month buys only part of the shop, so the month is ' +
-    'really a question about what this building will never get.',
-  difficultyEyebrow: 'HOW HARD',
+  lede: 'You’re paid for each day you clear. A perfect month buys only part of the shop.',
+  difficultyEyebrow: 'DIFFICULTY',
   difficultyFooter: 'Changing this starts a fresh month.',
-  monthHeading: 'THE MONTH',
-  purseHeading: 'THE PURSE',
+  monthHeading: 'MONTH',
+  purseHeading: 'PURSE',
   oddsHeading: 'HOW OFTEN A LIFT FAILS',
-  purseCarryNote: 'carries into next month — what it does not spend here, it keeps.',
+  purseCarryNote: 'Unspent units carry into next month.',
   purseKitNote:
-    'Kit belongs to the building, so a contract you lose takes it with it — and a tower left as built ' +
+    'Kit belongs to the building, so a contract you lose takes it with it. A building left as built ' +
     'starts missing days on its own, while one in good condition renews on better terms.',
+  /** The link over the carry and kit notes, drawn in a popover on the purse card. */
+  purseHelpLink: 'How the purse works',
+  /** The link that opens the contract document, drawn in a popover on the terms card. */
+  documentLink: 'Read the contract',
   /*
    * **The second half used to say *"The lift is out for the peak on each of those days"*, and it was
    * not true of any run — GitHub issue #264.** See {@link tipSuffix} for the mechanism and for why
@@ -1829,10 +1869,10 @@ export const CONTRACT_COPY = Object.freeze({
    * carry, which is time: the nights are spoken for and the kit is not live until they are done.
    */
   shopSub:
-    'Pick a level, then pick the nights it goes in on the month above. Those nights are spoken for — ' +
-    'nothing else can go in on them, and the kit is live the day after the last.',
-  termsHeading: 'What clears the week',
-  shaftHeading: 'The shaft decision',
+    'Pick a level, then pick its nights on the month above. Nothing else can go in on those nights, ' +
+    'and the kit is live the day after the last.',
+  termsHeading: 'This month so far',
+  shaftHeading: 'Adding a shaft',
   /*
    * *"You hand back two cars for eight days you still have to clear"* went the same way and for the
    * same reason (issue #264). It was the most expensive instance of the claim rather than the most
@@ -1854,16 +1894,16 @@ export const CONTRACT_COPY = Object.freeze({
    * drops *"which is what pays for"*, a value no run measured.
    */
   /** The shaft card where the shop sells no shaft — {@link SHOP_NO_SHAFT}'s tower, § D1312. */
-  shaftNotSold: 'The shop sells no shaft here, because every bank mixes kinds of car.',
-  shaftNotSold2: 'The cars it was built with are the cars it keeps, so the month is spent on what they do.',
+  shaftNotSold: 'No shaft is sold here, because every bank mixes kinds of car.',
+  shaftNotSold2: 'This building keeps the cars it was built with.',
   shaftBody2:
     'The alternative is four cheap things that each shave a second. They will out-perform the shaft this ' +
-    'month and leave the building exactly as short as it was.',
+    'month and leave the building as short as it was.',
   testsConflict:
-    'The queue cap and the wear budget cannot both be satisfied by driving harder — one wants more trips, ' +
-    'the other fewer. That is the day’s actual puzzle: the only things that move both are grouping people ' +
-    'by destination, bigger cars, and starting the crowd later.',
-  cancel: 'cancel',
+    'The queue cap wants more trips and the wear budget wants fewer, so driving harder can’t satisfy ' +
+    'both. Only three things move both: grouping people by destination, bigger cars, and starting the ' +
+    'crowd later.',
+  cancel: 'Cancel',
 } as const);
 
 /** § 8.3's month-grid legend. The `⚒` entry says *booked*, never *a car out* — issue #264. */
@@ -1943,12 +1983,16 @@ export interface ContractView {
     readonly totalNote: string;
     readonly carryNote: string;
     readonly kitNote: string;
+    /** {@link CONTRACT_COPY.purseHelpLink} — the link over the carry and kit notes. */
+    readonly helpLink: string;
   };
   readonly tests: {
     readonly eyebrow: string;
     /** {@link CONTRACT_ASKS_DECIDES} — which of the career flow's two goal sets this is. */
     readonly decides: string;
     readonly note: string;
+    /** {@link BUILDING_COPY.testsHelpLink} — the link over the note, the tensions and the conflict. */
+    readonly helpLink: string;
     readonly held: string;
     readonly rows: readonly CampaignTestRow[];
     readonly conflict: string;
@@ -2004,6 +2048,8 @@ export interface ContractClauseView {
 }
 
 export interface ContractDocumentView {
+  /** {@link CONTRACT_COPY.documentLink} — the link that opens the document in a popover. */
+  readonly link: string;
   readonly title: string;
   readonly parties: string;
   readonly clauses: readonly ContractClauseView[];
@@ -2056,29 +2102,30 @@ export function contractDocumentOf(
    * enforced, and a desk at 4 of 3 offered a renewal under this clause.
    */
   const lostMeans =
-    'A lost contract runs no more of its days and is offered no renewal; the month can be started again from day 1, which counts the loss.';
+    'A lost contract runs no more of its days and is offered no renewal. You can start the month again from day 1, which counts the loss.';
   return {
+    link: CONTRACT_COPY.documentLink,
     title: 'SERVICE CONTRACT',
     parties: `Between the managing agent of ${buildingName} and you, on ${difficulty.name} terms.`,
     clauses: [
       {
         number: '1',
         heading: 'Term',
-        body: `${buildingName}, for ${String(CONTRACT_DAYS)} working days. You run each day yourself, and a day counts only when you close it.`,
+        body: `${buildingName}, for ${String(CONTRACT_DAYS)} working days. A day counts only when you close it.`,
         levels: undefined,
         basisNote: undefined,
       },
       {
         number: '2',
         heading: 'Service levels',
-        body: 'On every day of the term the building is to meet all four, over the whole day:',
+        body: 'Every day, the building must meet all four, over the whole day:',
         levels,
-        basisNote: `These levels are the game’s own for ${difficulty.name}, and harder settings ask more. None is taken from a study of how long people will wait for a lift.`,
+        basisNote: `These levels are the game’s own for ${difficulty.name}. None is taken from a study of how long people will wait for a lift.`,
       },
       {
         number: '3',
         heading: 'Payment',
-        body: `Each cleared day pays ${String(w1)}, ${String(w2)}, ${String(w3)} or ${String(w4)} units into this building’s purse, in weeks one to four. The purse is this building’s alone and buys its kit.`,
+        body: `Each cleared day pays ${String(w1)}, ${String(w2)}, ${String(w3)} or ${String(w4)} units into this building’s purse, in weeks one to four.`,
         levels: undefined,
         basisNote: undefined,
       },
@@ -2092,14 +2139,14 @@ export function contractDocumentOf(
       {
         number: '5',
         heading: 'Days that cannot be read',
-        body: 'A day the run could not read, because too few people came or the longest wait belongs to somebody still waiting, is not filed. It pays nothing and costs nothing.',
+        body: 'If too few people came, or the longest wait belongs to somebody still waiting, the day can’t be read and isn’t filed. It pays nothing and costs nothing.',
         levels: undefined,
         basisNote: undefined,
       },
       {
         number: '6',
         heading: 'Renewal',
-        body: 'When day 20 closes the agent offers a renewal, priced from the building and your record on it. You may sign it, ask for more, renew with a refurbishment, or hand the building back. All twenty days are played first, and the next month’s first day does not run until you answer.',
+        body: 'When day 20 closes, the agent offers a renewal priced from the building and your record on it. You can sign it, ask for more, renew with a refurbishment, or hand the building back. The next month’s first day doesn’t run until you answer.',
         levels: undefined,
         basisNote: undefined,
       },
@@ -2267,7 +2314,7 @@ export function renewalRateHeadOf(offered: number, was: number): string {
       : offered < was
         ? `down from ${String(was)}`
         : 'the same as this month';
-  return `a day, ${against} — their offer, not yours to set`;
+  return `a day, ${against} · the agent’s offer`;
 }
 
 /**
@@ -2284,7 +2331,7 @@ export function perfectMonthLineOf(difficulty: Difficulty, carried: number, shop
   return (
     `A perfect month pays ${String(paid)} units, ${rateList} a cleared day across its four weeks; with the ` +
     `${String(carried)} carried in, that is ${String(carried + paid)} on hand. The shop below is worth ` +
-    `${String(shopWorth)}. You are choosing what this building does not get.`
+    `${String(shopWorth)}.`
   );
 }
 
@@ -2359,10 +2406,10 @@ export function contractView(input: CampaignInput): ContractView | undefined {
      */
     const tip =
       state === 'bookable' && pendingTier !== undefined
-        ? `book ${tierFaceOn(pendingTier, facts).name} — ${String(pendingNights)} ${pendingNights === 1 ? 'night' : 'nights'} from day ${String(index + 1)}, live on day ${String(index + 1 + pendingNights)}`
+        ? `Book ${tierFaceOn(pendingTier, facts).name}: ${String(pendingNights)} ${pendingNights === 1 ? 'night' : 'nights'} from day ${String(index + 1)}, live on day ${String(index + 1 + pendingNights)}`
         : `day ${String(index + 1)}${
             state === 'works'
-              ? ' · works are booked, one car out for the day'
+              ? ' · works booked, one car out for the day'
               : state === 'missed'
                 ? ' · missed'
                 : state === 'cleared'
@@ -2411,7 +2458,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       prompt:
         pendingTier === undefined
           ? undefined
-          : `Pick the night ${tierFaceOn(pendingTier, facts).name} goes in. ${String(pendingNights)} ${pendingNights === 1 ? 'night' : 'nights'} of works, and it is live the day after the last of them.`,
+          : `Pick the night ${tierFaceOn(pendingTier, facts).name} goes in. ${String(pendingNights)} ${pendingNights === 1 ? 'night' : 'nights'} of works, live the day after the last.`,
       cancel: CONTRACT_COPY.cancel,
       booked,
       /*
@@ -2425,7 +2472,7 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       worksCost:
         worksDays.length === 0
           ? undefined
-          : `${String(worksDays.length)} ${worksDays.length === 1 ? 'night' : 'nights'} of works booked, for ${String(committedUnits(tower))} units of kit that stays with the building. On each of those days one car is out of service for the works, and it is back the day the kit goes live.`,
+          : `${String(worksDays.length)} ${worksDays.length === 1 ? 'night' : 'nights'} of works booked, for ${String(committedUnits(tower))} units of kit that stays with the building. One car is out on each of those days, and back the day the kit goes live.`,
       legend: MONTH_LEGEND,
     },
     purse: {
@@ -2443,16 +2490,18 @@ export function contractView(input: CampaignInput): ContractView | undefined {
       oddsAfter: `${oddsAfterWorksPct(tower).toFixed(1)}% of days`,
       oddsNote:
         tower.bookings.length === 0
-          ? 'Nothing booked yet, so this keeps climbing with every trip. Machine and door work is what moves this number.'
-          : 'With the nights you have booked. Machines and doors both take load off the gear, which pushes the service window further out.',
+          ? 'Nothing booked yet, so this climbs with every trip. Machine and door work is what moves it.'
+          : 'With the nights you’ve booked. Machines and doors both push the service window further out.',
       totalNote: perfectMonthLineOf(difficulty, carriedIn(tower), shopTotalUnits(input.schedule, facts.shafts)),
-      carryNote: `This purse belongs to ${facts.name} alone and ${CONTRACT_COPY.purseCarryNote}`,
+      carryNote: `This purse belongs to ${facts.name} alone. ${CONTRACT_COPY.purseCarryNote}`,
       kitNote: CONTRACT_COPY.purseKitNote,
+      helpLink: CONTRACT_COPY.purseHelpLink,
     },
     tests: {
       eyebrow: contractAsksEyebrow(tower.day),
       decides: CONTRACT_ASKS_DECIDES,
       note: BUILDING_COPY.testsNote,
+      helpLink: BUILDING_COPY.testsHelpLink,
       held: testsHeldLine(rows),
       rows,
       conflict: CONTRACT_COPY.testsConflict,

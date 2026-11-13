@@ -953,6 +953,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * for a sentence.
          */
         'everyday/screenDom.ts#sideBySide',
+        /*
+         * `explainer` draws a link and a popover from the link, title and body its caller hands
+         * it; it is derived for its inline CSS. The one face of its own, the close button's, is
+         * `EXPLAINER_CLOSE_LABEL`, which is not excluded: the `EVERYDAY_MENU` adapter drives it.
+         */
+        'everyday/screenDom.ts#explainer',
         'everyday/screenDom.ts#unavailableBand',
         'everyday/screenDom.ts#WELL',
         'everyday/figures.ts#percentFigure',

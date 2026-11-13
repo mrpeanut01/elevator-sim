@@ -191,7 +191,7 @@ describe('what the cutaway paints', () => {
     expect(stageSource).toContain('STAGE_RECOMPUTING');
     expect(stageSource).toContain('STAGE_AWAITING_RUN');
     /* The mount had re-typed this one as a literal beside the constant it already imported. */
-    expect(stageSource).not.toContain("'recomputing the day from the start…'");
+    expect(stageSource).not.toContain("'Rerunning the day…'");
     expect(stageSource).not.toContain("'Paused at the start of the day. Nothing has happened yet.'");
   });
 

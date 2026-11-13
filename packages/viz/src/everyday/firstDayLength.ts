@@ -182,8 +182,8 @@ export function pinnedDayLengthLineOf(contractId: string): string | undefined {
   );
   const call = `for its call ${positionOf(row)}, about ${String(toCallMin)} min in`;
   return (
-    `A whole day: about ${String(dayMin)} min of watching at ${rung.label}, and wherever nobody on a ` +
-    `landing has waited a minute the stage skips ahead. ` +
+    `A whole day: about ${String(dayMin)} min of watching at ${rung.label}. The stage skips ahead ` +
+    `wherever nobody on a landing has waited a minute. ` +
     (row.asksOn ? `The stage stops first ${call}, and may stop again later in the day.` : `The stage stops once ${call}.`)
   );
 }

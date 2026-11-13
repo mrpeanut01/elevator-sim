@@ -50,7 +50,7 @@ import type { WatchOwner } from '../watch/view.js';
  * -------------------------------------------------------------------------- */
 
 /** The eyebrow over the rows a spectator may open, on § 14's *Your week*. */
-export const WATCH_ROWS_HEADING = 'RUNS THAT CAN BE WATCHED';
+export const WATCH_ROWS_HEADING = 'RUNS TO WATCH';
 
 /**
  * What the block says it is, above the rows — § 16 rule 2's basis line.
@@ -63,11 +63,9 @@ export const WATCH_ROWS_HEADING = 'RUNS THAT CAN BE WATCHED';
  * which was a stated absence when written and a stale one from the day the board read.
  */
 export const WATCH_ROWS_LEDE =
-  'A run is a record — a seed, a configuration and the changes made during the day. Pressing ' +
-  'Watch it re-simulates that record on this machine and replays what comes back, and a record ' +
-  'that no longer reproduces the figures it was filed with is not replayed at all. The rows are ' +
-  "the days closed on this device and the reference runs this repository shipped; other people's " +
-  "posted runs are watched from today's board, beside their place on it.";
+  'Watch it re-simulates a run from its record and replays the result. A record that no longer ' +
+  'reproduces the figures it was filed with is not replayed. The rows are the days closed on this ' +
+  "device and the reference runs. Other people's posted runs are watched from today's board.";
 
 /** The affordance, and § 1.5's rule is that a row that cannot be replayed loses it rather than dimming it. */
 export const WATCH_IT_LABEL = 'Watch it';
@@ -97,7 +95,7 @@ export const WATCH_CHECKING_LABEL = 'Checking…';
 
 /** What the block says when it holds no row at all. Not first-person — § 14.1. */
 export const NOTHING_TO_WATCH =
-  'No day has been closed on this device yet, and the reference runs have not loaded.';
+  'Nothing to watch yet. Close a day and it appears here.';
 
 /** What the block says while the shipped reference runs are still being fetched. */
 export const WATCH_ROWS_LOADING = 'Reading the reference runs…';
@@ -148,14 +146,13 @@ export function playThisCrowdRefusalFor(
   standing: { readonly day: number; readonly dayIdx: number },
 ): string | undefined {
   if (record === null) {
-    return 'this row carries no record, so there is no crowd to set up';
+    return 'This row has no record, so there is no crowd to set up.';
   }
   if (record.day === standing.day && record.dayIdx === standing.dayIdx) return undefined;
   return (
-    `this record is day ${String(record.day)} of the week it was played in, and the day standing ` +
-    `here is day ${String(standing.day)}. A tower grows through a week, so setting the same ` +
-    'building and seed up now would produce a different crowd — and replaying an archived day as ' +
-    'the day it was is not built. The replay above is unaffected: it runs the record exactly.'
+    `This record is day ${String(record.day)} of its week, and the day standing here is day ` +
+    `${String(standing.day)}. A tower grows through a week, so the crowd would be different. ` +
+    'The replay is unaffected: it runs the record exactly.'
   );
 }
 
@@ -179,7 +176,7 @@ export interface WatchStageBarInput {
 
 /** What the primary says instead of acting while the replay has not arrived. */
 export const REPLAY_NOT_ON_STAGE =
-  'the replay has not reached the stage yet — nothing is being watched to convert';
+  'The replay isn’t ready yet.';
 
 /**
  * Why § 7.6's intervention rows refuse while a record is on the stage.
@@ -195,7 +192,7 @@ export const REPLAY_NOT_ON_STAGE =
  * its inputs.
  */
 export const SPECTATOR_MAKES_NO_CHANGES =
-  'this is a replay of a record — its own changes are being replayed, and a spectator makes none';
+  'This is a replay. Its own changes play back, and a spectator makes none.';
 
 /**
  * § 3.3's `stage · watching` row, refined for what this build can actually do.

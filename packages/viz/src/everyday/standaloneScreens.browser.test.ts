@@ -131,9 +131,9 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
     expect(rates).toHaveLength(5);
     for (const rate of rates) expect(rate).toMatch(/a minute · [\d.]+× wave 1/);
 
-    // § 20.5's line, in both registers: the words, and the figure beside them.
-    expect(await page.textContent('.everyday-rush-hold')).toContain('over two minutes');
-    expect(await page.textContent('.everyday-rush-hold-figure')).toBe('120 s × 40 people');
+    // § 20.5's line, one sentence carrying both figures; its long account is behind *How rush works*.
+    expect(await page.textContent('.everyday-rush-hold')).toContain('over 2 minutes');
+    expect(await page.textContent('.everyday-rush-hold')).toContain('Ends when 40 people have waited over 2 minutes at once.');
     await page.close();
   });
 
@@ -287,7 +287,7 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     const structures = async (): Promise<number> => page.$$eval('.everyday-designer-shaft-chip', (nodes) => nodes.length);
     const before = (await groups(page)).length;
     await page.click('.everyday-designer-shaft-chip[data-k="shaft:s5"]');
-    expect(await page.textContent('.everyday-designer-wing')).toBe('Stand apart, as a block on the other side');
+    expect(await page.textContent('.everyday-designer-wing')).toBe('Stand apart on the other side');
     await page.click('.everyday-designer-wing');
     expect(await groups(page)).toHaveLength(before + 1);
     expect(await page.textContent('.everyday-designer-wing')).toBe('Rejoin the first block');
@@ -482,7 +482,7 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     }));
     expect(fold.open).toBe(false);
     expect(fold.plates).toBe(1);
-    expect(fold.summary).toContain('as an engineer would write it');
+    expect(fold.summary).toContain('The engineer’s document');
     await page.click('.everyday-designer-document-summary');
     expect(await page.$eval('.everyday-designer-document', (node) => (node as HTMLDetailsElement).open)).toBe(true);
     await page.close();

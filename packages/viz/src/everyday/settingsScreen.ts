@@ -84,6 +84,7 @@ import { STAGE_SPEEDS } from './stageScreenModel.js';
 /* GitHub issue #242 — the page's own fault count, read into the report the player composes. */
 import { CLIENT_FAULTS } from './faults.js';
 import type { EverydayScreenContext, EverydayScreenHandle, EverydayScreenModule } from './screens.js';
+import { explainer } from './screenDom.js';
 import { settingsScreenViewOf, type SettingsScreenView } from './settingsView.js';
 /* GitHub issue #245's report block — its words, its refusals and the address it opens. */
 import {
@@ -530,6 +531,8 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   chimesBalance.style.cssText = `font-size:15px;color:${C.ink};margin-top:6px`;
   const chimesLede = el(doc, 'div', undefined, view.you.chimes.lede);
   chimesLede.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;margin-top:6px;max-width:70ch`;
+  /* How chimes are earned, kept and spent is read once, so it sits behind a link beside the lede. */
+  chimesLede.append(' ', explainer(doc, view.you.chimes.how).root);
   const chimesHome = el(doc, 'div', 'everyday-settings-chimes-home', view.you.chimes.homeNote);
   chimesHome.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.5;margin-top:8px;max-width:70ch`;
   const chimesSpendHeading = el(doc, 'div', undefined, view.you.chimes.spendHeading);
@@ -725,7 +728,11 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
     label.style.cssText = 'font-size:14px;font-weight:600';
     const note = el(doc, 'div', 'everyday-settings-telemetry-note', row.note);
     note.style.cssText = `font-size:12.5px;color:${C.warmGrey};line-height:1.45;margin-top:2px;max-width:64ch`;
-    text.append(label, note);
+    /* What is and is not recorded, behind a link under the row's one line. */
+    const detail = el(doc, 'div');
+    detail.style.cssText = 'margin-top:4px';
+    detail.append(explainer(doc, view.device.telemetryDetail).root);
+    text.append(label, note, detail);
     box.append(text);
 
     const pill = el(doc, 'button', `everyday-settings-${row.id}`, row.value);

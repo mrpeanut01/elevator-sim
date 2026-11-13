@@ -305,8 +305,7 @@ export const TUNE_CARDS: readonly TuneCard[] = Object.freeze([
     name: 'The tower',
     sub: 'shape and height',
     effect:
-      'Taller means longer round trips; the same cars cover more ground and everybody waits a ' +
-      'little more.',
+      'Taller means longer round trips, so everybody waits a little more.',
     dwellChips: false,
     rows: [
       {
@@ -322,7 +321,7 @@ export const TUNE_CARDS: readonly TuneCard[] = Object.freeze([
       {
         key: 'cars',
         label: 'Shafts',
-        hint: 'how many cars run at all',
+        hint: 'how many cars run',
         unit: '',
         min: 1,
         max: 12,
@@ -335,22 +334,21 @@ export const TUNE_CARDS: readonly TuneCard[] = Object.freeze([
     name: 'The machines',
     sub: 'speed, capacity, doors',
     effect:
-      'Faster cars help tall buildings. On a short tower the doors matter far more than the speed ' +
-      'does.',
+      'Faster cars help tall buildings. On a short tower the doors matter far more than speed.',
     dwellChips: true,
     rows: [],
   },
   {
     name: 'The crowd',
-    sub: 'who arrives, and where from',
+    sub: 'who arrives, and where',
     effect:
-      'The morning is the test. Push arrivals up and every dispatcher looks the same: overwhelmed.',
+      'Push arrivals up and every dispatcher looks the same: overwhelmed.',
     dwellChips: false,
     rows: [
       {
         key: 'rate',
         label: 'How busy',
-        hint: 'percent of the population arriving every five minutes',
+        hint: 'share of the population arriving every five minutes',
         unit: ' %pop/5 min',
         min: 1,
         max: 25,
@@ -512,7 +510,7 @@ export function tuneDwellChips(selected: DwellChoice | undefined): readonly Tune
   chips.push({
     choice: undefined,
     label: 'the dispatcher’s own',
-    seconds: 'whatever the profile authored',
+    seconds: 'as the dispatcher sets it',
     selected: selected === undefined,
   });
   return chips;
@@ -549,13 +547,13 @@ export function tuneSandboxStrip(moved: readonly TuneKey[]): TuneSandboxStrip {
     return {
       state: 'Nothing changed yet — a sandbox day all the same',
       note:
-        'Test simulation plays the day as it stands, as a sandbox day: it never counts, and your week ' +
-        'stays where it is. The day that counts starts from its brief.',
+        'A run from here never counts, and your week stays where it is. The day that counts ' +
+        'starts from its brief.',
     };
   }
   return {
     state: 'Sandbox — nothing counts',
-    note: 'Change anything you like. The run will not be posted, and the bench still works.',
+    note: 'Change anything you like. The run will not be posted.',
   };
 }
 
@@ -564,40 +562,37 @@ export const TUNER_COPY = Object.freeze({
   title: 'Tune the tower',
   /* Wave AP lane AP-D2 (§ D1451): a run from here never counts, changed or not. */
   lede:
-    'Everything here is live, and a day run from here is a sandbox day, changed or not: it never ' +
-    'counts, and your week stays where it is.',
+    'Change the tower, the machines or the crowd, then run the day.',
   stampMoved: 'This run will be stamped “sandbox”',
   stampClean: 'Nothing changed yet',
   stampMovedBody:
-    'Every figure it produces carries the changes you made, so a sandbox day can never be mistaken ' +
-    'for a scored one.',
+    'Every figure it produces carries your changes, so it can’t be mistaken for a scored day.',
   /*
    * Read *The day still matches everyone else's. Run it whenever you are ready.* over a press that
    * began the counted attempt (the post-AO panel's seat D, D8); before the attempt a sandbox day
    * meets a practice crowd, so it did not match either (§ D1362).
    */
   stampCleanBody:
-    'A run from here is still a sandbox day, which counts for nothing. The day that counts starts from its brief.',
+    'Still a sandbox day. The day that counts starts from its brief.',
   /**
    * The box that leaves the copied day's wrinkle and booked cars out of a sandbox day — wave AP lane
    * AP-D2, [§ D1451](../../../../DECISIONS.md). Ticked by default: the sandbox runs the day you played.
    */
-  keepDay: 'Run it with today’s wrinkle and booked cars, as the day was dealt',
+  keepDay: 'Keep today’s wrinkle and booked cars',
   dwellLabel: 'Door dwell',
   dwellHint: 'how long the doors stay open',
   speedLabel: 'Rated speed',
   capLabel: 'Capacity',
-  stepsHint: 'Rated speed and capacity are steps within the machine class, not free numbers.',
+  stepsHint: 'Rated speed and capacity come in fixed steps for this machine class.',
   writesEyebrow: 'WHAT IT WRITES',
-  noBuilding: 'the standing building is one this build does not know, so there is nothing to tune',
+  noBuilding: 'This building isn’t one the game knows, so there is nothing to tune.',
   /**
    * In place of *Arriving at the lobby* on a day whose template keeps its own mix — {@link TuneOffer}.
    * Wave AO, [§ D1368](../../../../DECISIONS.md): once the run could run, the row wrote a split `core`
    * refuses beside such a template, so it would have been a control that changes nothing.
    */
   lobbyShareIsTheDays:
-    'Arriving at the lobby is not offered on this day: the day sets who arrives where, hour by hour, ' +
-    'so the share through the lobby stays the day’s own.',
+    'Arriving at the lobby is not offered on this day: the day sets who arrives where, hour by hour.',
 } as const);
 
 /**

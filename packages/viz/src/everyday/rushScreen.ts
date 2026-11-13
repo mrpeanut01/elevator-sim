@@ -4,8 +4,9 @@
  * Every word and every figure is `rushScreenModel.ts`'s, which is where the ramp arithmetic, the
  * § 20.5 hold line, the register of absences and the § 3.3 refinement live and are argued. This
  * file draws that model with `tokens.ts`'s § 19 values, in the prototype's two-column geometry: the
- * paper column carries the title, the three facts and the five bands; the ink column carries the
- * hold rule, the house’s standings under the note that says what they are, and who would drive.
+ * paper column carries the title, the three facts, the five bands and the end rule in one line; the
+ * ink column carries the house’s standings under the note that says what they are, and who would
+ * drive. The long accounts (how rush works, what the house runs are, the rebuild) sit behind links.
  *
  * It wires **one control**, and this paragraph said *no control* until GitHub issue **#565**
  * (§ D857). § 3.3 still gives the screen one primary (`Start the rush`) and the shell still owns
@@ -37,7 +38,7 @@
 import { specIsDirty } from '../authoring/selectorSpec.js';
 
 import { actionBarFor } from './actionBar.js';
-import { sideBySide } from './screenDom.js';
+import { explainer, sideBySide } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
@@ -46,7 +47,6 @@ import {
   rushDrivingLine,
   rushFactViews,
   rushGeneratedRangeLine,
-  rushHoldLineFigure,
   rushLeftBehindLine,
   rushOpeningLine,
   rushRebuildLineOf,
@@ -55,7 +55,7 @@ import {
   RUSH_SCREEN_COPY as COPY,
   type RushFurthestStanding,
 } from './rushScreenModel.js';
-import { rushHouseToBeatLineOf, rushStandingsOf, type RushPostedStandings, type RushYoursRowView } from './rushHouse.js';
+import { RUSH_HOUSE_COPY, rushHouseToBeatLineOf, rushStandingsOf, type RushPostedStandings, type RushYoursRowView } from './rushHouse.js';
 import type { RushDeviceStanding } from './rushDeviceBest.js';
 import { RUSH_PURSE } from './rushRebuild.js';
 import { mountWorkedAnswer } from './tutorialScreens.js';
@@ -173,9 +173,28 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     row.append(waves, rate, figure, note, track);
     bandsList.append(row);
   }
-  const opening = el(doc, 'p', 'everyday-rush-opening', rushOpeningLine());
-  opening.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.warmGrey};margin:9px 0 0;max-width:660px`;
-  bandsBlock.append(bandsEyebrow, bandsList, opening);
+  /*
+   * The end rule in one line under the waves, with the long account one press away: how the waves
+   * climb, why the rule is where it is, what a sitting is and what a further run means.
+   */
+  const holdLine = el(doc, 'div', 'everyday-rush-hold', `${COPY.holdLine} `);
+  holdLine.style.cssText = `font-size:14px;line-height:1.5;color:${C.inkSoft};margin:12px 0 0;max-width:660px`;
+  holdLine.append(
+    explainer(doc, {
+      link: COPY.howLink,
+      title: COPY.howLink,
+      body: [
+        COPY.howWaves,
+        rushOpeningLine(),
+        COPY.howEnd,
+        rushGeneratedRangeLine(),
+        COPY.howSitting,
+        COPY.howFurthest,
+        COPY.drivingNote,
+      ],
+    }).root,
+  );
+  bandsBlock.append(bandsEyebrow, bandsList, holdLine);
   paper.append(bandsBlock);
 
   /*
@@ -201,18 +220,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   const ink = el(doc, 'div', 'everyday-rush-aside');
   ink.style.cssText = `background:${C.ink};color:${C.paper};padding:30px 26px;display:flex;flex-direction:column;min-width:0`;
 
-  const holdEyebrow = el(doc, 'div', undefined, COPY.holdEyebrow);
-  holdEyebrow.style.cssText = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label}`;
-  const holdLine = el(doc, 'p', 'everyday-rush-hold', COPY.holdLine);
-  holdLine.style.cssText = `font-size:14px;line-height:1.55;color:${C.fainter};margin:9px 0 0`;
-  const holdFigure = el(doc, 'div', 'everyday-rush-hold-figure', rushHoldLineFigure());
-  holdFigure.style.cssText = `font:500 12px ${TYPE.mono};color:${C.sun};margin-top:7px`;
-  const generated = el(doc, 'p', 'everyday-rush-generated', rushGeneratedRangeLine());
-  generated.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.label};margin:10px 0 0`;
-  ink.append(holdEyebrow, holdLine, holdFigure, generated);
-
   const bestsBlock = el(doc, 'div');
-  bestsBlock.style.cssText = 'margin-top:22px';
   const bestsEyebrow = el(doc, 'div', undefined, COPY.bestsEyebrow);
   bestsEyebrow.style.cssText = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};margin-bottom:11px`;
   bestsBlock.append(bestsEyebrow);
@@ -337,9 +345,6 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   toBeat.style.cssText = `font-size:13px;line-height:1.5;color:${C.fainter};margin:9px 0 0`;
   const leftBehind = el(doc, 'p', 'everyday-rush-left-behind');
   leftBehind.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:9px 0 0`;
-  const drivingNote = el(doc, 'p', undefined, COPY.drivingNote);
-  drivingNote.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:9px 0 0`;
-  drivingBlock.append(drivingNote);
   /*
    * § D672: a sitting the account has bought a fitted start for says so before it starts, and says
    * where it will be posted. Absent otherwise — there is no control here and no price, because the
@@ -363,8 +368,14 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     'everyday-rush-rebuild-line',
     rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, context.host.rushOpeningPurse()),
   );
-  rebuildLine.style.cssText = `font-size:12px;line-height:1.5;color:${C.label};margin:12px 0 0`;
-  drivingBlock.append(rebuildLine);
+  rebuildLine.style.cssText = `font-size:14px;line-height:1.55;color:${C.inkSoft};margin:0 0 10px`;
+  /* Behind a link: read once, and the result screen's own menu says it again where it is spent. */
+  const rebuildHow = explainer(doc, { link: COPY.rebuildLink, title: COPY.rebuildLink, body: [rebuildLine] });
+  rebuildHow.link.style.color = C.sun;
+  const rebuildRow = el(doc, 'div');
+  rebuildRow.style.cssText = 'margin:12px 0 0';
+  rebuildRow.append(rebuildHow.root);
+  drivingBlock.append(rebuildRow);
   /* § D478: a stream this far outside the building's band says so before it starts. */
   const disclosureLine = context.host.rushDisclosure();
   if (disclosureLine !== undefined) {
@@ -410,7 +421,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       leftBehind.remove();
     } else {
       leftBehind.textContent = leftBehindLine;
-      drivingBlock.insertBefore(leftBehind, drivingNote);
+      pickNote.after(leftBehind);
     }
 
     const standings = rushStandingsOf(
@@ -428,8 +439,16 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       standingsBody.append(refusal);
       return;
     }
-    const houseNote = el(doc, 'p', 'everyday-rush-house-note', standings.note);
+    /* The caption above the rows, and the long account of what they are behind its link. */
+    const houseNote = el(doc, 'div', 'everyday-rush-house-note', `${standings.note} `);
     houseNote.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:0 0 11px;text-wrap:pretty`;
+    const houseAbout = explainer(doc, {
+      link: RUSH_HOUSE_COPY.aboutLink,
+      title: RUSH_HOUSE_COPY.aboutLink,
+      body: [RUSH_HOUSE_COPY.aboutRuns, RUSH_HOUSE_COPY.aboutOrder, RUSH_HOUSE_COPY.aboutStart, RUSH_HOUSE_COPY.aboutHandover],
+    });
+    houseAbout.link.style.color = C.sun;
+    houseNote.append(houseAbout.root);
     const bestsList = el(doc, 'div', 'everyday-rush-bests');
     bestsList.style.cssText = 'display:grid;gap:5px';
     const yoursBefore = (index: number): void => {
@@ -541,7 +560,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    * **On a phone the dispatcher choice comes before the house's runs** — wave AS, lane AS-1 (GitHub
    * issue #635, finding 8). Stacked, the ink column put the choice under thirteen house rows, about
    * 2 900 px down a 390 px screen. Once the ink column sits under the paper, the driving block is
-   * drawn after the hold line and before the house's runs; side by side the handoff's order stands.
+   * drawn before the house's runs; side by side the handoff's order stands.
    * Asked of the layout itself, so a rail that narrows the screen counts. Recorded here under
    * [§ D405](../../../../DECISIONS.md).
    */

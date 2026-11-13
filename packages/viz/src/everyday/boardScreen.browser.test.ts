@@ -71,7 +71,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday board and ladder screen', () => {
     expect(await page.textContent('.everyday-ladder-empty')).toContain('gauntlet');
     expect(await page.textContent('.everyday-gauntlet-send')).toContain('gauntlet');
     /* Every rating here is local, and the sentence beside the table says which half is absent. */
-    expect(await page.textContent('.everyday-ladder-world-absent')).toContain('needs a server');
+    expect(await page.textContent('.everyday-ladder-world-absent')).toContain('aren’t available here');
     await page.close();
   }, 120_000);
 
@@ -99,7 +99,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday board and ladder screen', () => {
      * fail this line rather than quietly keep drawing a sentence that had stopped being true.
      */
     const absence = await page.textContent('.everyday-board-absent');
-    expect(absence).toContain('needs a server');
+    expect(absence).toContain('isn’t available here');
     /* The read has resolved, so the in-flight line is gone rather than sitting under the absence. */
     expect(await page.$('.everyday-board-asking')).toBeNull();
     /* § 12.2: a labelled unavailable state, and the screen is otherwise complete. */

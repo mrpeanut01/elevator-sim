@@ -202,7 +202,7 @@ describe('spend and the editor prices', () => {
     expect(spend.repairUnits).toBe(10);
     expect(spend.machineryUnits).toBe(10);
     expect(budgetNoteOf(regeared, spend)).toBe(
-      'You are buying machinery — compare it against the free change first.',
+      'You are buying machinery. Compare it against the free change first.',
     );
   });
 

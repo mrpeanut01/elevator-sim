@@ -204,7 +204,7 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
       await page.waitForSelector('.everyday-rush-result', { timeout: 15_000 });
       /* The house run on the same crowd is stated beside the round, as two figures and no verdict. */
       expect(await page.textContent('.everyday-rush-result-house')).toMatch(
-        /^This round was ended by hand at \d+:\d\d, in wave \d+\. The house run on the same crowd, .+ with no changes, held /u,
+        /^You ended this round at \d+:\d\d, in wave \d+\. On the same waves, the house run with .+ \(no changes\) held /u,
       );
       /* Run the rush again, and close the page before the new round's clock moves. */
       await page.locator('.everyday-bar-primary').click();
@@ -301,7 +301,7 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
       expect(order.picker, JSON.stringify(order)).toBeGreaterThan(order.firstHouseRow);
       /* § D1545 (GitHub issue #636, R5): the house run on this crowd is stated as the line to beat, for the dispatcher standing. */
       const line = (): Promise<string> => page.evaluate(() => document.querySelector('.everyday-rush-to-beat')?.textContent ?? '');
-      const pattern = /^The house run on this crowd, (.+) with no changes, holds (to \d+:\d\d, into wave \d+\. That is the time to pass|all \d+ waves, the whole climb)\.$/u;
+      const pattern = /^(Time to pass: \d+:\d\d, into wave \d+\. That’s the house run with .+ \(no changes\) on these waves|The house run with .+ \(no changes\) holds all \d+ waves)\.$/u;
       expect(await line()).toMatch(pattern);
       const options = await page.locator('.everyday-rush-picker option').evaluateAll((nodes) =>
         nodes.map((node) => ({ value: (node as HTMLOptionElement).value, name: node.textContent ?? '' })),
@@ -310,7 +310,7 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
       const other = options.find((option) => option.value !== current);
       if (other !== undefined) {
         await page.locator('.everyday-rush-picker').selectOption(other.value);
-        await page.waitForFunction((name) => (document.querySelector('.everyday-rush-to-beat')?.textContent ?? '').includes(`, ${name} with no changes`), other.name, {
+        await page.waitForFunction((name) => (document.querySelector('.everyday-rush-to-beat')?.textContent ?? '').includes(`the house run with ${name} (no changes)`), other.name, {
           timeout: 5_000,
         });
       }

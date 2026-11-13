@@ -100,6 +100,7 @@ import { provideEverydaySwap } from './swap.js';
  */
 import { everydayTelemetry, onEverydayConsent } from './telemetryPort.js';
 import { CONSENT_COPY, consentAskViewOf } from '../telemetry/consentView.js';
+import { explainer } from './screenDom.js';
 import { systemClock } from '../playback/clock.js';
 import {
   EVERYDAY_COLORS as C,
@@ -243,7 +244,7 @@ const BAR_REASON_ID = 'everyday-bar-reason';
  * only that the cell is inert. Why it is inert is a fact about standing on the screen the cell
  * names, which is the shell's to know.
  */
-const MENU_LEAVE_REASON = 'You are in the lobby. This is the screen it goes to.';
+const MENU_LEAVE_REASON = "You're in the lobby.";
 
 /**
  * Above every overlay the Engineer surface raises.
@@ -2918,11 +2919,22 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     heading.style.cssText = `font:600 13px ${TYPE.heading};color:${C.ink}`;
     const body = el(doc, 'div', 'everyday-consent-body', view.body);
     body.style.cssText = `margin-top:3px;font-size:12.5px;line-height:1.45;color:${C.ink};max-width:78ch`;
-    const not = el(doc, 'div', 'everyday-consent-not', view.notCollected);
-    not.style.cssText = `margin-top:4px;font-size:11.5px;line-height:1.45;color:${C.warmGrey};max-width:78ch`;
-    const later = el(doc, 'div', 'everyday-consent-later', view.later);
-    later.style.cssText = `margin-top:4px;font-size:11.5px;line-height:1.45;color:${C.warmGrey};max-width:78ch`;
-    said.append(heading, body, not, later);
+    /*
+     * The copy edit: what is not recorded, and how to change the answer, sit behind one link. Both
+     * are still in the document on every draw, as a closed popover's words are.
+     */
+    const not = el(doc, 'p', 'everyday-consent-not', view.notCollected);
+    not.style.cssText = `margin:0 0 10px;font-size:13px;line-height:1.5;color:${C.inkSoft}`;
+    const later = el(doc, 'p', 'everyday-consent-later', view.later);
+    later.style.cssText = `margin:0 0 10px;font-size:13px;line-height:1.5;color:${C.inkSoft}`;
+    const more = explainer(doc, {
+      link: CONSENT_COPY.details,
+      title: CONSENT_COPY.details,
+      body: [view.body, not, later],
+    });
+    more.root.classList.add('everyday-consent-more');
+    more.root.style.cssText = 'display:inline-block;margin-top:4px';
+    said.append(heading, body, more.root);
     row.append(said);
 
     const answers = el(doc, 'div');
@@ -3113,7 +3125,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       doc,
       'p',
       undefined,
-      'The Lobby floor on the left takes you back to the modes.',
+      'Go back to the Lobby on the left.',
     );
     back.style.cssText = `color:${C.warmGrey};font-size:12px;max-width:60ch`;
     screenRegion.append(h, p, back);

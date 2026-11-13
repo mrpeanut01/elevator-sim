@@ -235,8 +235,7 @@ export interface SupportView {
 export const SUPPORT_COPY = Object.freeze({
   heading: 'REPORT A PROBLEM',
   lede:
-    'Something broken, or a number that does not look right? Tell us here and we will try to ' +
-    'put ourselves back in your run.',
+    'Something broken, or a number that looks wrong? Tell us and we’ll try to replay your run.',
   /*
    * **The ruling's requirement.** Two sentences and no hedging: what happens to the words, who can
    * read them, and how long they last. The third clause is the one that earns its place — players
@@ -244,56 +243,54 @@ export const SUPPORT_COPY = Object.freeze({
    * thinking-about-it, put where they are typing rather than in a notice they could go and read.
    */
   publicNotice:
-    'What you write here is posted publicly, as an issue in this game’s public code repository. ' +
-    'Anyone can read it, and it stays there. Do not put anything about yourself or anyone else in ' +
-    'the box that you would not put on a public page.',
+    'What you write is posted publicly, as an issue in this game’s public code repository. ' +
+    'Anyone can read it, and it stays there. Leave out anything about yourself or anyone else ' +
+    'that you wouldn’t put on a public page.',
   /*
    * `docs/26` § 15.4's second line. It is an obligation rather than a courtesy: a report that
    * silently carried a run pointer would be collection the reader did not compose.
    */
   attachNotice:
-    'The lines below travel with your words, so we can replay the run you were on. Your name, ' +
-    'your picture and your email address are not attached, and nothing else about you is either.',
+    'These lines go with your report so we can replay your run. Your name, picture and email ' +
+    'address are not attached, and nothing else about you is either.',
   handoffNotice:
-    'The button opens the report page with all of this already written into it. Nothing is posted ' +
-    'until you press the button on that page, and you can read the whole report there first.',
+    'The button opens the report page with all of this filled in. Nothing is posted until you ' +
+    'press the button on that page.',
   /*
    * § 13.4's T-3, and the argument for wording it this way is § 16.5's: a promise this product
    * cannot keep is worse than the honest sentence. It cannot unpublish what somebody has read.
    */
   deletionNotice:
-    'Once it is posted we cannot unpublish it. Taking a report down is something you would ask a ' +
-    'person who looks after the repository to do — it is not a button this game has.',
+    'Once it is posted we cannot unpublish it. To take a report down, ask the people who look ' +
+    'after the repository.',
   fieldLabel: 'WHAT WENT WRONG',
   action: 'Open the report page',
 
   /* ---- the three stages' statements about the run ---- */
   noRun:
-    'No run has played on this page yet, so there is no crowd to point at. Say what you were ' +
-    'doing and what you expected instead, and we will work from that.',
+    'No run has played yet, so there is none to attach. Say what you were doing and what you ' +
+    'expected instead.',
   run:
-    'These are the settings your run was built from. The crowd number is the part that makes it ' +
-    'repeatable — the same number gives the same morning, so we can watch what you watched.',
+    'These are the settings your run was built from. The same crowd number gives the same ' +
+    'morning, so we can watch what you watched.',
   runPartlyCarried:
-    'These are the settings your run was built from, and they are not the whole of it: things you ' +
-    'changed while the day was playing do not travel with settings. Say what you changed and we ' +
-    'will start from there.',
+    'These are the settings your run was built from. Changes you made while the day was playing ' +
+    'do not travel with them, so say what you changed.',
 
   /* ---- the two refusals ---- */
   emptyRefusal:
-    'Nothing is typed yet. Say what went wrong first — a report with no words in it is one nobody ' +
-    'can act on.',
+    'Nothing is typed yet. Say what went wrong first.',
   tooLongRefusal:
-    'That is longer than the report page will take in one go. Trim it, or put the short version ' +
-    'here and add the rest once the page is open.',
+    'That is too long for the report page. Put the short version here and add the rest once the ' +
+    'page is open.',
 
   /* ---- the attachment's labels, and the two values this module authors ---- */
   seedLabel: 'Crowd number',
   buildingLabel: 'Building',
   dispatcherLabel: 'Dispatcher',
-  dayLabel: 'Day of the week',
+  dayLabel: 'Day',
   playingLabel: 'What you were playing',
-  buildLabel: 'This build',
+  buildLabel: 'Game version',
   browserLabel: 'Your browser',
   buildUnknown: 'not built for release',
   browserUnknown: 'not known',
@@ -304,7 +301,7 @@ export const SUPPORT_COPY = Object.freeze({
    * report is public, the reader is shown exactly what is sent, and a class on a player surface is
    * internal notation. `faults.ts` carries the whole argument, including what it costs.
    */
-  faultsLabel: 'Problems this page hit',
+  faultsLabel: 'Errors on this page',
   faultsNone: 'none',
   faultsStartingUp: 'while the game was starting up',
   faultsPlaying: 'after it had started',

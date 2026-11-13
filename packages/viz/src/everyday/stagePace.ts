@@ -569,7 +569,7 @@ function rungLabelOf(simPerRealS: number): string {
  * stops at any call the stage has not had the player's answer to. It changes no speed and no skip.
  */
 export function stagePlayedOnLineOf(rung: string): string {
-  return `fast-forwarding at ${rung}: you have watched a while and there is nothing to decide yet · pick a speed to watch, or ${STAGE_SKIP_COPY.label}: it stops at any call to come`;
+  return `fast-forwarding at ${rung}: nothing to decide yet · pick a speed to watch, or ${STAGE_SKIP_COPY.label} (it stops at any call)`;
 }
 
 /**

@@ -119,7 +119,7 @@ describe('the pinned whole day’s length and its call — § D1047', () => {
     for (const row of PINNED_DAY_LENGTHS) {
       const line = pinnedDayLengthLineOf(row.contractId) ?? '';
       expect(line, row.contractId).toMatch(
-        /^A whole day: about \d+ min of watching at 4×, and wherever nobody on a landing has waited a minute the stage skips ahead\. /u,
+        /^A whole day: about \d+ min of watching at 4×\. The stage skips ahead wherever nobody on a landing has waited a minute\. /u,
       );
       /*
        * § D1204: a day that asks on after its call says the stage stops there *first*, and promises

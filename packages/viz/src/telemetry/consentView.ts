@@ -78,13 +78,14 @@ export const CONSENT_COPY = Object.freeze({
     'settings each run used. It stays on our own server and goes nowhere else.',
   notCollected:
     'We do not record anything you type, your name, your email address, where you are, or what ' +
-    'you do on any other site. Saying no changes nothing about the game — every mode, every ' +
-    'screen and every number works exactly the same.',
+    'you do on any other site. Saying no changes nothing about the game.',
   no: 'No',
   yes: 'Yes, count it',
   later:
     'You can change this later in Settings. Turning it off there also asks us to delete what was ' +
     'already recorded.',
+  /** The link beside the body, and the heading of the popover that holds the two notes above. */
+  details: 'What we record',
 } as const);
 
 /**
@@ -101,18 +102,16 @@ export const CONSENT_COPY = Object.freeze({
  * surface early.
  */
 export const CONSENT_ROW_COPY = Object.freeze({
-  label: 'Counting how the game is going',
-  note:
-    'Which screens you reach and how long you play. Never anything you type, and never your ' +
-    'name or address.',
+  label: 'Usage data',
+  note: 'Which screens you reach and how long you play. Never your name or anything you type.',
   on: 'on',
   off: 'off',
   withdrawnNote:
-    'Off. The local half is immediate. Deleting what reached our server is a request, and if you ' +
-    'were offline it may not have arrived — in that case it is deleted when it ages out.',
+    'Off. Recording has stopped, and we were asked to delete what we hold. If you were offline ' +
+    'the request may not have arrived, and the data is deleted when it ages out.',
   notDurable:
-    'This browser will not let the game remember your answer, so it will ask again next time. ' +
-    'Nothing is being recorded in the meantime.',
+    'This browser can’t save your answer, so we’ll ask again next time. Nothing is recorded ' +
+    'until then.',
 } as const);
 
 /** The ask, or nothing. `undefined` on every state but `unasked` — § 10 non-goal 3, no second ask. */

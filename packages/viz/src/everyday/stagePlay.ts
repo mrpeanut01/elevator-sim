@@ -150,8 +150,8 @@ const NOT_OFFERED_HERE: ReadonlySet<EditorParkingStrategy> = new Set(['fixed-flo
 
 export const STAGE_PLAY_COPY = Object.freeze({
   loading: 'Reading the stage…',
-  loadFailed: 'This stage could not be read, so nothing here can be played. Reload to try again.',
-  notFound: 'That stage is not on the path this build carries. Go back to the path and pick one there.',
+  loadFailed: 'This stage couldn’t be read. Reload to try again.',
+  notFound: 'That stage isn’t on the path. Go back and pick one there.',
   heldHead: 'Held back',
   settingLabel: 'Standing order',
   settingStanding: 'as the building has it',
@@ -159,8 +159,8 @@ export const STAGE_PLAY_COPY = Object.freeze({
   notForSale: 'not sold here',
   budgetLead: 'Budget',
   spendsNothing: 'As the building stands, nothing is spent.',
-  refusedCannotRun: 'These settings cannot run together on this building, so the stage is not run.',
-  refusedWithheld: 'This setting moves something no scenario sells, so the stage is not run.',
+  refusedCannotRun: 'These settings can’t run together on this building.',
+  refusedWithheld: 'This setting changes something no stage sells.',
   /*
    * Issue #626 item 1: the goals were first named in the verdict, so a player ran the stage without
    * knowing what it asked. The page now lists them before the press, in the verdict's own words.
@@ -172,16 +172,16 @@ export const STAGE_PLAY_COPY = Object.freeze({
   /** Wave AR lane AR-3, GitHub issue #633: a cleared stage's press, while a stage is left to clear. */
   nextStageLabel: 'Next stage',
   runningLabel: 'Running the stage…',
-  runningWhy: 'The stage is running. The settings are yours to change while it does, and a change makes the verdict it returns stale.',
+  runningWhy: 'The stage is running. Change a setting now and its verdict will be out of date.',
   loadingWhy: 'The stage is still being read.',
-  heldWhy: 'This stage is held back, so there is nothing here to run.',
-  refusedWhy: 'This setting is refused at this budget, so there is nothing to run until it fits.',
+  heldWhy: 'This stage is held back.',
+  refusedWhy: 'This setting doesn’t fit the budget.',
   /*
    * The held-back crowds are named by where they come from, never as crowds the player *could not
    * have tuned against* — ruling R1, amendment 5 ([§ D1602](../../../../DECISIONS.md)).
    */
   noteReady: 'Judged on the stage’s own crowds, then again on crowds kept apart from them.',
-  noteSolved: 'Cleared. A stage pays once, and a clear unlocks nothing.',
+  noteSolved: 'Cleared. A stage pays once.',
   /*
    * A stage this device has cleared, opened again — [§ D1358](../../../../DECISIONS.md). The run is
    * the same judge on the same crowds, and only the pay differs: a stage pays once.
@@ -192,14 +192,14 @@ export const STAGE_PLAY_COPY = Object.freeze({
    * par clause is now {@link stagePracticeLineOf}'s, from the stage's own par (§ D1376).
    */
   practice: 'Cleared on this device. Running it again is practice: it pays nothing new.',
-  notePractice: 'Practice: the same judge on the same crowds, and a stage pays once.',
+  notePractice: 'Practice: same crowds, same judging. A stage pays once.',
   clearedHead: 'Cleared.',
   /*
    * The outcome leads — ruling R1, amendment 6 ([§ D1602](../../../../DECISIONS.md)). It read
    * *Every goal met on the stage's own crowds, and not on the ones held back* above a refusal, and
    * the playtest's three personas read a win and then *nearly there* (finding X1).
    */
-  metNotHeldHead: 'Not cleared. Met on the stage’s own crowds, and not on the crowds kept apart from them.',
+  metNotHeldHead: 'Not cleared. Met on the stage’s own crowds, but not on the crowds kept apart from them.',
   missedHead: 'Not cleared.',
   goalMet: 'met',
   goalMissed: 'missed',
@@ -213,27 +213,27 @@ export const STAGE_PLAY_COPY = Object.freeze({
   goalBarNotReached: 'bar not reached',
   goalUnjudged: 'not judged',
   holdoutNotRun:
-    'The held-back crowds were not run: a goal missed on the stage’s own crowds cannot be recovered on others.',
+    'The crowds kept apart were not run: a goal missed on the stage’s own crowds can’t be recovered on others.',
   paysOnce: 'A stage pays once, so this clear pays nothing.',
-  unlocksNothing: 'It unlocks nothing: every stage on the path is open, or held for the reason written on it.',
-  stale: 'The settings on screen are not the ones this verdict was measured on. Run it again to judge them.',
+  unlocksNothing: 'It unlocks nothing: every stage on the path is already open, or held for the reason on it.',
+  stale: 'The settings have changed since this verdict. Run it again to judge them.',
   failed: 'The run stopped before it finished, so there is no verdict.',
   /*
    * § D1419: the budget rungs. Each sold row says what it buys on the census and that a device
    * purchase is for this stage on this device; each unsold row says its measured reason.
    */
   rungHeading: 'A WIDER BUDGET',
-  rungDevice: 'Bought from this device\u2019s chimes, for this stage on this device.',
+  rungDevice: 'Paid in chimes, for this stage on this device.',
   rungBuy: 'Buy it',
-  rungUnmeasured: 'The census has no count at this rung, so whether it adds a way through is not known.',
+  rungUnmeasured: 'Nothing has been counted at this rung, so it isn’t known whether it adds a way through.',
   rungAboveUnbought: 'Sold once the rung below it is bought.',
   /*
    * GitHub issue #626 item 4, § D1496: a press plays one of the stage's crowds under both settings
    * while the verdict is measured on all of them. No digit in any of these: the block stands over the
    * verdict and publishes no figure (§ D644 ruling 4).
    */
-  watchEyebrow: 'One of the stage\u2019s crowds, watched',
-  watchNote: 'The verdict is all of them, both settings on the same passengers.',
+  watchEyebrow: 'Watching one of the stage\u2019s crowds',
+  watchNote: 'The verdict uses all of them, with both settings on the same passengers.',
   watchBaselineCaption: 'As the building has it',
   watchCandidateCaption: 'With your settings',
   watchSkip: 'Stop watching',
@@ -242,16 +242,16 @@ export const STAGE_PLAY_COPY = Object.freeze({
    * settings. Said about the counts only, which are equal exactly; nothing here claims a mean moved
    * or did not.
    */
-  sameAsShipped: 'Every count here is the same as the building’s own setting got, so on this stage your change moved none of them.',
-  sameAsPrevious: 'Every count here is the same as your last run got on other settings, so that change moved none of them on this stage.',
-  labLink: 'Open this stage on the Engineer surface',
-  labNote: 'The Engineer surface draws every dial the stage’s budget reaches and the full report. A clear there pays nothing.',
+  sameAsShipped: 'Every count matches the building’s own setting, so your change moved none of them on this stage.',
+  sameAsPrevious: 'Every count matches your last run on other settings, so that change moved none of them on this stage.',
+  labLink: 'Open this stage in Engineer',
+  labNote: 'Engineer shows every dial the budget reaches and the full report. A clear there pays nothing.',
   /*
    * Ruling R10 ([§ D1622](../../../../DECISIONS.md)), amendment 4: the split's place, held while its
    * batch runs with no figure in it, and the one line a failed batch leaves.
    */
   splitPending: 'Each of your two changes, with the other kept, is still running on the stage’s own crowds.',
-  splitFailed: 'The run that splits your two changes stopped before it finished, so this block has nothing to show.',
+  splitFailed: 'The run that splits your two changes stopped before it finished.',
 });
 
 /** What the player has set. `parking` is `null` for *as the building has it*. */
@@ -913,7 +913,7 @@ function refusalOf(facts: StagePlayFacts): string | undefined {
     case 'over-budget':
       return (
         `Over budget: these settings cost ${String(facts.admission.units)} units and this stage opens on ` +
-        `${String(facts.budgetUnits)}, so the stage is not run.`
+        `${String(facts.budgetUnits)}.`
       );
   }
 }
@@ -935,7 +935,7 @@ function statusOf(phase: StagePlayPhase, replications: number): string | undefin
    */
   return phase.seedSet === 'tuning'
     ? `Running ${done} of the stage’s own crowds, both settings on the same passengers.`
-    : `Met on the stage’s own crowds. Now ${done} crowds kept apart from them; these decide the clear.`;
+    : `Met on the stage’s own crowds. Running ${done} crowds kept apart from them, which decide the clear.`;
 }
 
 function verdictViewOf(facts: StagePlayFacts, verdict: StagePlayVerdictFacts, stale: boolean): StagePlayVerdictView {
@@ -1052,7 +1052,7 @@ export function stageRungRowOf(rung: StageRungFacts, balanceChimes: number): Sta
     return { stepId: rung.stepId, text: `${head} Not sold. ${STAGE_PLAY_COPY.rungUnmeasured}`, offer: 'not-sold', buyLabel: undefined };
   }
   const found =
-    `The census found ${waysText(rung.survivors)} at ${String(rung.units)} units, against ` +
+    `${waysText(rung.survivors)} counted at ${String(rung.units)} units, against ` +
     `${String(rung.survivorsBelow)} at ${String(rung.unitsBelow)}.`;
   if (!rung.sold && rung.addsWay) {
     return {
@@ -1065,7 +1065,7 @@ export function stageRungRowOf(rung: StageRungFacts, balanceChimes: number): Sta
   if (!rung.sold) {
     return {
       stepId: rung.stepId,
-      text: `${head} Not sold. The census found ${waysText(rung.survivors)} at it, the same as at ${String(rung.unitsBelow)} units, so it would buy no new way through.`,
+      text: `${head} Not sold. ${waysText(rung.survivors)} counted at it, the same as at ${String(rung.unitsBelow)} units, so it would buy no new way through.`,
       offer: 'not-sold',
       buyLabel: undefined,
     };
@@ -1120,8 +1120,8 @@ export function stagePlayViewOf(facts: StagePlayFacts, phase: StagePlayPhase): S
     })),
     parking: facts.parking,
     runNote:
-      `A run is ${String(facts.replications)} runs of ${minutesOf(facts.durationS)} of building time on this ` +
-      `stage’s own crowds, your settings and the building’s on the same passengers. If every goal is met, ` +
+      `Each press plays ${String(facts.replications)} of this stage’s own crowds for ${minutesOf(facts.durationS)} of building time, ` +
+      `with your settings and the building’s on the same passengers. If every goal is met, ` +
       `${String(facts.replications)} more follow on crowds kept apart from the stage’s own, and those decide the clear.`,
     practice: facts.clearedBefore === true ? stagePracticeLineOf(facts.parUnits, facts.keptSpentUnits) : undefined,
     status: statusOf(phase, facts.replications),

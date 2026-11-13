@@ -38,14 +38,11 @@ export const WORLD_FIGURES_LABEL = 'WORLD FIGURES UNAVAILABLE';
 /**
  * Why, in one sentence a player reads.
  *
- * It names the mechanism (*every posted run is replayed by the server before it appears*) because
- * that mechanism is § 14's own reason the boards are worth reading, and a refusal that dropped it
- * would leave a reader thinking the figures are merely missing rather than deliberately unposted.
+ * One short reason, so the band stays a labelled state. The mechanism (*every posted run is
+ * replayed by the server before it appears*) is said where a board is drawn or explained:
+ * `weekView.ts`'s board rules and `boardScreen.ts`.
  */
-export const WORLD_FIGURES_REASON =
-  'Nobody else’s runs can be reached from this build — there is no server to post them to, and a ' +
-  'figure about other players that was not replay-verified is not a figure. Everything about ' +
-  'your own day below is measured from the run itself.';
+export const WORLD_FIGURES_REASON = 'Other players’ results aren’t available here.';
 
 /**
  * What each world figure would have been, named rather than left blank — ENGINE_CONTRACT § 12's
@@ -55,10 +52,10 @@ export const WORLD_FIGURES_REASON =
  * rule 15 asks for beyond *that something is*.
  */
 export const WORLD_FIGURES_ABSENT: readonly string[] = Object.freeze([
-  'how many people played this tower, and how the middle one of them did',
-  'the longest wait anybody recorded, and the two distributions your run would sit in',
-  'today’s board — the top runs on this crowd, with your row at its real rank',
-  'the style split — what everyone else brought, captioned as a share and not a ranking',
+  'how many people played this tower, and how the middle one did',
+  'the longest wait anyone recorded, and the two charts your run would sit in',
+  'today’s board: the top runs on this crowd, with your row at its rank',
+  'the style split: what everyone else brought, as a share and not a ranking',
 ]);
 
 /**
@@ -75,7 +72,6 @@ export const WORLD_FIGURES_ABSENT: readonly string[] = Object.freeze([
  */
 export function percentileLine(dayClosed: boolean): string {
   return dayClosed
-    ? 'Your place among today’s players cannot be shown — there is no verified distribution to ' +
-        'put your run in.'
-    : 'Nothing to place yet — the day is not closed.';
+    ? 'Your place among today’s players isn’t available here.'
+    : 'Nothing to place yet. Today is not closed.';
 }

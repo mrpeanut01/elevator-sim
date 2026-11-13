@@ -161,7 +161,7 @@ export interface ScenarioHubView {
 export const SCENARIO_COPY = Object.freeze({
   eyebrow: 'Scenario',
   title: 'Pick a problem',
-  lede: 'A building with something wrong with it. Watch it, read the letter, change what you like, and run it again.',
+  lede: 'A building with something wrong. Read the letter, change it, run it again.',
   /*
    * The note carries **no count of sources**, deliberately. It said *"Two of the four kinds of
    * scenario are playable"* and was wrong within a wave of being written, because a literal about
@@ -169,30 +169,29 @@ export const SCENARIO_COPY = Object.freeze({
    * true, and is what a reader needs, is that each row says its own state — so that is what it
    * says, and `SCENARIO_ABSENCES` carries what is missing.
    */
-  note: 'Every row here says what it is and, where it is held back, why. What this list cannot reach yet is written under it.',
+  note: 'Each row says what it is and, where it is held back, why.',
   /** Wave AQ lane AQ-1: a path row's budget, census and press notes, folded under this. */
   pathDetails: 'Details',
   /** Wave AR lane AR-3 (§ D1534): a held row's face, with the census's reason under Details. */
-  heldShort: 'Not open to play yet. Details says why.',
+  heldShort: 'Not open yet. Details says why.',
   /** The § 3.3 primary while a stage is left to clear, which opens {@link ScenarioHubView.startHere}. */
   startHere: (position: number): string => `Play stage ${String(position)}`,
   /** Drawn where nothing has provided the path — never an empty list, never a spinner. */
-  pathAbsent:
-    'The ten stages on the path are read from the campaign’s own file, and this page has not been handed it. Reload if it does not appear.',
+  pathAbsent: 'The path has not loaded yet. Reload if it does not appear.',
   /** § D1129 clause 4: a cleared stage's row. It pays once and unlocks nothing, and says both. */
-  cleared: 'Cleared on this device. Its chimes are paid, and clearing it again pays nothing.',
+  cleared: 'Cleared. Its chimes are paid, and clearing it again pays nothing.',
   /** § D1234: what a par mark on a stage row is measured against. */
-  parBasis: 'the cheapest way through the census found on this stage’s page',
+  parBasis: 'the cheapest way through we found on this stage’s page',
   /* § D1417: what meeting it pays, said in `scenario/par.ts`'s one sentence. It read *"pays nothing extra"*. */
   parPays: PAR_PAYS_LINE,
   /* § D1358: the arms a cleared row draws where it earns no mark. */
   parFree:
-    'Par is free here: the cheapest way through the census found on this stage’s page costs nothing, so no clear is marked against it.',
+    'Par is free here: the cheapest way through we found costs nothing, so no clear is marked against it.',
   parNone:
-    'This stage has no par: no way through the census found on its page could be priced, so no clear is marked against one.',
-  parUnkept: 'What your clear cost was not kept on this device, so it is not compared.',
+    'This stage has no par: none of the ways through we found could be priced, so no clear is marked against one.',
+  parUnkept: 'The cost of your clear was not kept, so it is not compared.',
   /* § D1358: a cleared stage can be run again as practice. */
-  parPractice: 'Run it again as practice to chase it: a clear pays once, and a practice run can only move your mark up.',
+  parPractice: 'Run it again as practice to chase par. A clear pays once, and practice can only move your mark up.',
 });
 
 function unitsText(units: number): string {
@@ -265,8 +264,8 @@ export const SCENARIO_ENTRIES: readonly ScenarioEntry[] = Object.freeze([
      * the door can change both rather than implying neither moves.
      */
     blurb:
-      'One day on one building. The crowd is the same for everybody today; the building is the one ' +
-      'your week is on, and the door lets you change it.',
+      'One day on the building your week is on. Everybody gets the same crowd today, and you can ' +
+      'change building at the door.',
     /*
      * Composed in `everyday/sittingShape.ts` from the contract day's own length and the rung the
      * stage opens on, never typed here — GitHub issue #559, which measured *"~3 min"* against a
@@ -280,7 +279,7 @@ export const SCENARIO_ENTRIES: readonly ScenarioEntry[] = Object.freeze([
   Object.freeze({
     id: 'fix-a-building',
     title: 'Fix a building',
-    blurb: 'A building with something wrong. Diagnose it, change it, re-run it.',
+    blurb: 'Work out what is wrong, change it, and re-run it.',
     shape: SITTING_SHAPES.fixCase,
     screen: 'fixit' as const,
   }),
@@ -333,7 +332,7 @@ export const SCENARIO_ENTRIES: readonly ScenarioEntry[] = Object.freeze([
  */
 export const SCENARIO_ABSENCES: readonly string[] = Object.freeze([
   'A stage cleared from the path pays its chimes once and does not reach a career, whose towers are a path of their own. Nothing here sells a stage a wider budget yet.',
-  'Two of the six engineering challenges ship, and they are played on the Engineer surface rather than from this list. The other four ask for something a scenario run cannot do yet, and each says which.',
+  'Two of the six engineering challenges ship, and you play them in Engineer, not from this list. The other four need something a scenario run cannot do yet, and each says what.',
 ]);
 
 /* -------------------------------------------------------------------------- *
@@ -344,11 +343,10 @@ export const SCENARIO_ABSENCES: readonly string[] = Object.freeze([
 export const OWN_BUILDINGS_COPY = Object.freeze({
   heading: 'Your buildings',
   lede:
-    'Buildings you drew and saved on the Design floor. Play a day in one from its brief to its ' +
-    'report. Each has a week of its own, and a day there is yours alone: it is not posted to a ' +
-    'board and it earns no chimes.',
+    'Buildings you saved on the Design floor. Each has a week of its own. A day there is not ' +
+    'posted to a board and earns no chimes.',
   play: 'Play a day',
-  empty: 'You have not saved a building yet. Draw one on the Design floor and it is listed here.',
+  empty: 'No saved buildings yet. Draw one on the Design floor.',
   design: 'Design a building',
   /* § D1631: the shelf can be kept. */
   rename: 'Rename',
@@ -356,7 +354,7 @@ export const OWN_BUILDINGS_COPY = Object.freeze({
   saveName: 'Save name',
   cancel: 'Cancel',
   remove: 'Remove',
-  removeAsk: 'Remove this building from this device? It cannot be brought back.',
+  removeAsk: 'Remove this building? It cannot be brought back.',
   removeYes: 'Remove it',
   removeNo: 'Keep it',
 });
@@ -439,10 +437,9 @@ function heldRegisterLine(rows: readonly ScenarioPathRow[]): string | undefined 
   if (held === 0) return undefined;
   return (
     `${String(held)} of the ${String(rows.length)} stages on the path are listed with their ` +
-    'counts and are not offered to play: nothing that was tried on them got through. That is a ' +
-    'measurement of the content rather than of you, and the ways-in that were tried by name were ' +
-    'all tried, while the ones drawn from the dials were a sample — so it is none found rather ' +
-    'than none there.'
+    'counts but are not open to play: nothing we tried on them got through. That measures the ' +
+    'stage, not you. Every named way in was tried, but the dial settings were a sample, so it is ' +
+    'none found rather than none there.'
   );
 }
 
@@ -490,8 +487,7 @@ function pathViewOf(
      * up from the survivor sentence itself.
      */
     offerLine:
-      `${String(counts.listed)} stages on the path, ${String(counts.offered)} of them open to ` +
-      'play from here today.',
+      `${String(counts.listed)} stages, ${String(counts.offered)} open to play.`,
   });
 }
 

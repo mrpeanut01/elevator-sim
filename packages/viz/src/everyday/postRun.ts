@@ -68,14 +68,13 @@ export const POST_RUN_COPY = Object.freeze({
    * checks it (the server, by replaying the seed), and that a refusal is not an accusation.
    */
   note:
-    'Posting sends this run’s seed and settings, and the four figures it measured. The server ' +
-    'replays the seed from its own copy of the reference data and compares — a run only reaches a ' +
-    'board if it reproduces there.',
+    'Posting sends this run’s crowd number and settings, and the four figures it measured. The ' +
+    'server replays the run, and it only reaches a board if the server gets the same result.',
   /*
    * The one sentence this module authors about a success. It says what the server did rather than
    * congratulating anybody, and the placement line beside it says where the run went.
    */
-  posted: 'Posted. The server replayed your seed and it reproduced.',
+  posted: 'Posted. The server replayed your run and got the same result.',
   /*
    * Where the run landed, one sentence per board the server has — see {@link placementLineOf}.
    *
@@ -90,11 +89,10 @@ export const POST_RUN_COPY = Object.freeze({
    * on the thing they just joined.
    */
   postedDaily:
-    'It went on today’s board: this run met the day’s fixture, so it is ranked against everyone ' +
-    'else who played it.',
+    'It’s on today’s board, ranked against everyone else who played this day.',
   postedPersonal:
-    'It went in your own record log: this run is not today’s fixture, so there is nobody to rank ' +
-    'it against. It is kept, and it is yours.',
+    'It’s in your own record log. This run wasn’t today’s shared day, so there is nobody to rank ' +
+    'it against.',
   /*
    * A `placement` this build has no sentence for — a server ahead of this client, or a field it
    * omitted. Says the two things that are still true and does not guess the third.
@@ -103,19 +101,16 @@ export const POST_RUN_COPY = Object.freeze({
    * exists because of, one release later.
    */
   postedUnknownBoard:
-    'The server accepted it and put it on a board this build does not have a name for. The run is ' +
-    'recorded either way.',
+    'The server accepted it, on a board this version can’t name. The run is recorded either way.',
   /*
    * Why a run this shell will not post cannot be posted from anywhere else either. Drawn beside the
    * refusal so the player does not go looking for a second button.
    */
   refusedNote:
-    'This is checked here rather than on the server, so nothing was sent. The run is still on ' +
-    'screen and still in your week.',
+    'This was checked on this device, so nothing was sent. The run is still in your week.',
   /** The pressable-but-nothing-to-post case, in the note's own place. */
   noRun:
-    'There is no finished run to post yet. Play a day, then come back — the run on screen is what ' +
-    'gets posted.',
+    'There is no finished run to post yet. Play a day first.',
 } as const);
 
 /**

@@ -324,8 +324,8 @@ export function briefCarriedDriverLineOf(input: {
   const why = input.driverId === before.startedWithId ? `, the driver ${before.weekday} started with` : '';
   return (
     `${input.weekday} opens on ${input.driverName}${why}. ${before.weekday}’s handover to ${handover.toName} ` +
-    `at ${handover.clock} kept to ${before.weekday}: a handover on the stage lasts the rest of its own day, ` +
-    `and only the driver picked on this brief carries over. To drive with ${handover.toName} today, pick it here.`
+    `at ${handover.clock} lasted only that day. Only the driver you pick here carries over. ` +
+    `To drive with ${handover.toName} today, pick it here.`
   );
 }
 
@@ -396,11 +396,11 @@ export function raceAgainstCard(): BriefRefusalCard {
      * newcomer's first — and on a `?seed=` link it is not, and the seed line two rows up says so.
      */
     what:
-      'A second dispatcher driving a second copy of this run’s crowd beside yours — the plain ' +
+      'A second dispatcher drives a second copy of this run’s crowd beside yours: the plain ' +
       'baseline, your latest saved, or nobody.',
     why: built
-      ? 'Pick one on the stage, under THE DAY SO FAR: the rival drives the same crowd from the ' +
-        'same seed, so the gap between the two lines is your change and not the morning.'
+      ? 'Pick one on the stage, under THE DAY SO FAR. Both drive the same crowd, so the gap between the two lines is ' +
+        'your change and not the morning.'
       : `Not here yet: ${unbuiltReasonFor('stage')}.`,
     caveat: 'One day each is a race, not proof. The test bench settles it properly.',
     door: undefined,
@@ -469,10 +469,10 @@ export function lockedForScore(
      */
     what:
       (crowdIsToday
-        ? 'The crowd is the day’s and the tower is your week’s — neither is yours to pick from here. '
-        : 'The crowd is this run’s own rather than the day’s, and the tower is your week’s — neither ' +
-          'is yours to pick from here. ') +
-      'You can change all of it, the machines too — the run just stops counting.',
+        ? 'The crowd is the day’s and the tower is your week’s, so you can’t pick either here. '
+        : 'The crowd is this run’s own rather than the day’s, and the tower is your week’s, so you ' +
+          'can’t pick either here. ') +
+      'You can change all of it, the machines too, but the run just stops counting.',
     /*
      * **The door names a state, never a destination** — GitHub issue #225,
      * [§ D496](../../../../DECISIONS.md). It read *Take it to the sandbox*, a verb and a place, which
@@ -486,8 +486,8 @@ export function lockedForScore(
      * site.
      */
     why: built
-      ? 'Change anything you like: the day still runs with what you changed, it just stops ' +
-        'counting on today’s board — a sandbox day, not a scored one.'
+      ? 'A changed day still runs. It’s a sandbox day, not a scored one, and it stays off ' +
+        'today’s board.'
       : `Change it here: ${unbuiltReasonFor('tuner')}.`,
     /*
      * **What the door opens, named from the screen's own control list** — wave AO, lane AO-2,
@@ -542,7 +542,7 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
     load:
       today.load === undefined
         ? undefined
-        : { heading: 'THE CROWD, AS CONFIGURED', word: today.load.word, note: today.load.note },
+        : { heading: 'THE CROWD, AS PLANNED', word: today.load.word, note: today.load.note },
     wrinkle: {
       heading: 'TODAY’S WRINKLE',
       title: today.wrinkleName,
@@ -554,15 +554,14 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
        * wrinkles, and the front door's picker (§ D912) resumes weeks at any day. What is shared is
        * the day of the week, whatever the tower.
        */
-      shared: 'Anyone on this day of their week meets the same one, at the same point in the day, whatever the tower.',
+      shared: 'Everyone on this day of their week gets the same one, at the same point in the day, whatever the tower.',
     },
     asks: {
       /* One constant over these five bars — GitHub issue #567. `shift/goals.ts` owns it. */
       heading: TODAY_ASKS_HEADING,
       rows: today.asks,
       note:
-        'Nothing is graded until twenty people have turned up, so a quiet morning is read rather ' +
-        'than marked.',
+        'Goals start once twenty people have turned up.',
     },
     wayThrough:
       today.wayThrough === undefined

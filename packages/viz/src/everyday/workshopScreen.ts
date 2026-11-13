@@ -107,7 +107,7 @@ import {
 import { plainLeverEchoOf, plainLeverHelp, plainLeverSub } from '../mode/plainLevers.js';
 
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
-import { sideBySide } from './screenDom.js';
+import { explainer, sideBySide } from './screenDom.js';
 import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import type { NameRefusal } from '../dev/dispatcherEditor.js';
@@ -1854,7 +1854,7 @@ function mountWorkshop(
           });
           controls.append(valueSelect);
         }
-        const drop = el(doc, 'button', 'everyday-workshop-and-drop', 'drop');
+        const drop = el(doc, 'button', 'everyday-workshop-and-drop', 'Drop');
         drop.type = 'button';
         drop.setAttribute('aria-label', `Drop ${ordinal}`);
         drop.style.cssText = PILL;
@@ -1866,7 +1866,7 @@ function mountWorkshop(
       if (rowView.canAddCondition) {
         const more = el(doc, 'button', 'everyday-workshop-and-add', 'and…');
         more.type = 'button';
-        more.setAttribute('aria-label', `and… a further condition for rule ${String(index + 1)}`);
+        more.setAttribute('aria-label', `and… add a condition to rule ${String(index + 1)}`);
         more.style.cssText = PILL;
         more.addEventListener('click', () => {
           setRows(rows.map((entry, at) => (at === index ? rowWithAnotherCondition(entry) : entry)));
@@ -1911,7 +1911,7 @@ function mountWorkshop(
         controls.append(valueSelect);
       }
 
-      const remove = el(doc, 'button', 'everyday-workshop-rule-delete', 'delete');
+      const remove = el(doc, 'button', 'everyday-workshop-rule-delete', 'Delete');
       remove.type = 'button';
       remove.style.cssText = `margin-left:auto;cursor:pointer;border:1px solid ${C.rule};border-radius:${String(R.pill)}px;background:transparent;padding:4px 11px;font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
       remove.addEventListener('click', () => {
@@ -1933,7 +1933,7 @@ function mountWorkshop(
       wrap.append(row);
     });
 
-    const add = el(doc, 'button', 'everyday-workshop-rule-add', 'add a rule');
+    const add = el(doc, 'button', 'everyday-workshop-rule-add', 'Add a rule');
     add.type = 'button';
     add.style.cssText = `cursor:pointer;border:1.5px solid ${C.rule};border-radius:${String(R.pill)}px;background:${C.cardSunk};padding:7px 15px;font:500 12px ${TYPE.mono};color:${C.ink}`;
     add.addEventListener('click', () => {
@@ -1941,15 +1941,22 @@ function mountWorkshop(
     });
     wrap.append(add);
 
-    for (const [cls, text] of [
-      ['everyday-workshop-rules-vocabulary', view.vocabularyNote],
-      ['everyday-workshop-rules-fallback', view.fallback],
+    const fallback = el(doc, 'p', 'everyday-workshop-rules-fallback', view.fallback);
+    fallback.style.cssText = `${NOTE};margin:10px 0 0`;
+    wrap.append(fallback);
+    /* The two long notes are read once, so they sit behind a link under the list they are about. */
+    const notes = [
       ['everyday-workshop-rules-exclusivity', view.exclusivity],
-    ] as const) {
+      ['everyday-workshop-rules-vocabulary', view.vocabularyNote],
+    ].map(([cls, text]) => {
       const line = el(doc, 'p', cls, text);
-      line.style.cssText = `${NOTE};margin:10px 0 0`;
-      wrap.append(line);
-    }
+      line.style.cssText = `${NOTE};margin:0 0 10px`;
+      return line;
+    });
+    const how = el(doc, 'div');
+    how.style.cssText = 'margin-top:8px';
+    how.append(explainer(doc, { link: COPY.rulesLink, title: COPY.rulesLink, body: notes }).root);
+    wrap.append(how);
     return wrap;
   }
 
@@ -2012,7 +2019,10 @@ function mountWorkshop(
         // The way back to the shelf is not a write.
         // Neither is running the test bed: it changes nothing the attempt runs on.
         control.disabled =
-          !control.matches('.everyday-workshop-back') && control.closest('.everyday-workshop-bed') === null;
+          !control.matches('.everyday-workshop-back') &&
+          control.closest('.everyday-workshop-bed') === null &&
+          // Nor is reading an explanation.
+          control.closest('.everyday-explainer') === null;
       }
     }
     context.refreshBar();

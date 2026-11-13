@@ -147,12 +147,12 @@ describe('the menu a player reads', () => {
 describe('the setup screen’s line about the rebuild — § D1295', () => {
   it('says what a wave pays from the purse’s own figure, and the opening purse only when there is one', () => {
     const standard = rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, 0);
-    expect(standard).toContain(`pays ${String(RUSH_PURSE.unitsPerWaveOutlasted)} units into a purse`);
+    expect(standard).toContain(`pays ${String(RUSH_PURSE.unitsPerWaveOutlasted)} units into your purse`);
     expect(standard).toContain('What you buy stays for the rest of the sitting.');
     expect(standard).not.toContain('opens with');
     expect(rushRebuildLineOf(RUSH_PURSE.unitsPerWaveOutlasted, 15)).toContain('This sitting opens with 15 units you bought with chimes.');
     expect(rushRebuildLineOf(1, 1)).toBe(
-      'Each wave a round outlasts pays 1 unit into a purse, and between rounds you can spend it rebuilding the tower: ' +
+      'Each wave a round outlasts pays 1 unit into your purse. Between rounds you can spend it rebuilding the tower: ' +
         'doors, control, car size and queue marshalling. What you buy stays for the rest of the sitting. This sitting ' +
         'opens with 1 unit you bought with chimes.',
     );

@@ -148,32 +148,31 @@ export const RUSH_REBUILD_COPY = Object.freeze({
    * sitting is runs from an as-shipped start, and the swarm's default that a bought tier stays fitted.
    */
   purseNote:
-    'Counted here from how many waves each round outlasted, the way the server counts it when you post ' +
-    'the sitting. Whatever you buy stays fitted for every later round of this sitting, and the next ' +
-    'sitting starts from the building as shipped.',
+    'The purse counts the waves each round outlasted. What you buy stays fitted for the rest of this ' +
+    'sitting. The next sitting starts from the building as shipped.',
   /** The measured reason the rows say what a tier fits rather than what it is worth — see the module docstring. */
   unmeasured:
-    'What a tier does to how long the next round holds is not known until you play it. On the towers ' +
-    'measured, the same tier held longer on one, shorter on another, and changed nothing on a third.',
+    'You won’t know what a tier does to the next round until you play it. On the towers measured, the ' +
+    'same tier held longer on one, shorter on another, and changed nothing on a third.',
   fitted: 'Fitted for the rest of this sitting.',
-  picked: 'Bought for the next round. Press it again to put the units back.',
+  picked: 'Bought for the next round. Press again to put the units back.',
   buy: (units: number): string => `Buy for ${String(units)} ${units === 1 ? 'unit' : 'units'}`,
   undo: 'Put it back',
   short: (units: number): string => `Short by ${String(units)} ${units === 1 ? 'unit' : 'units'}.`,
   /** `core`'s `rushTierChangesNothing` — the structural check, which is all this screen can know before a run. */
-  changesNothing: 'Changes nothing on this tower: it would build the tower this sitting already has.',
+  changesNothing: 'Changes nothing here: this tower already has it.',
   /** Shafts and Machines — refused by name, with the reason, which is what the ruling asked for. */
   needsCommissioning:
-    'Not sold between rush rounds. It rebuilds how a whole bank is made, and the server that checks a ' +
-    'posted sitting cannot build that, so a round played with it could not be ranked.',
+    'Not sold between rush rounds. It rebuilds a whole bank, which the server that checks a posted ' +
+    'sitting cannot build, so a round played with it could not be ranked.',
   /** Tenants 2 and 3. */
   changesTheCrowd:
-    'Not sold between rush rounds. It changes who arrives, and a rush board ranks sittings that met the ' +
+    'Not sold between rush rounds. It changes who arrives, and the board ranks sittings that met the ' +
     'same crowd.',
   pending: (units: number, left: number): string =>
     `This rebuild costs ${String(units)} ${units === 1 ? 'unit' : 'units'}, leaving ${String(left)} in the purse. ` +
     'Run the rush again to play the next round with it.',
-  noneYet: 'Nothing bought for the next round yet.',
+  noneYet: 'Nothing bought yet.',
   /* What a tier fits, from `core`'s own numbers. Each fragment is a clause of one line. */
   fitsDoors: (seconds: number): string => `${String(seconds)} s off every door cycle`,
   fitsHallDwell: (seconds: number): string => `${String(seconds)} s off the time doors stand open at a landing`,

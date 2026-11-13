@@ -247,8 +247,10 @@ export interface ChimesPanelView {
   readonly heading: string;
   /** *You have 40 chimes.* The one read, and the whole of it. */
   readonly balanceLine: string;
-  /** What chimes are and are not, in two sentences a player meets once. */
+  /** What chimes are, in one line. */
   readonly lede: string;
+  /** The detail behind the *How chimes work* link: how they are earned, kept and spent. */
+  readonly how: { readonly link: string; readonly title: string; readonly body: readonly string[] };
   /** Where the tally lives, and — off an account — that its runs cannot be posted. */
   readonly homeNote: string;
   readonly spendHeading: string;
@@ -302,24 +304,29 @@ export const CHIMES_EARN_RULE =
 
 export const CHIMES_PANEL_COPY = Object.freeze({
   heading: 'CHIMES',
-  lede:
-    `${CHIMES_EARN_RULE} Nothing about them changes while you are away ` +
-    '— none of this refills, runs out, or asks you to come back on a particular day, and there is ' +
+  lede: 'You earn chimes by finishing things that count, and spend them below.',
+  /** The link beside the lede, and the popover it opens: how chimes are earned, kept and spent. */
+  howLink: 'How chimes work',
+  howEarn: CHIMES_EARN_RULE,
+  howKeep:
+    'They don\u2019t refill, run out, or ask you to come back on a particular day, and there is ' +
     'nothing here to buy with money.',
+  howSpend:
+    'They buy what is listed here and a wider budget for a scenario. They never open a slot and ' +
+    'never buy back a missed day.',
+  howSignedOut:
+    'Signed out, they come from this device and what they buy stays with this device\u2019s career.',
   spendHeading: 'WHAT THEY BUY',
   spendNote:
-    'A wider budget for a scenario is the fourth thing chimes are for, and it is not on this list ' +
-    'because each scenario sets its own price for it rather than this table \u2014 so nothing here ' +
-    'charges one. The fix-a-building screen and a stage\u2019s own page do, on the one in front of you.',
+    'Chimes also buy a wider budget for a scenario. Each scenario sets its own price, so you buy ' +
+    'that on the fix-a-building screen or the stage\u2019s own page.',
   /** What the one offered row does, said before the press rather than after it. */
   prefitOffer:
-    'Your next rush starts with the doors, the control and the tenancies already fitted, and it is ' +
-    'bought once. A rush played on a fitted tower is posted to its own board rather than ranked ' +
-    'against towers as built.',
+    'Your next rush starts with the doors, the control and the tenancies already fitted. Bought ' +
+    'once. A rush on a fitted tower posts to its own board, not the one for towers as built.',
   /** And what it does once it is bought, which is the same thing in the past tense. */
   prefitOwned:
-    'Bought. Your next rush starts fitted, and is posted to its own board rather than ranked ' +
-    'against towers as built.',
+    'Bought. Your next rush starts fitted and posts to its own board, not the one for towers as built.',
   /**
    * **What the career top-up does, said before the press** — GitHub issue #557.
    *
@@ -336,12 +343,12 @@ export const CHIMES_PANEL_COPY = Object.freeze({
    * what a step buys, and a copy of it here would be a second.
    */
   purseOffer:
-    'into the purse of the tower your Career desk is open on, to spend on works there like any ' +
-    'other unit. Works still take the nights they take, and nothing here buys back a missed day.',
+    'into the purse of the tower open on your Career desk, to spend on works there. Works still ' +
+    'take their nights, and this never buys back a missed day.',
   /** And what it did, which is the same thing in the past tense. */
   purseOwned:
-    'Bought, as many times as one contract may be topped up. The units are in the purse of the ' +
-    'tower each was bought for, and they are spent on works like any other unit.',
+    'Bought as many times as one contract allows. The units are in the purse of the tower each ' +
+    'was bought for.',
   /**
    * **What the rush top-up does, said before the press** — GitHub issue #372, § D1295. The figure is
    * composed in front of it from the ledger's own `grantUnits`, as the career's is. Two clauses, each
@@ -350,13 +357,12 @@ export const CHIMES_PANEL_COPY = Object.freeze({
    * opened with them ranks only beside sittings with the same modifiers (§ D543).
    */
   rushPurseOffer:
-    'into the purse every rush sitting you start opens with, to spend on rebuilding the tower between ' +
-    'rounds. A sitting that opens with a wider purse is posted to its own board rather than ranked ' +
-    'against the standard purse.',
+    'into the purse every rush you start opens with, to spend on rebuilding the tower between ' +
+    'rounds. A rush that opens with a wider purse posts to its own board, not the standard one.',
   /** And what it did, which is the same thing in the past tense. */
   rushPurseOwned:
-    'Bought, as many times as a rush purse may be topped up. Every rush sitting you start opens with ' +
-    'these units, and is posted to its own board.',
+    'Bought as many times as a rush purse allows. Every rush you start opens with these units ' +
+    'and posts to its own board.',
   /**
    * No campaign desk is open, so a top-up would be charged and land nowhere.
    *
@@ -365,8 +371,7 @@ export const CHIMES_PANEL_COPY = Object.freeze({
    * a second cause: a purchase that reaches no run.
    */
   purseNoTower:
-    'Open a building on the Career screen first — this tops up that tower\u2019s purse, so there ' +
-    'has to be one.',
+    'Open a building in Career first. This tops up that tower\u2019s purse.',
   /**
    * **What each row does when this device's tally pays** — [§ D1418](../../../../DECISIONS.md),
    * swarm DS's Q3 ruling, which replaced § D911 clause 6 in writing. The account sentences above say
@@ -380,34 +385,33 @@ export const CHIMES_PANEL_COPY = Object.freeze({
    */
   prefitDeviceOffer:
     'Your next rush on this device starts with the doors, the control and the tenancies already ' +
-    'fitted, bought once from this device\u2019s chimes. It stays on this device: a sitting started ' +
-    'fitted is kept here and never posted.',
+    'fitted. Bought once, from this device\u2019s chimes. A rush started fitted stays on this ' +
+    'device and is never posted.',
   prefitDeviceOwned:
-    'Bought on this device. Your next rush here starts fitted, and a sitting started fitted is kept ' +
-    'on this device and never posted.',
+    'Bought on this device. Your next rush here starts fitted, stays on this device and is never posted.',
   purseDeviceOffer:
-    'into the purse of the tower your Career desk is open on, from this device\u2019s chimes, to spend ' +
-    'on works there like any other unit. It stays with this device\u2019s career. Works still take the ' +
-    'nights they take, and nothing here buys back a missed day.',
+    'into the purse of the tower open on your Career desk, from this device\u2019s chimes, to spend ' +
+    'on works there. It stays with this device\u2019s career. Works still take their nights, and ' +
+    'this never buys back a missed day.',
   purseDeviceOwned:
-    'Bought on this device, as many times as one contract may be topped up. The units are in the ' +
-    'purse of the tower each was bought for, in this device\u2019s career.',
+    'Bought on this device, as many times as one contract allows. The units are in the purse of ' +
+    'the tower each was bought for, in this device\u2019s career.',
   rushPurseDeviceOffer:
-    'into the purse every rush sitting you start on this device opens with, from this device\u2019s ' +
-    'chimes, to spend on rebuilding the tower between rounds. A sitting that opens with it is kept ' +
-    'on this device and never posted.',
+    'into the purse every rush you start on this device opens with, from this device\u2019s ' +
+    'chimes, to spend on rebuilding the tower between rounds. A rush that opens with it stays on ' +
+    'this device and is never posted.',
   rushPurseDeviceOwned:
-    'Bought on this device, as many times as a rush purse may be topped up. Every rush sitting you ' +
-    'start here opens with these units, and is kept on this device rather than posted.',
+    'Bought on this device, as many times as a rush purse allows. Every rush you start here opens ' +
+    'with these units, stays on this device and is never posted.',
   /** A device row whose tally the caller did not read, so nothing is offered from it. */
-  rowNoDeviceRead: 'This device\u2019s tally has not been read on this screen, so nothing is offered from it.',
+  rowNoDeviceRead: 'This device\u2019s chimes have not been read here, so nothing is offered from them.',
   /** The account bridge has not answered, so whether this can be pressed is not yet known. */
-  rowBooting: 'Still finding out whether you are signed in, so this is not offered for a moment.',
+  rowBooting: 'Checking whether you\u2019re signed in. Not offered for a moment.',
   /** Served with no API origin: there is no ledger on this build to spend out of. */
-  rowNoLedger: 'This build was served without a ledger, so there is nothing here to spend.',
+  rowNoLedger: 'Spending isn\u2019t available on this page.',
   accountHome:
-    'Your tally lives with your account, so it follows you to whatever you sign in on next, and a ' +
-    'run you widened can be posted like any other.',
+    'Kept with your account, so they follow you wherever you sign in. A run you widened can be ' +
+    'posted like any other.',
   /**
    * **The sentence this replaced is deleted rather than reworded** — § D227, GitHub issue #579. It
    * said *"there is no tally yet — chimes are kept with an account and this build keeps none on
@@ -420,15 +424,14 @@ export const CHIMES_PANEL_COPY = Object.freeze({
    * buys stays on this device, because a device purchase is never posted.
    */
   deviceHome:
-    'You are not signed in, so this tally is kept on this device. It pays for a wider budget on a ' +
-    'scenario or a stage you are playing and for the three below, and whatever it buys stays on this ' +
-    'device: a run that uses it is kept here and never posted.',
+    'You\u2019re signed out, so these chimes are kept on this device. They pay for a wider budget ' +
+    'on a scenario or stage and for the three below. What they buy stays on this device, and a run ' +
+    'that uses them is never posted.',
   /** And where the browser will not keep it — `settingsView.ts#saveNotice`'s shape, one block down. */
   deviceNotDurable:
-    'This device is not keeping storage, so anything finished here is counted until this tab ' +
-    'closes and no longer.',
-  bootingHome: 'Still finding out whether you are signed in, so this tally may yet change hands.',
-  none: 'You have no chimes yet. Finishing anything is what pays them.',
+    'This browser isn\u2019t saving, so they last until this tab closes.',
+  bootingHome: 'Checking whether you\u2019re signed in. This count may change.',
+  none: 'No chimes yet. You earn them by finishing things that count.',
 });
 
 /**
@@ -493,7 +496,7 @@ export const SPEND_OFFERS: Readonly<Record<string, ChimesSpendCopy>> = Object.fr
  * promise kept by a test in another file is a promise a renderer can still break.
  */
 const UNDESCRIBED_SINK =
-  'Not offered. This build has nothing to say about this one, which is a fault rather than a price.';
+  'Not offered. Something is wrong on our side with this one.';
 
 /** The device home's sentence, with the durability caveat only where it is owed. */
 function deviceHomeNoteOf(durable: boolean | undefined): string {
@@ -681,6 +684,16 @@ export function chimesPanelViewOf(input: ChimesPanelInput): ChimesPanelView {
     heading: CHIMES_PANEL_COPY.heading,
     balanceLine: balanceLineOf(table, balance),
     lede: CHIMES_PANEL_COPY.lede,
+    how: {
+      link: CHIMES_PANEL_COPY.howLink,
+      title: CHIMES_PANEL_COPY.howLink,
+      body: [
+        CHIMES_PANEL_COPY.howEarn,
+        CHIMES_PANEL_COPY.howKeep,
+        CHIMES_PANEL_COPY.howSpend,
+        CHIMES_PANEL_COPY.howSignedOut,
+      ],
+    },
     homeNote,
     spendHeading: CHIMES_PANEL_COPY.spendHeading,
     rows: table.sinks.map((sink) => ({
