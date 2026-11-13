@@ -365,7 +365,7 @@ function joinedAxisNames(names: readonly string[]): string {
 
 /** What an axis says, with the id standing in where this build has no name for it. */
 function namedValueOf(axis: ResolvedAxis): string {
-  return axis.name ?? `${axis.id} — not in this build`;
+  return axis.name ?? `${axis.id} (not in this version)`;
 }
 
 /**
@@ -373,8 +373,7 @@ function namedValueOf(axis: ResolvedAxis): string {
  * carry it, because both arms print a name this build resolved.
  */
 const NAMES_ARE_THIS_BUILDS =
-  'The names beside the ids are this build’s own: the board’s identity pins the profile the server ' +
-  'loaded, and this browser does not compute that digest.';
+  'The names beside the ids are this copy of the game’s own, not the server’s.';
 
 /**
  * The configuration sentence, or `undefined` when there is nothing honest to say.
@@ -401,17 +400,16 @@ export function boardRevealOf(configuration: BoardConfiguration): string | undef
     .join(' · ');
   if (configuration.agreed) {
     return (
-      `What every row on this board ran — ${named}. ` +
+      `Every row on this board ran: ${named}. ` +
       'The server replayed each row from those ids before it accepted its figures, so the dispatcher ' +
       `named here is the one that produced them. ${NAMES_ARE_THIS_BUILDS}`
     );
   }
   return (
-    `What every row on this board shares — ${named}. ` +
-    `The rows differ on ${joinedAxisNames(configuration.varying)}. That is named on each row rather ` +
-    'than here, because one value named for the whole board would be a claim about the rows that ' +
-    'did not run it. The server replayed every row from its own ids before it accepted its figures, ' +
-    `so what is named — here and on the rows — is what produced the figures beside it. ${NAMES_ARE_THIS_BUILDS}`
+    `Every row on this board shares: ${named}. ` +
+    `The rows differ on ${joinedAxisNames(configuration.varying)}, which is named on each row. ` +
+    'The server replayed every row from its own ids before it accepted its figures, so what is ' +
+    `named, here and on the rows, is what produced the figures beside it. ${NAMES_ARE_THIS_BUILDS}`
   );
 }
 
@@ -419,9 +417,9 @@ export function boardRevealOf(configuration: BoardConfiguration): string | undef
  * Why this build cannot name part of what ran, or `undefined`.
  *
  * Separate from {@link boardRevealOf} because it is a **refusal** and refusals are shown even when
- * the sentence beside them is fine: a reader looking at a configuration line with `predictive-x —
- * not in this build` in the middle of it deserves to be told what that means rather than left to
- * infer it from a dash.
+ * the sentence beside them is fine: a reader looking at a configuration line with `predictive-x
+ * (not in this version)` in the middle of it deserves to be told what that means rather than left
+ * to infer it.
  *
  * ## Two refusals it no longer makes, and neither was dropped to make a screen quieter
  *
@@ -447,17 +445,16 @@ export function boardRevealRefusalOf(configuration: BoardConfiguration): string 
     // Nothing shared and nothing differing is an empty page: no rows, so no disagreement to report.
     if (configuration.varying.length === 0) return undefined;
     return (
-      'The rows on this board share no part of what they ran, so there is nothing this screen can ' +
-      'say about the board as a whole. Each row names its own configuration instead — one row’s ' +
-      'named for all of them would describe runs it was never true of.'
+      'The rows on this board share no part of what they ran, so nothing is said about the board ' +
+      'as a whole. Each row names its own configuration instead.'
     );
   }
   if (configuration.unresolved.length === 0) return undefined;
   return (
-    `This build does not carry ${configuration.unresolved
+    `This version does not have ${configuration.unresolved
       .map((axis) => `${axis.axis.toLowerCase()} “${axis.id}”`)
-      .join(', ')}. The rows are real — the server replayed every one of them — but this browser ` +
-    'cannot say what those ids are, and it will not invent a name for them.'
+      .join(', ')}. The rows are real, and the server replayed every one of them, but this ` +
+    'browser cannot name those ids.'
   );
 }
 
@@ -548,10 +545,9 @@ export const BEAT_LABEL = 'Run this row’s configuration';
 export function beatDetailOf(run: RunSubmission, variation?: RowVariation | undefined): string {
   return (
     `${variation === undefined ? '' : `${variation.detail}. `}` +
-    `Loads this row’s own configuration with its own seed — ${run.seed} — and runs it. ` +
+    `Loads this row’s own configuration and its own seed, ${run.seed}, and runs it. ` +
     'Left alone it reproduces these four figures exactly, because the same seed brings the same ' +
-    'passengers; changed, it answers with the same people, which is what makes the comparison a ' +
-    'real one rather than an approximate one.'
+    'passengers. Change something and it answers with the same people.'
   );
 }
 
@@ -571,7 +567,7 @@ export function beatRefusalOf(
 ): string | undefined {
   const issues = issuesFor(selectionFromRun(run));
   if (issues.length === 0) return undefined;
-  return `${issues.map((issue) => issue.message).join(' ')} A row this build cannot resolve is still a real run — the server replayed it — and this browser simply cannot reproduce it.`;
+  return `${issues.map((issue) => issue.message).join(' ')} The row is still a real run, and the server replayed it. This browser cannot reproduce it.`;
 }
 
 /**
@@ -602,7 +598,7 @@ export function beatRefusalOf(
  * against restating the capital rule. This adds only the consequence, which nothing said.
  */
 export const BEATING_NOTE =
-  'So what is left to differ between the rows above is the seed: every one of them is that same ' +
-  'dispatcher answering a different set of passengers, which is luck rather than skill. This ' +
-  'week’s challenge is the surface built for the other question — it fixes the seed set for ' +
+  'So the rows above differ only by seed: every one of them is that same dispatcher answering a ' +
+  'different set of passengers, which is luck rather than skill. This week’s challenge asks ' +
+  'the other question: it fixes the seed set for ' +
   'everybody and leaves the dispatcher free.';

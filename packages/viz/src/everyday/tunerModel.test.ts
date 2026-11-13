@@ -701,17 +701,17 @@ describe('what the tuner offers on the day it opens over — wave AO, § D1368',
     expect(crowd).toBeDefined();
     expect(tuneRowsOffered(crowd!, { mixIsTheDays: false }).map((row) => row.key)).toEqual(['rate', 'lobbyShare']);
     expect(tuneRowsOffered(crowd!, { mixIsTheDays: true }).map((row) => row.key)).toEqual(['rate']);
-    expect(TUNER_COPY.lobbyShareIsTheDays).toMatch(/not offered on this day/u);
+    expect(TUNER_COPY.lobbyShareIsTheDays).toMatch(/isn’t offered today/u);
   });
 
   it('lists every control it draws, by card, in the screen’s own words — the list the brief names', () => {
     expect(tuneControlsOffered({ mixIsTheDays: false, machineSteps: true })).toEqual([
-      { card: 'The tower', controls: ['Floors above the lobby', 'Shafts'] },
+      { card: 'The tower', controls: ['Floors above the lobby', 'Cars'] },
       { card: 'The machines', controls: ['Rated speed', 'Capacity', 'Door dwell'] },
       { card: 'The crowd', controls: ['How busy', 'Arriving at the lobby'] },
     ]);
     expect(tuneControlsOffered({ mixIsTheDays: true, machineSteps: false })).toEqual([
-      { card: 'The tower', controls: ['Floors above the lobby', 'Shafts'] },
+      { card: 'The tower', controls: ['Floors above the lobby', 'Cars'] },
       { card: 'The machines', controls: ['Door dwell'] },
       { card: 'The crowd', controls: ['How busy'] },
     ]);

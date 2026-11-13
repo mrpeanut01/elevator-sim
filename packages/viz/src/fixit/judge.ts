@@ -353,44 +353,44 @@ function progressOf(
  * are the interval, so the sentence says which is which.
  */
 export const REPLICATED_BASIS_LINE =
-  'one run before and one after on the letter’s morning, which is the gate, then the same order on forty-nine more mornings, each run beside the building as it stands on the same crowd — and fixed only where the drop holds across those forty-nine.';
+  'One run before and one after on the letter’s morning: that is the gate. Then the same order on forty-nine more mornings, each next to the building as it stands, on the same crowd. Fixed only if the drop holds across those forty-nine.';
 
 /**
  * The same, for an order that changes who arrives: each morning's second run meets that morning's
  * crowd less the people moved, thinned rather than re-drawn since GitHub issue #601 (§ D1076).
  */
 export const REPLICATED_DEMAND_BASIS_LINE =
-  'one run before and one after on the letter’s morning, which is the gate, then the same order on forty-nine more mornings, each run beside the building as it stands — and the change moves who arrives, so each morning’s second run meets that morning’s crowd less the people it moved. Fixed only where the drop holds across those forty-nine.';
+  'One run before and one after on the letter’s morning: that is the gate. Then the same order on forty-nine more mornings, each next to the building as it stands. The change moves who arrives, so each morning’s second run meets that morning’s crowd less the people it moved. Fixed only if the drop holds across those forty-nine.';
 
 /**
  * The basis under a check that stopped at a futility look — § D1120 clause 3. The two lines above
  * say *forty-nine more mornings*, which is false of a check that ran ten.
  */
 export const FUTILITY_BASIS_LINE =
-  'one run before and one after on the letter’s morning, which is the gate, then the same order on the derived mornings in turn, each beside the building as it stands on the same crowd — looked at after ten, twenty, thirty and forty, and stopped at the first look where the complaint was no lower on average.';
+  'One run before and one after on the letter’s morning: that is the gate. Then the same order on more mornings in turn, each next to the building as it stands, on the same crowd. Checked after ten, twenty, thirty and forty, and stopped at the first check where the complaint was no lower on average.';
 
 /** The same, for an order that changes who arrives. */
 export const FUTILITY_DEMAND_BASIS_LINE =
-  'one run before and one after on the letter’s morning, which is the gate, then the same order on the derived mornings in turn, each beside the building as it stands with that morning’s crowd less the people the change moved — looked at after ten, twenty, thirty and forty, and stopped at the first look where the complaint was no lower on average.';
+  'One run before and one after on the letter’s morning: that is the gate. Then the same order on more mornings in turn, each next to the building as it stands, with that morning’s crowd less the people the change moved. Checked after ten, twenty, thirty and forty, and stopped at the first check where the complaint was no lower on average.';
 
 /**
  * The same, for an order that changes which trips the lifts can carry: each morning's second run
  * meets a crowd drawn for the building as changed (§ D1160, `engine.ts#ROUTES_BASIS_LINE`).
  */
 export const REPLICATED_ROUTES_BASIS_LINE =
-  'one run before and one after on the letter’s morning, which is the gate, then the same order on forty-nine more mornings, each run beside the building as it stands — and the order changes which trips the lifts can carry, so each morning’s second run meets a crowd drawn for the building as you changed it. Fixed only where the drop holds across those forty-nine.';
+  'One run before and one after on the letter’s morning: that is the gate. Then the same order on forty-nine more mornings, each next to the building as it stands. Your order changes which trips the lifts can carry, so each morning’s second run meets a crowd drawn for the building as you changed it. Fixed only if the drop holds across those forty-nine.';
 
 /** The futility form of {@link REPLICATED_ROUTES_BASIS_LINE}. */
 export const FUTILITY_ROUTES_BASIS_LINE =
-  'one run before and one after on the letter’s morning, which is the gate, then the same order on the derived mornings in turn, each beside the building as it stands with a crowd drawn for the building as you changed it — looked at after ten, twenty, thirty and forty, and stopped at the first look where the complaint was no lower on average.';
+  'One run before and one after on the letter’s morning: that is the gate. Then the same order on more mornings in turn, each next to the building as it stands, with a crowd drawn for the building as you changed it. Checked after ten, twenty, thirty and forty, and stopped at the first check where the complaint was no lower on average.';
 
 export const JUDGE_COPY = Object.freeze({
   checkingHead: 'It cleared on the letter’s morning. Now checking it on forty-nine more.',
   checkingBody:
-    'One morning can be luck. The same order is running on forty-nine more mornings, each beside the building as it stands. It is called fixed only once all forty-nine are in; it can stop sooner, after ten, twenty, thirty or forty, only to say it is not fixed.',
-  clearedOnceHead: 'It cleared on the letter’s morning, and it did not hold on the others.',
+    'One morning can be luck, so the same order is running on forty-nine more mornings, each next to the building as it stands. It’s fixed only once all forty-nine are in. It can stop early, after ten, twenty, thirty or forty, only to say it is not fixed.',
+  clearedOnceHead: 'It cleared on the letter’s morning but did not hold on the others.',
   clearedOnceClosing:
-    'It cleared on this morning only, which one lucky crowd can do: it is not fixed, and nothing is banked.',
+    'It cleared on this morning only, and one lucky crowd can do that. It is not fixed, and nothing is banked.',
   replicationLabel: 'The same order on forty-nine more mornings',
   /** The live counter's unit, beside *N of 49* — § D1120 clause 4. */
   progressUnit: 'mornings in',
@@ -445,7 +445,7 @@ function unitOf(measure: ComplaintMeasure): string {
 function reductionClause(measure: ComplaintMeasure, replication: FixitReplication): string {
   const { reduction } = replication;
   if (!Number.isFinite(reduction.mean)) {
-    return `the complaint could be read on only ${String(reduction.n)} of ${String(replication.mornings)} mornings, which is no interval at all`;
+    return `the complaint could be read on only ${String(reduction.n)} of ${String(replication.mornings)} mornings, too few for an interval`;
   }
   const digits = 1;
   const direction = reduction.mean >= 0 ? 'fell by' : 'rose by';

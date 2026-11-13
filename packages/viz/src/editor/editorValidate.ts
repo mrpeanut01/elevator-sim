@@ -178,10 +178,9 @@ export function validateBuilding(
 const LANDING_PANEL_REFUSAL_CODE = 'landing-call-type-not-playable';
 
 const LANDING_PANEL_REFUSAL =
-  'per-floor destination panels are not playable in the viewer yet (GitHub issue #437). ' +
-  'A landing that takes its own kind of call can make the run hybrid, holding the riders at some ' +
-  'landings to one car, and this viewer would still show every rider taking whichever car answers. ' +
-  'Remove this field to run the building here.';
+  'per-floor destination panels are not playable in the viewer yet. They can hold the riders ' +
+  'at some landings to one car, and this viewer would still show every rider taking whichever ' +
+  'car answers. Remove this field to run the building here.';
 
 /**
  * One located issue per floor and per floor range that declares a landing call type, floors first,
@@ -232,7 +231,7 @@ export function summariseReport(report: ValidationReport): string {
   if (report.valid) return `valid${warningText}`;
   const count = report.issues.length;
   const more = issuesMayBeIncomplete(report)
-    ? ` (${report.stage === 'json' ? 'JSON' : 'schema'} stage — more may appear once these are fixed)`
+    ? ` (${report.stage === 'json' ? 'JSON' : 'schema'} stage: more may appear once these are fixed)`
     : '';
   return `${String(count)} problem${count === 1 ? '' : 's'}${more}${warningText}`;
 }

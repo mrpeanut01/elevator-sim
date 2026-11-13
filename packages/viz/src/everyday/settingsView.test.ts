@@ -164,7 +164,7 @@ describe('Playing — two wired rows, never a dead toggle (§ 20.12)', () => {
     expect(metres.playing.rows.find((row) => row.id === 'units')).toEqual({
       id: 'units',
       label: 'Units',
-      note: 'machine specifications read in metres or feet',
+      note: 'machine specs shown in metres or feet',
       value: 'metres',
       on: false,
     });
@@ -298,7 +298,7 @@ describe('This device — statements of fact, and the register of refusals besid
     expect(facts.map((fact) => fact.label)).toEqual(['Your progress', 'Posted runs']);
     expect(facts[0]?.value).toBe('on this device');
     expect(facts[1]?.value).toBe('always checked');
-    expect(facts[1]?.note).toContain('re-simulated by the server');
+    expect(facts[1]?.note).toContain('re-run by the server');
   });
 
   /**

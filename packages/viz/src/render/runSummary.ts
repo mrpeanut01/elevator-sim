@@ -302,7 +302,7 @@ function runFigure(recording: VizRecording): SummaryFigure {
     id: RUN_ID,
     label: 'run',
     value: `${recording.buildingName} · ${recording.dispatcherProfileId}`,
-    note: `seed ${recording.seed} — every number below replays exactly from it.`,
+    note: `seed ${recording.seed}: every number below replays exactly from it.`,
     kind: 'observation',
   });
 }
@@ -316,7 +316,7 @@ function windowFigure(summary: VizSummary): SummaryFigure {
     value: `${span.id} · ${span.startS.toFixed(0)}–${span.endS.toFixed(0)} s`,
     note:
       `${summary.windowSeconds.toFixed(0)} s of simulated time. Every figure below is over this ` +
-      'window and over nothing else.',
+      'window only.',
     kind: 'observation',
   });
 }
@@ -407,9 +407,8 @@ function wait95Note(summary: VizSummary): string {
     return `1 in 20 rides waited more than ${summary.wait95S.toFixed(0)} s.`;
   }
   return (
-    'Fewer than 20 rides were served in this window, so a one-in-twenty restatement would ' +
-    'name a ride the sample does not contain. This is the 95th percentile of the rides there ' +
-    'were.'
+    'Fewer than 20 rides were served in this window, so there is no one-in-twenty restatement. ' +
+    'This is the 95th percentile of the rides there were.'
   );
 }
 
@@ -453,8 +452,7 @@ function energyFigure(summary: VizSummary): SummaryFigure {
     note:
       `${movement.join(', ')}. Kilojoules of out-of-balance mechanical work, not kWh: it omits ` +
       'acceleration losses, drive and gearing efficiency, door motors and standby power. An axis ' +
-      'beside the waits above, never a score — the arm that drives least is the arm that carried ' +
-      'fewest people.',
+      'beside the waits above, never a score.',
     kind: 'observation',
   });
 }
@@ -488,7 +486,7 @@ function longWaitsFigure(summary: VizSummary): SummaryFigure {
   const frequency =
     summary.waitCount >= 100
       ? ` That is ${pct.toFixed(0)} in 100 rides.`
-      : ' Fewer than 100 rides were served, so it is stated as a percentage and not as "n in 100".';
+      : ' Fewer than 100 rides were served, so it is a percentage, not "n in 100".';
   return figure({
     id: LONG_WAITS_ID,
     label: `rides over ${threshold} s`,
@@ -524,9 +522,9 @@ function intervalFigure(summary: VizSummary): SummaryFigure {
   const cov =
     achievedInterval.coefficientOfVariation === null
       ? 'Too few gaps to report a coefficient of variation.'
-      : `Spacing CoV ${achievedInterval.coefficientOfVariation.toFixed(2)} — the gaps' standard ` +
-        'deviation divided by their mean. This project sets no threshold for it, so it is a ' +
-        'number here and not a verdict.';
+      : `Spacing CoV ${achievedInterval.coefficientOfVariation.toFixed(2)}: the gaps' standard ` +
+        'deviation divided by their mean. No threshold is set for it, so it is a number, not a ' +
+        'verdict.';
   return figure({
     id: INTERVAL_ID,
     label: 'interval at the terminal',
@@ -635,8 +633,8 @@ export function runSummaryFigures(
       'door to door',
       summary.meanTimeToDestinationS,
       sampleOf(summary.timeToDestinationCount, 'journey'),
-      'A whole journey, spanning every leg and every transfer — not the same unit as the waits ' +
-        'above, which are per ride.',
+      'A whole journey, across every leg and transfer. Not the same unit as the waits above, ' +
+        'which are per ride.',
       suppressed,
       summary,
     ),

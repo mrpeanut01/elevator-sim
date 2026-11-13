@@ -37,7 +37,7 @@
  * § D134 made that the dispatcher the viewer opens on — so the case selected the one already in
  * charge, the panel correctly answered *Already driving* with a disabled button, and the press hung
  * for thirty seconds on a verb the product was right not to offer. The third case then failed on
- * the strip still reading *Nothing to put side by side yet*, which is the same finding one line
+ * the strip still reading *Nothing to compare yet*, which is the same finding one line
  * downstream: no run had started, so no sheet had filed. Established by driving the shipped page
  * before either was touched — the run verb reads `Run this dispatcher`, enabled, the moment any
  * dispatcher that is not the driving one is picked.
@@ -250,7 +250,7 @@ describe.skipIf(!HAS_BROWSER)('the dispatcher editor reports the run it started'
       true,
     );
     expect(strip.text).toContain('What your run moved');
-    expect(strip.text).toContain('Nothing to put side by side yet');
+    expect(strip.text).toContain('Nothing to compare yet');
     expect(strip.rows).toEqual([]);
   });
 
@@ -283,7 +283,7 @@ describe.skipIf(!HAS_BROWSER)('the dispatcher editor reports the run it started'
     await playOutAndFile();
 
     const strip = await readStrip();
-    expect(strip.text).toContain('Left is what the sheet on screen said when you pressed');
+    expect(strip.text).toContain('Left: the sheet on screen when you pressed');
     /*
      * The identity row is the one that must be there whatever the run did — a reader cannot read six
      * moved figures honestly without knowing which dispatcher this is a run of. The figure rows are

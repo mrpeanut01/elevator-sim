@@ -395,7 +395,7 @@ describe('a scored day — § D1169', () => {
     const held = stagePaceOf(scored(lostAtS + 60, { longestStandingS: PACE_HOLD_WAIT_S + 30, lostAtS }));
     expect(held).toEqual({ simPerRealS: BETWEEN_PEAKS_SIM_PER_REAL_S, reason: 'lost' });
     expect(stagePaceNoteOf(held, { acts: [], simTimeS: lostAtS + 60 })).toBe(
-      'the day can no longer clear: playing the rest at 30×, and no call is asked',
+      'the day can no longer clear: playing the rest at 30×, with no more calls',
     );
     /* A chip pressed after the loss is the player's rung, even a slow one; one pressed before it is not. */
     const chosen = stagePaceOf(scored(lostAtS + 60, { longestStandingS: PACE_HOLD_WAIT_S + 30, lostAtS, playerChoseSpeedAtS: lostAtS + 10 }));
@@ -438,7 +438,7 @@ describe('a scored day — § D1169', () => {
       'fast-forwarding at 30×: nobody on a landing has waited a minute',
     );
     expect(stagePaceNoteOf({ simPerRealS: 4, reason: 'watching' }, { acts, simTimeS: 0 })).toBe(
-      'slowed to your speed, 4×, for a wait on a landing of over a minute',
+      'slowed to your speed, 4×, for a wait of over a minute on a landing',
     );
     expect(stagePaceNoteOf({ simPerRealS: 4, reason: 'yours' }, { acts, simTimeS: 0 })).toBe(
       'your speed, 4×, until somebody on a landing has waited a minute',
@@ -1001,7 +1001,7 @@ describe('the chip does not flicker — § D1506', () => {
       const past = row.standing !== undefined && row.standing >= PACE_HOLD_WAIT_S;
       if (row.note.includes('somebody on a landing has waited over a minute')) expect(past).toBe(true);
       /* § D1525: the slowed line is true while the wait stands and through the dwell after it. */
-      if (row.note.includes('for a wait on a landing of over a minute')) expect(past || row.pace.lingering === true).toBe(true);
+      if (row.note.includes('for a wait of over a minute on a landing')) expect(past || row.pace.lingering === true).toBe(true);
       if (row.note.includes('nobody on a landing has waited a minute')) expect(past).toBe(false);
       /* Slowed means the player's rung, and fast-forwarding means faster than it. */
       if (row.note.startsWith('slowed')) expect(row.pace.simPerRealS).toBe(WATCHING);
@@ -1015,7 +1015,7 @@ describe('the chip does not flicker — § D1506', () => {
     expect([...seen].sort()).toEqual(
       [
         stagePlayedOnLineOf('30×'),
-        'slowed to your speed, 4×, for a wait on a landing of over a minute',
+        'slowed to your speed, 4×, for a wait of over a minute on a landing',
       ].sort(),
     );
   });

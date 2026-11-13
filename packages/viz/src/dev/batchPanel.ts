@@ -72,6 +72,7 @@ import {
   PREFERRED_BATCH_CANDIDATE,
   preferredId,
 } from './defaults.js';
+import { explainer } from './dom.js';
 
 export interface BatchPanelElements {
   readonly building: HTMLSelectElement;
@@ -255,31 +256,31 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
   function requestFromForm(): BatchRequest | undefined {
     const seedText = ui.seed.value.trim();
     if (seedText === '' || !/^\d+$/.test(seedText)) {
-      fail('a batch needs a whole-number seed, so that every replication in it replays exactly.');
+      fail('Seed must be a whole number.');
       return undefined;
     }
     const replications = Number(ui.replications.value);
     if (!Number.isSafeInteger(replications) || replications < 1) {
-      fail('replications must be a whole number of at least 1.');
+      fail('Replications must be a whole number, 1 or more.');
       return undefined;
     }
     const durationS = Number(ui.duration.value);
     if (!Number.isFinite(durationS) || durationS <= 0) {
-      fail('duration must be a positive number of simulated seconds.');
+      fail('Duration must be a positive number of simulated seconds.');
       return undefined;
     }
     if (ui.baseline.value === ui.candidate.value) {
       // Not refused. W3's own liveness evidence is a profile against itself reporting "not
       // resolved" rather than a winner, and a reader is entitled to run it.
       ui.status.textContent =
-        'both arms are the same profile — the difference is exactly zero by construction, which is the control this panel is meant to survive.';
+        'Both arms are the same dispatcher, so every difference is exactly zero.';
     }
     const demandText = ui.demand.value.trim();
     let arrivalRatePctPop5min: number | null = null;
     if (demandText !== '') {
       const value = Number(demandText);
       if (!Number.isFinite(value) || value <= 0) {
-        fail('demand must be a positive percentage, or blank for the building’s own profile.');
+        fail('Demand must be a positive percentage, or blank for the building’s own profile.');
         return undefined;
       }
       arrivalRatePctPop5min = value;
@@ -366,7 +367,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     ui.progress.max = total;
     ui.progress.value = 0;
     ui.progress.hidden = false;
-    ui.status.textContent = `starting ${String(total)} replications…`;
+    ui.status.textContent = `Starting ${String(total)} replications…`;
     setRunning(true);
 
     const next = new Worker(new URL('./batchWorker.ts', import.meta.url), { type: 'module' });
@@ -375,13 +376,13 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
       const message = event.data as BatchWorkerMessage;
       if (message.kind === 'progress') {
         ui.progress.value = message.progress.completed;
-        ui.status.textContent = `${String(message.progress.completed)} of ${String(message.progress.total)} replications — the page is still yours while this runs.`;
+        ui.status.textContent = `${String(message.progress.completed)} of ${String(message.progress.total)} replications`;
         return;
       }
       setRunning(false);
       ui.progress.hidden = true;
       if (message.kind === 'failed') {
-        fail(`the batch failed: ${message.message}`);
+        fail(`The batch failed: ${message.message}`);
         stopWorker();
         return;
       }
@@ -393,7 +394,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     next.addEventListener('error', (event: ErrorEvent) => {
       setRunning(false);
       ui.progress.hidden = true;
-      fail(`the batch worker failed to start: ${event.message}`);
+      fail(`The batch worker failed to start: ${event.message}`);
       stopWorker();
     });
     next.postMessage({
@@ -470,7 +471,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
       const details = doc.createElement('details');
       details.className = 'figure-why';
       const summary = doc.createElement('summary');
-      summary.textContent = `why — the arithmetic behind ${item.label}`;
+      summary.textContent = `Why: the arithmetic behind ${item.label}`;
       const noteNode = doc.createElement('p');
       noteNode.className = 'figure-note';
       noteNode.textContent = note;
@@ -525,7 +526,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     const button = doc.createElement('button');
     button.type = 'button';
     button.className = 'remedy-button';
-    button.textContent = `Drop the load 10 % to ${next.toFixed(1)} %pop/5 min and re-run`;
+    button.textContent = `Lower demand 10 % to ${next.toFixed(1)} %pop/5 min and re-run`;
     button.addEventListener('click', () => {
       ui.demand.value = next.toFixed(1);
       /*
@@ -623,16 +624,16 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     switch (item.verdict) {
       case 'shown':
         return excludesZero
-          ? 'excludes zero — an axis, so no arm is named ahead'
-          : 'contains zero — an axis, so no arm is named ahead';
+          ? 'excludes zero · an axis, so no arm is named ahead'
+          : 'contains zero · an axis, so no arm is named ahead';
       case 'under-budget':
-        return 'excludes zero — below the replication budget, so no arm is named ahead';
+        return 'excludes zero · below the replication budget, so no arm is named ahead';
       case 'resolved':
-        return 'excludes zero — this row names the arm ahead';
+        return 'excludes zero · this row names the arm ahead';
       case 'unresolved':
         return excludesZero
           ? 'no interval could be formed'
-          : 'contains zero — not ordered by this batch';
+          : 'contains zero · not ordered by this batch';
       case 'suppressed':
       case 'unmeasured':
         return 'no interval';
@@ -663,10 +664,9 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
   function firstReason(reasons: readonly string[]): string | undefined {
     const first = reasons[0];
     if (first === undefined) return undefined;
-    const rest = reasons.length - 1;
-    return rest === 0
-      ? `One run refused, and said: ${first}`
-      : `${String(reasons.length)} runs refused. The first said: ${first} The other ${String(rest)} each name their own queue growth in the same words.`;
+    return reasons.length === 1
+      ? `1 run refused: ${first}`
+      : `${String(reasons.length)} runs refused. The first said: ${first}`;
   }
 
   /** A row's CSS class from its verdict — never from its metric. */
@@ -731,12 +731,12 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     for (const comparison of report.comparisons) {
       ui.output.append(
         row(
-          'the answer',
+          'answer',
           comparison.summary.answer,
           `${comparison.candidateProfileName} (${comparison.candidateProfileId}) against ` +
-            `${comparison.baselineProfileName} (${comparison.baselineProfileId}). Every ` +
-            'difference below is candidate minus baseline, in that order, so a bar left of the ' +
-            'zero line means the candidate’s number is the smaller one.',
+            `${comparison.baselineProfileName} (${comparison.baselineProfileId}). Differences ` +
+            'are candidate minus baseline, so a bar left of zero means the candidate’s figure ' +
+            'is smaller.',
           comparison.summary.resolved.length > 0 ? 'figure-estimate' : 'figure-observation',
         ),
       );
@@ -756,7 +756,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
        */
       if (comparison.summary.capacityFinding !== null) {
         ui.output.append(
-          row('what can still be said', comparison.summary.capacityFinding, undefined, 'figure-observation'),
+          row('still measurable', comparison.summary.capacityFinding, undefined, 'figure-observation'),
         );
       }
       /*
@@ -768,7 +768,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
        */
       ui.output.append(
         row(
-          'what this batch could say',
+          'summary',
           comparison.summary.sentence,
           comparison.summary.remedy ?? undefined,
           comparison.summary.remedy === null ? 'figure-observation' : 'figure-warning',
@@ -787,7 +787,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
         `${report.buildingName} · ${String(report.replications)} replications per arm · ${String(report.durationS)} s · ${report.demandClause}`,
         // R7: the seed is text, so it can be selected and pasted. Every replication's own seed is
         // `replicationSeed(this, i)`, so this one field replays the whole batch.
-        `seed ${report.seed} — every replication in this batch replays from it.`,
+        `Seed ${report.seed}. The whole batch replays from it.`,
         'figure-observation',
       ),
     );
@@ -869,9 +869,8 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     if (shown.length === 0) return;
     ui.output.append(
       row(
-        'the words above',
-        'What each term on this screen means. Definitions only — nothing here is a result, and ' +
-          'nothing here compares two settings.',
+        'glossary',
+        'What the terms above mean. Definitions only, not results.',
         undefined,
         'figure-observation',
       ),
@@ -907,7 +906,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
         continue;
       }
       ui.output.append(
-        comparisonRow(item, `The same reason as “${first}” above, in the same words.`),
+        comparisonRow(item, `Same reason as “${first}” above.`),
       );
     }
   }
@@ -923,8 +922,8 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     ui.output.append(
       row(
         'goals',
-        'What each candidate goal is on this configuration — a frequency over the runs above, ' +
-          'never a verdict on one of them.',
+        'How often each candidate goal passed over the runs above. A pass rate, never a ' +
+          'verdict on one run.',
         goals.floorNote ?? undefined,
         goals.floorNote === null ? 'figure-observation' : 'figure-warning',
       ),
@@ -967,42 +966,51 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     ui.output.replaceChildren();
     ui.output.append(
       row(
-        'what Compare is for',
-        'A batch runs the same shift over and over, feeds both dispatchers the identical ' +
-          'passengers, and reports the difference between them with a confidence interval.',
-        'One run cannot tell you a dispatcher is better — the same building on a different seed ' +
-          'swings further than most dispatchers do. This is the one screen in the product allowed ' +
-          'to say one beat the other, and it answers “no difference this batch can resolve” ' +
-          'whenever the interval includes zero.',
+        'compare',
+        'A batch runs the same shift many times, gives both dispatchers identical passengers, ' +
+          'and reports the difference between them with a confidence interval.',
+        undefined,
         'figure-observation',
+        explainer(doc, {
+          link: 'Why a batch, not one run',
+          title: 'Why a batch, not one run',
+          body: [
+            'One run can’t tell you a dispatcher is better. The same building on a different ' +
+              'seed swings further than most dispatchers do.',
+            'A batch can say one beat the other. It answers “no difference this batch can ' +
+              'resolve” whenever the interval includes zero.',
+          ],
+        }),
       ),
       row(
         'baseline and candidate',
-        'baseline is what you are comparing against — usually the dispatcher you have been ' +
-          'running. candidate is the change you want to test.',
-        'Every difference below is stated candidate minus baseline, in that order, so a negative ' +
-          'figure means the candidate’s number is the smaller one.',
+        'Baseline is what you compare against. Candidate is the change you want to test.',
+        'Differences are candidate minus baseline, so a negative figure means the candidate’s ' +
+          'is smaller.',
         'figure-observation',
       ),
       costRow(),
       row(
         'demand %pop/5 min',
-        'Leave it blank and the batch runs the building’s own traffic profile at the band point ' +
-          'beside it. A number here overrides both: the percentage of the building’s population ' +
-          'arriving every 5 minutes.',
-        'It is the lever to reach for when a batch comes back saying it has no average wait to ' +
-          'compare — that means a run’s queues never stopped growing, and lowering the load is ' +
-          'what fixes it. When that happens the batch offers the drop as a button rather than ' +
-          'as a paragraph.',
+        'Blank runs the building’s own traffic profile at the traffic band beside it. A number ' +
+          'overrides both: the percentage of the building’s population arriving every 5 minutes.',
+        undefined,
         'figure-observation',
+        explainer(doc, {
+          link: 'When to lower it',
+          title: 'When to lower demand',
+          body: [
+            'If a batch comes back with no average wait to compare, a run’s queues never stopped ' +
+              'growing. Lowering demand is the lever to reach for, and the batch offers it as a ' +
+              'button.',
+          ],
+        }),
       ),
       demandLevelRow(),
       row(
-        'to begin',
+        'start',
         'Press Run batch.',
-        'Nothing is computed until you do. The page stays yours while it runs — the stage in the ' +
-          'Simulation tab keeps moving — and Cancel stops it, which reports nothing, because a ' +
-          'stopped batch has no result.',
+        'The page stays usable while it runs. Cancel stops it, and a stopped batch reports nothing.',
         'figure-observation',
       ),
     );
@@ -1062,16 +1070,21 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     return row(
       'traffic band',
       typed
-        ? `the demand field overrides the band: this batch runs at ${ui.demand.value.trim()} %pop/5 min.`
-        : `the ${level} of this building’s own profile` +
-          `${rate === null ? '' : ` — ${rate.toFixed(1)} %pop/5 min`}`,
-      'Every traffic profile declares a min, a typical and a max arrival rate. This picks which ' +
-        'one to run, and it opens on min because that is the lightest traffic the reference data ' +
-        'says the building sees — the point at which the fewest runs saturate, and so the point ' +
-        'at which a batch has the most means it can stand behind. It is not a guarantee: a ' +
-        'building can saturate at its own minimum, and when it does the rows below say so rather ' +
-        'than quoting a number.',
+        ? `The demand field overrides the band: this batch runs at ${ui.demand.value.trim()} %pop/5 min.`
+        : `The ${level} of this building’s own profile` +
+          `${rate === null ? '' : `: ${rate.toFixed(1)} %pop/5 min`}`,
+      'Each traffic profile declares a min, a typical and a max arrival rate. This picks one.',
       'figure-observation',
+      explainer(doc, {
+        link: 'Why it opens on min',
+        title: 'Why the band opens on min',
+        body: [
+          'Min is the lightest traffic the reference data says the building sees. It is where ' +
+            'the fewest runs saturate, so a batch has the most averages it can report.',
+          'It is not a guarantee. A building can saturate at its own minimum, and the result ' +
+            'rows then say so instead of quoting a number.',
+        ],
+      }),
     );
   }
 
@@ -1085,13 +1098,12 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
       ui.building.options[ui.building.selectedIndex]?.text ?? ui.building.value;
     const minutes = Number.isFinite(durationS) ? Math.round(durationS / 60) : 0;
     return row(
-      'what Run batch will do',
+      'this batch',
       `${buildingLabel} · ${String(arms)} dispatchers × ${String(replications)} replications = ` +
         `${String(simulations)} simulations · ${String(durationS)} simulated seconds each ` +
         `(${String(minutes)} min of building time)`,
-      'duration and the shift window are in simulated seconds, not real ones. This is minutes of ' +
-        'work rather than seconds; the progress bar counts the simulations above. The project ' +
-        'budgets 50–200 replications, and the report says so when you leave that range.',
+      'Durations are simulated seconds. Expect minutes of real time. Budget 50–200 ' +
+        'replications; the report says so when a batch is outside that range.',
       'figure-observation',
     );
   }
@@ -1122,7 +1134,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
     stopWorker();
     setRunning(false);
     ui.progress.hidden = true;
-    ui.status.textContent = 'cancelled — a stopped batch has no result, so nothing is reported.';
+    ui.status.textContent = 'Cancelled. A stopped batch reports nothing.';
     showingEmptyState = true;
     drawEmptyState();
   });

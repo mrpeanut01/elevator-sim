@@ -556,7 +556,7 @@ describe('the commissioning screen can be committed, cancelled and read', () => 
      * the line this change authored rather than the rule being loosened.
      */
     const preview = fabricScreen(movedArm())
-      .notices.filter((line) => line.includes('would be commissioning'))
+      .notices.filter((line) => line.includes('Changed from the building'))
       .join(' ')
       .toLowerCase();
     expect(preview, 'there is no preview line to sweep').not.toBe('');
@@ -581,7 +581,7 @@ describe('the commissioning screen can be committed, cancelled and read', () => 
      * repeats neither number.
      */
     const arm = movedArm();
-    const preview = fabricScreen(arm).notices.filter((line) => line.includes('would be commissioning'));
+    const preview = fabricScreen(arm).notices.filter((line) => line.includes('Changed from the building'));
     expect(preview.length, 'there is no preview line to check').toBe(1);
     for (const figure of [String(arm.review.capitalUnits), String(arm.review.budgetUnits)]) {
       expect(preview[0] ?? '', `the preview restates ${figure}`).not.toContain(figure);
@@ -667,7 +667,7 @@ describe('the root offers a way out that is not a mode being entered', () => {
     const firstSitting = detailAt(false);
     expect(firstSitting).not.toContain('Back to the shift on screen');
     // The honest account: what is behind the menu, that nothing files from it, and where to start.
-    expect(firstSitting).toContain('demo day');
+    expect(firstSitting).toContain('is a demo');
     expect(firstSitting).toContain('nothing is filed from it');
     expect(firstSitting).toContain('Start here');
     // And it stays enabled — issue #97's own requirement, unchanged by the rewording.
@@ -715,10 +715,10 @@ describe('the playback-speed row states its relationship to the stage chips', ()
     const row = rowsOn('settings').find((entry) => entry.id === 'settings.playback-speed');
     expect(row, 'the settings screen lost its playback-speed row').toBeDefined();
     const detail = row?.detail ?? '';
-    expect(detail).toContain('multiplier');
+    expect(detail).toContain('Multiplies');
     expect(detail).toContain('chips');
     // Both directions of the independence, so neither control reads as overriding the other.
-    expect(detail).toContain('survives changing chips');
+    expect(detail).toContain('stays when you change chip');
   });
 });
 
@@ -863,7 +863,7 @@ describe('the root recommends exactly one row, and neither product loses anythin
         promise,
       );
     }
-    expect(casualCopy, 'Casual’s door does not say what it opens').toContain('scenarios board');
+    expect(casualCopy, 'Casual’s door does not say what it opens').toContain('Scenarios board');
 
     const engineer = rootIn('advanced').rows[0];
     expect(engineer?.intent).toEqual({ kind: 'navigate', to: 'free-play' });
@@ -900,7 +900,7 @@ describe('the root recommends exactly one row, and neither product loses anythin
     expect(rootIn('basic', { firstVisit: false }).notices).toEqual([]);
     const welcome = rootIn('basic', { firstVisit: true }).notices;
     expect(welcome.length, 'a stated first visit gets no welcome').toBe(1);
-    expect(welcome[0]).toContain('Nothing was restored');
+    expect(welcome[0]).toContain('First time here?');
   });
 
   /** And it belongs to the screen a player lands on, not to every screen behind it. */
@@ -911,7 +911,7 @@ describe('the root recommends exactly one row, and neither product loses anythin
       expect(
         notices.join(' '),
         `the ${screen} screen welcomes a first-time player it is not the first thing they see`,
-      ).not.toContain('Nothing was restored');
+      ).not.toContain('First time here?');
     }
   });
 });

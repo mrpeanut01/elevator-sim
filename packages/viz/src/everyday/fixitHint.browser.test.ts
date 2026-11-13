@@ -216,7 +216,7 @@ describe.skipIf(!HAS_BROWSER)('a fix case as a search — § D1120', () => {
         card: document.querySelector('.everyday-fixit-outcome')?.textContent ?? '',
         rows: document.querySelectorAll('.everyday-fixit-outcome-row').length,
       }));
-      expect(verdict.head).toBe('It cleared on the letter’s morning, and it did not hold on the others.');
+      expect(verdict.head).toBe('It cleared on the letter’s morning but did not hold on the others.');
       expect(verdict.card).toMatch(/the check stopped after 10 of 49 mornings: the complaint was lower on \d+ of 10, and no lower on average, so no interval is drawn/);
       expect(verdict.card).not.toMatch(/95 % interval/);
       expect(verdict.card).toContain('not fixed, and nothing is banked');

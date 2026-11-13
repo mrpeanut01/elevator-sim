@@ -515,7 +515,7 @@ describe('the rest of the record', () => {
     expect(record.dayLabel).toBe('WEEK 1 · TUESDAY · DAY 2');
     expect(record.weekday).toBe('Tuesday');
     expect(record.seedLine).toBe(
-      'tower midtown-office · crowd 424242 · today’s date, so everyone playing today meets this crowd',
+      'tower midtown-office · crowd 424242 · today’s crowd, the same for everyone playing today',
     );
   });
 
@@ -546,7 +546,7 @@ describe('the rest of the record', () => {
       units: 'metric',
     };
     const own = todayOf(ownInput);
-    expect(own.seedLine).toBe('tower midtown-office · crowd 424242 · a crowd of this run’s own, not the day’s');
+    expect(own.seedLine).toBe('tower midtown-office · crowd 424242 · this run’s own crowd, not today’s');
     expect(own.seedLine).not.toContain('everyone');
     /*
      * § D1141: on a week already under way on another crowd, the line says before the press that the
@@ -566,7 +566,7 @@ describe('the rest of the record', () => {
     };
     const underWay = todayOf({ ...ownInput, week: underWayWeek });
     expect(underWay.seedLine).toBe(
-      'tower midtown-office · crowd 424242 · a crowd of this run’s own, not the day’s, so this run is practice and banks nothing into your week',
+      'tower midtown-office · crowd 424242 · this run’s own crowd, not today’s, so this run is practice and banks nothing into your week',
     );
     /*
      * Wave AL, lane AL-A, the post-AK panel's seat D (H3): the same brief's week block said *This
@@ -862,7 +862,7 @@ describe('the moot sentence is drawn only over the run it was measured on — is
      */
     const press = ladderRowFor('c7')?.pressDay;
     expect(sentence).toContain(`standing order, name of ${press?.standingOrder ?? ''}`);
-    expect(sentence).toContain('with no press at all; the day’s report names');
+    expect(sentence).toContain('with no press at all. The day’s report names');
     for (const id of press?.mootUnder ?? []) expect(sentence).not.toContain(`name of ${id}`);
     /* No digit, the strip's own rule. */
     expect(/\d/u.test(sentence), sentence).toBe(false);
@@ -1024,13 +1024,13 @@ describe('a pinned first day says whose crowd it is, and how long it takes — �
   it('labels the crowd as the pinned one, on the seed line and on the first-session line', () => {
     const pinned = midtownPinned({});
     expect(pinned.crowdIsPinned).toBe(true);
-    expect(pinned.seedLine).toContain('the pinned crowd this day was measured on, not the day’s');
+    expect(pinned.seedLine).toContain('the pinned crowd this day was measured on, not today’s');
     expect(pinned.seedLine).not.toContain('of this run’s own');
     expect(pinned.firstSessionLine).toBe(FIRST_SESSION_LINE_PINNED);
     /* Another crowd on the same tower is not the pinned day, and says so the way it always did. */
     const own = midtownPinned({ seed: 424_242n });
     expect(own.crowdIsPinned).toBe(false);
-    expect(own.seedLine).toContain('a crowd of this run’s own, not the day’s');
+    expect(own.seedLine).toContain('this run’s own crowd, not today’s');
   });
 
   it('says the moot census was measured on this crowd — never *today’s*, which a pin never is', () => {

@@ -470,7 +470,7 @@ describe('the how-to-play entry reaches the page', () => {
     expect(textUnder(summary as Recorded)).toContain('How to play');
     // It says that it opens, in words: the row card takes the disclosure triangle away, and KB-15
     // forbids a signal carried by shape alone.
-    expect(textUnder(summary as Recorded)).toContain('Opens here, and starts nothing');
+    expect(textUnder(summary as Recorded)).toContain('Opens here');
   });
 
   it('puts every section of the guide on the page', async () => {
@@ -479,7 +479,7 @@ describe('the how-to-play entry reaches the page', () => {
     const text = textUnder(root);
 
     for (const heading of [
-      'What you are actually doing',
+      'What you are doing',
       'The three ways in',
       'What a shift is',
       'The six things Free play lets you set',
@@ -582,7 +582,7 @@ describe('the root menu recommends one row, and says so in more than a colour', 
       const text = textUnder(first as Recorded);
       expect(text, `the recommended row does not name itself in ${mode}`).toContain('Start here');
       expect(text, `the recommended row does not say who it is for in ${mode}`).toContain(
-        'if you are new',
+        'New here?',
       );
     }
   });
@@ -621,14 +621,14 @@ describe('the root menu recommends one row, and says so in more than a colour', 
   it('welcomes a first visit, and only when the shell has actually said it is one', async () => {
     const loaded = await catalogue();
     const silent = render(initialMenuState(loaded), loaded);
-    expect(textUnder(silent.root)).not.toContain('Nothing was restored');
+    expect(textUnder(silent.root)).not.toContain('First time here?');
 
     const returning = render(initialMenuState(loaded), loaded, { firstVisit: () => false });
-    expect(textUnder(returning.root)).not.toContain('Nothing was restored');
+    expect(textUnder(returning.root)).not.toContain('First time here?');
 
     const fresh = render(initialMenuState(loaded), loaded, { firstVisit: () => true });
     const welcome = byClass(fresh.root, 'menu-notice').map((node) => node.textContent).join(' ');
-    expect(welcome, 'a first visit gets no welcome').toContain('Nothing was restored');
+    expect(welcome, 'a first visit gets no welcome').toContain('First time here?');
     // The two wayfinding claims in that sentence are the ones the cases above pin to the page. It
     // may not name a third thing nothing checks.
     expect(welcome).toContain('Start here');
@@ -641,7 +641,7 @@ describe('the root menu recommends one row, and says so in more than a colour', 
     const elsewhere = render({ ...initialMenuState(loaded), screen: 'settings' }, loaded, {
       firstVisit: () => true,
     });
-    expect(textUnder(elsewhere.root)).not.toContain('Nothing was restored');
+    expect(textUnder(elsewhere.root)).not.toContain('First time here?');
   });
 });
 
@@ -723,7 +723,7 @@ describe('a select dispatches an intent about the option that was chosen', () =>
           'one option and the menu asked for the one already showing',
       ).toBe(true);
     }
-    // The `Under` row is the constraint, and it was one of the four the old ternary dropped.
+    // The `Constraint` row is the constraint, and it was one of the four the old ternary dropped.
     expect(asked.map((intent) => intent.kind)).toContain('set-constraint');
     expect(asked.map((intent) => intent.kind)).toContain('set-commissioning');
   });
@@ -1462,7 +1462,7 @@ describe('an empty leaderboard shows what a board is', () => {
     const text = textUnder(root);
 
     expect(byClass(root, 'menu-board').length, 'nothing board-shaped was drawn').toBeGreaterThan(0);
-    expect(text).toContain('An example of a board');
+    expect(text).toContain('An example board');
     expect(text, 'the example does not say nobody posted it').toContain('nobody posted them');
     // Where the reader would appear, which is the picture #34 says is missing.
     expect(text).toContain('You, if you post this run');
@@ -1496,7 +1496,7 @@ describe('an empty leaderboard shows what a board is', () => {
         notice: undefined,
       }),
     });
-    expect(textUnder(root)).not.toContain('An example of a board');
+    expect(textUnder(root)).not.toContain('An example board');
   });
 });
 
@@ -1583,7 +1583,7 @@ describe('an open leaderboard can be acted on — GitHub issue #93', () => {
     expect(text, 'the dispatcher behind the board is not named').toContain('Conventional collective');
     expect(text).toContain('Midtown Office');
     // The clause that keeps the name a report rather than a claim about this build's own copy.
-    expect(text).toContain('this build’s own');
+    expect(text).toContain('this copy of the game’s own');
     // The control, once per row, and pressing it asks for **that** row's run rather than a board.
     const adas = beatControl(root, 'Ada Lovelace');
     expect(adas, 'no control was drawn for Ada’s row').toBeDefined();
@@ -1641,7 +1641,7 @@ describe('an open leaderboard can be acted on — GitHub issue #93', () => {
     );
     const text = textUnder(root);
     expect(text).toContain('not-shipped-here');
-    expect(text).toContain('will not invent a name');
+    expect(text).toContain('cannot name those ids');
     const button = beatControl(root, 'Grace Hopper');
     expect(button?.attrs.get('disabled'), 'an unrunnable row was still offered').toBe('disabled');
     // Disabled **and** explained, on the rule this panel has carried since it landed.
@@ -1919,5 +1919,42 @@ describe('§ D1635 — the Engineer menu’s root is a shaft of landings', () =>
     expect(floorRowFor(rows, 'm')).toBeUndefined();
     expect(floorRowFor(rows, 'Enter')).toBeUndefined();
     expect(floorRowFor(rows, '')).toBeUndefined();
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The long notes behind a link
+ * -------------------------------------------------------------------------- */
+
+describe('a screen’s long notes sit behind a link, under the rows', () => {
+  it('draws every explainer the view carries, with its text in the document', async () => {
+    const loaded = await catalogue();
+    for (const screen of ['campaign', 'challenge', 'leaderboard'] as const) {
+      const { root } = render({ ...initialMenuState(loaded), screen }, loaded);
+      const links = byClass(root, 'explain-link');
+      expect(links.length, `${screen} draws no explainer link`).toBe(1);
+      const popover = byClass(root, 'explain-pop')[0];
+      expect(popover, `${screen}'s explainer has no popover`).toBeDefined();
+      // The popover's text is in the document while it is closed, so a sweep still reaches it.
+      expect(textUnder(popover as Recorded).length).toBeGreaterThan(80);
+      // After the rows: what a screen offers comes before what it explains.
+      const order = walk(root);
+      const list = byClass(root, 'menu-list')[0] as Recorded;
+      expect(order.indexOf(links[0] as Recorded)).toBeGreaterThan(order.indexOf(list));
+    }
+  });
+
+  it('keeps the same popover across a redraw, so one being read is not closed', async () => {
+    const loaded = await catalogue();
+    const drawn = render({ ...initialMenuState(loaded), screen: 'leaderboard' }, loaded);
+    const before = byClass(drawn.root, 'explain-pop')[0];
+    drawn.draw();
+    expect(byClass(drawn.root, 'explain-pop')[0]).toBe(before);
+  });
+
+  it('draws none on a screen that has none', async () => {
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'settings' }, loaded);
+    expect(byClass(root, 'explain-link')).toEqual([]);
   });
 });

@@ -304,7 +304,7 @@ describe('the verdicts', () => {
     for (const row of report.comparisons[0]?.rows ?? []) {
       expect(row.verdict, row.metric).toBe('suppressed');
       expect(row.estimate, row.metric).toBeNull();
-      expect(row.note, row.metric).toContain('arithmetic on unrelated runs');
+      expect(row.note, row.metric).toContain('did not run on the same passengers');
     }
     expect(report.crnSentence).toContain('passengers[7]');
   });
@@ -342,7 +342,7 @@ describe('the verdicts', () => {
     const awt = rowFor(report, 'awtS');
     expect(awt.verdict).toBe('unresolved');
     expect(awt.estimate).toBeNull();
-    expect(awt.sentence).toContain('no measurable spread');
+    expect(awt.sentence).toContain('no spread');
   });
 });
 
@@ -450,7 +450,7 @@ describe('the summary — it counts and routes, and it never names a winner', ()
     const summary = summaryOf(batchReport(fakeResult({ delta: 0 })));
     expect(summary.resolved).toEqual([]);
     expect(summary.sentence).toContain('interval containing zero');
-    expect(summary.sentence).toContain('no difference this batch can resolve');
+    expect(summary.sentence).toContain('cannot resolve a difference');
   });
 
   it('never claims an ordering the rows did not license', () => {
@@ -636,7 +636,7 @@ describe('what a batch with no mean can still say', () => {
     expect(summary.capacityFinding).toContain('Conventional collective');
     expect(summary.capacityFinding).toContain('queues never stopped growing in 1 of 50 runs');
     expect(summary.capacityFinding).toContain('finding about capacity');
-    expect(summary.capacityFinding).toContain('does not need a mean to be true');
+    expect(summary.capacityFinding).toContain('needs no mean');
     // The reason it is admissible with every wait row suppressed: the arms saw the same people.
     expect(summary.capacityFinding).toContain('same passengers');
   });

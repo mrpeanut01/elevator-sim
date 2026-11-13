@@ -21,7 +21,7 @@
  */
 
 import { gapSentence } from '../menu/gap.js';
-import { el, fill, on, reconcile, setText, type ElementSpec } from './dom.js';
+import { el, explainer, fill, on, reconcile, setText, type ElementSpec } from './dom.js';
 import {
   canSubmitForm,
   formIssues,
@@ -39,6 +39,7 @@ import {
   type ChallengeScreenInput,
   type CommissioningScreenInput,
   type MenuAffordance,
+  type MenuExplainer,
   type MenuGuide,
   type MenuIntent,
 } from '../menu/screens.js';
@@ -515,6 +516,15 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
   if (view.issues.length > 0) children.push(issueList(draw, 'issues', view.issues));
 
   /*
+   * The screen's long notes, each behind a link. Under the rows rather than above them, so the
+   * first thing on a screen is what it offers, and after them in the tab order for the same reason:
+   * the trap in {@link asModal} cycles `controls` in the order they were kept.
+   */
+  view.explainers.forEach((note, index) => {
+    children.push(explainerLine(draw, `explain.${String(index)}`, note));
+  });
+
+  /*
    * The two screens with content an affordance cannot express: a table of somebody else's runs.
    *
    * The challenge arm is GitHub issue #112. `ChallengeBoardPage.entries` was fetched, threaded
@@ -706,6 +716,8 @@ function asModal(
      * second writer of the first would leave the second undone.
      */
     if (event.key === 'Escape') {
+      /* An open explanation takes the key first: the browser closes the popover, the menu stays. */
+      if (explanationOpen(root)) return;
       event.preventDefault();
       DISPATCH.get(root)?.({ kind: 'close' });
       return;
@@ -1113,7 +1125,7 @@ function accountForm(
       noticeLine(
         draw,
         'account.retry',
-        'That request was refused for now. Wait for the time named above before asking again.',
+        'That request was refused for now. Wait for the time shown above, then ask again.',
       ),
     );
   }
@@ -1291,8 +1303,7 @@ function exampleBoard(doc: Document): HTMLElement {
   const lead = el(doc, 'p', { className: 'menu-note' });
   setText(
     lead,
-    'An example of a board, so the shape is legible before there is one. These are not real ' +
-      'runs and nobody posted them.',
+    'An example board. These are not real runs and nobody posted them.',
   );
   wrap.append(lead);
 
@@ -1317,9 +1328,8 @@ function exampleBoard(doc: Document): HTMLElement {
   const rule = el(doc, 'p', { className: 'menu-note' });
   setText(
     rule,
-    'One of the four figures orders the board and the other three sit beside it — they are never ' +
-      'added together, because a run that spends less by carrying fewer people has not done better. ' +
-      'The seed is printed so any row can be replayed and checked.',
+    'One of the four figures orders the board. The other three sit beside it and are never ' +
+      'added together. The seed is printed so any row can be replayed and checked.',
   );
   wrap.append(rule);
   return wrap;
@@ -1372,7 +1382,7 @@ function challengeBoardTable(
     setText(
       empty,
       `Nothing has been posted to this board yet. Run all ${String(page.seedCount)} seeds and post ` +
-        'the set to be the first row on it.',
+        'the set to be its first row.',
     );
     fill(wrap, empty);
     return wrap;
@@ -1474,6 +1484,39 @@ const RANKED_MEASURED: Readonly<
   ttdMeanS: { of: (measured) => measured.ttdMeanS, unit: 's' },
   pctOverLongWait: { of: (measured) => measured.pctOverLongWait, unit: 'points' },
 });
+
+/** What {@link explainerLine} built for a slot, and the text it was built from. */
+const EXPLAINERS = new WeakMap<HTMLElement, { readonly signature: string; readonly link: HTMLElement }>();
+
+/**
+ * One long note behind its link — `dev/dom.ts#explainer`, kept across redraws.
+ *
+ * Built once per text rather than once per draw: the menu redraws on every state change, and a
+ * popover rebuilt under a reader would close while they were reading it. The link is kept as a
+ * control, so Tab reaches it and the trap wraps past it.
+ */
+function explainerLine(draw: Draw, key: string, note: MenuExplainer): HTMLElement {
+  const slot = draw.retain('div', key, { className: 'menu-notice menu-explain' });
+  const signature = JSON.stringify(note);
+  let built = EXPLAINERS.get(slot);
+  if (built === undefined || built.signature !== signature) {
+    const node = explainer(draw.doc, note);
+    built = { signature, link: node.children[0] as HTMLElement };
+    EXPLAINERS.set(slot, built);
+    fill(slot, node);
+  }
+  draw.keep(built.link, key);
+  return slot;
+}
+
+/** Whether one of this menu's explanations is open. `false` wherever the selector is unknown. */
+function explanationOpen(root: HTMLElement): boolean {
+  try {
+    return typeof root.querySelector === 'function' && root.querySelector('.explain-pop:popover-open') !== null;
+  } catch {
+    return false;
+  }
+}
 
 function noticeLine(draw: Draw, key: string, text: string): HTMLElement {
   const line = draw.retain('p', key, { className: 'menu-notice' });

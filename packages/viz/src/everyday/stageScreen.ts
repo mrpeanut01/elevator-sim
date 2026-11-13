@@ -4121,7 +4121,13 @@ function mountStage(
         if (simTimeS > session.holdAtS) playback.seekTo(session.holdAtS);
         rushLossTimer = view.setTimeout(goToRushResult, RUSH_LOSS_HOLD_MS);
         syncTransport();
-        requestFrame();
+        /*
+         * The line and the crossing's figures on one frame. `syncTransport` has just written the loss
+         * line, and returning here left the clock and the figures to the next frame: after a Skip from
+         * the start that frame drew "40 / 40" beside figures still reading 0. `endRush` has set the
+         * session's end, so this second pass skips this branch and draws at the hold.
+         */
+        draw();
         return;
       }
     }

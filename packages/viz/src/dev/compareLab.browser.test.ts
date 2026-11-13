@@ -166,7 +166,7 @@ describe.skipIf(!HAS_BROWSER)('Compare, before anything has run', () => {
   it('says what the tab is, and that a batch has to be started', async () => {
     const body = await textOf('#batch-output');
     expect(body, 'the Compare panel body is empty on arrival').not.toBe('');
-    expect(body).toContain('what Compare is for');
+    expect(body).toContain('A batch runs the same shift many times');
     // The verb. Its absence is what made the panel read as broken rather than as waiting.
     expect(body).toContain('Press Run batch');
     // baseline and candidate, explained, and which way round the subtraction goes.
@@ -273,7 +273,7 @@ describe.skipIf(!HAS_BROWSER)('the Lab does not open on an unwinnable run', () =
       stuck += 1;
       // The fallback is not silent: the bar says the arms are the same and names the way out.
       const status = await textOf('#campaign-status');
-      expect(status, stage).toContain('both settings are Conventional collective (collective)');
+      expect(status, stage).toContain('Both settings are Conventional collective (collective)');
       expect(status, stage).toContain('edit the weights');
     }
     // …and it is a fallback, not the rule: most stages do have somewhere to go.
@@ -298,7 +298,7 @@ describe.skipIf(!HAS_BROWSER)('the Lab does not open on an unwinnable run', () =
     await page.selectOption('#campaign-stage', 'stage-1-first-call');
     await page.selectOption('#campaign-profile', 'collective');
     const status = await textOf('#campaign-status');
-    expect(status).toContain('both settings are Conventional collective (collective)');
+    expect(status).toContain('Both settings are Conventional collective (collective)');
     expect(status).toContain('control run');
     expect(status).toContain('cannot be reached');
   });
@@ -502,7 +502,7 @@ describe.skipIf(!HAS_BROWSER)('the interval reaches the page', () => {
     const labels = await page.evaluate(() =>
       [...document.querySelectorAll('#batch-output .figure-label')].map((node) => node.textContent?.trim() ?? ''),
     );
-    expect(labels[0]).toBe('the answer');
+    expect(labels[0]).toBe('answer');
     // And the provenance is still there, unabridged — this is a reordering, not a deletion.
     expect(labels).toContain('batch');
     expect(labels).toContain('common random numbers');
@@ -521,13 +521,13 @@ describe.skipIf(!HAS_BROWSER)('a suppressed batch says what it cost and offers t
     const labels = await page.evaluate(() =>
       [...document.querySelectorAll('#batch-output .figure-label')].map((node) => node.textContent?.trim() ?? ''),
     );
-    expect(labels[0]).toBe('the answer');
+    expect(labels[0]).toBe('answer');
     expect(labels[1]).toBe('pairs dropped');
     // Above the eight metric rows, which is the whole of "up front".
     expect(labels.indexOf('pairs dropped')).toBeLessThan(labels.indexOf('average wait'));
 
     const button = await textOf('.remedy-button');
-    expect(button, 'the remedy is still only a paragraph').toContain('Drop the load 10 %');
+    expect(button, 'the remedy is still only a paragraph').toContain('Lower demand 10 %');
 
     // …and it writes the field, which is what makes it a control rather than a caption.
     const before = await page.inputValue('#batch-demand');

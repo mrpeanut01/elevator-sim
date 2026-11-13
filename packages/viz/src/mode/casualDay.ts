@@ -97,6 +97,12 @@ function lowerFirst(text: string): string {
 }
 import type { ReportFigure } from '../shift/types.js';
 
+/** A definition's opening sentence, with its full stop: the part a card has room for. */
+function firstSentenceOf(text: string): string {
+  const end = text.indexOf('. ');
+  return end === -1 ? text : text.slice(0, end + 1);
+}
+
 /* -------------------------------------------------------------------------- *
  * The order — people first
  * -------------------------------------------------------------------------- */
@@ -202,8 +208,7 @@ const CASUAL_LEAD_BY_CELL: Readonly<Record<string, string>> = Object.freeze({
    * conditional (*even on days*), which is the fix rather than a hedge.
    */
   minute:
-    'A head count of people, not an estimate, so it stays on this sheet even on days the ' +
-    'average below it is withheld.',
+    'A head count, not an estimate, so it shows even on days the average wait is withheld.',
   /*
    * Window-independent, where the old sentence was not — GitHub issue
    * [#291](https://github.com/mrpeanut01/elevator-sim/issues/291), and it is the entry directly
@@ -239,9 +244,8 @@ const CASUAL_LEAD_BY_CELL: Readonly<Record<string, string>> = Object.freeze({
    * that survives the next lead somebody adds.
    */
   'average-wait':
-    'An average wait: everybody’s wait added up and divided, so a few long ones can hide inside ' +
-    'a good-looking number. How many rides went into it, and which stretch of the day it was read ' +
-    'over, are the cell’s own note — and that stretch is not the same on every building.',
+    'Everyone’s wait added up and divided, so a few long waits can hide in it. The note says how ' +
+    'many rides it covers and which part of the day.',
   /*
    * Rewritten for `docs/19` defect 3, and the old sentence is quoted because it was false twice
    * over: *"People who stopped waiting and walked. They are counted here and nowhere else."* The
@@ -261,14 +265,18 @@ const CASUAL_LEAD_BY_CELL: Readonly<Record<string, string>> = Object.freeze({
    * meaning gets one definition. Its last clause already says why the count sits beside the
    * average, so the sentence that said it here is gone rather than said twice. The length itself
    * is the cell's own note, which derives it from the run; a static lead may not.
+   *
+   * **Only the definition's opening sentence is read in now** (`firstSentenceOf`): the glossary's
+   * second sentence is its long account of why the count sits beside the average, and a card has
+   * room for the short form, which this lead says in its own second sentence.
    */
   stairs:
-    `The give-up line is ${lowerFirst(glossaryPlain('abandonment-horizon'))} The note beside the ` +
-    'count says how long it is and how many of them a car still came for — those are inside ' +
-    'CARRIED as well, so the two cells can overlap rather than add.',
+    `The give-up line is ${lowerFirst(firstSentenceOf(glossaryPlain('abandonment-horizon')))} It ` +
+    'is counted beside the average wait and never folded into it. The note says how long the line ' +
+    'is and how many of these riders a car still came for. Those riders are in CARRIED too, so ' +
+    'the two figures can overlap.',
   'energy-work':
-    'How hard the motors worked. It is read beside the waits and never added to them: a day ' +
-    'that spends less by carrying fewer people has not saved anything.',
+    'How hard the motors worked. It sits beside the waits and is never added to them.',
 });
 
 /**
@@ -314,7 +322,7 @@ export function casualNoteFor(cell: ReportFigure): string {
  * Not exported, for {@link CASUAL_LEAD_BY_CELL}'s stated reason: it reaches the honesty search
  * through {@link casualNoteFor}, which `honesty/surfaces.ts` drives on both modes.
  */
-const CASUAL_NOTE_SEAM = 'The cell’s own note:';
+const CASUAL_NOTE_SEAM = 'In detail:';
 
 /* -------------------------------------------------------------------------- *
  * The two headings, and the small print
@@ -376,11 +384,11 @@ export const CASUAL_LEVERS_HEADING = 'What would make tomorrow better';
  * it named.
  *
  * **Both terms are still translated, which is what #100 asked for**; what is dropped is the claim
- * about which of them applies here. The opener still promises *two* phrases and now quotes three
- * strings, so it says outright that the first comes in two forms — a sentence that miscounted its
- * own page would be this issue's defect in miniature, on the fix for it. That opener is load-bearing
- * beyond this constant: `everyday/reportView.ts` forbids re-ordering the layered block **because**
- * it says *below*, so the words *below* and *two* both have to stay true.
+ * about which of them applies here. The opener is now *How to read this sheet.*, which is the
+ * handle of the fold `everyday/reportView.ts` draws it behind, and it counts no phrases, so it has
+ * nothing to miscount. One word is still load-bearing beyond this constant: `everyday/reportView.ts`
+ * forbids re-ordering the layered block **because** the lead says the window is *named below*, so
+ * *below* has to stay true.
  *
  * It costs **ten words** on the longest player-facing block in the product (84 → 94, measured), which
  * is GitHub issue #211's subject, so the count is stated rather than left to be discovered. They land
@@ -400,13 +408,11 @@ export const CASUAL_LEVERS_HEADING = 'What would make tomorrow better';
  * already refuses: two different windows carry that id and only one of them was found by counting.
  */
 export const CASUAL_SMALL_PRINT_LEAD =
-  'Two phrases below are worth having before you read them. One names the window every average ' +
-  'here was read over, and it comes in more than one form: “the full-shift window” is the whole ' +
-  'shift, and “the five-minute window” and the rest say how long a stretch it was, with its clock ' +
-  'times beside it. Either ' +
-  'way, a wait quoted on this sheet is a wait from inside the window named below. “A confidence ' +
-  'interval that excludes zero” is the bar for saying one setting beat another — one day cannot ' +
-  'clear it, and fifty or more paired runs can, which is what Compare is for.';
+  'How to read this sheet. Every average here covers one stretch of the day, called its window ' +
+  'and named below with its clock times. “The full-shift window” is the whole shift. “The ' +
+  'five-minute window” and the like say how long the stretch was. “A confidence interval that ' +
+  'excludes zero” is the bar for saying one setting beat another. One day cannot clear it. Fifty ' +
+  'or more runs of each on the same crowds can.';
 
 /**
  * What Casual says about **reach** — § D299 § 2, on the sheet rather than in a decision record.
@@ -428,6 +434,6 @@ export const CASUAL_SMALL_PRINT_LEAD =
  * is the stale-refusal defect § D227 records, filed before it happens.
  */
 export const CASUAL_REACH_NOTE =
-  'This is the plain-language view. It carries every figure the engineer’s view carries — what ' +
-  'differs is the wording and which figures lead, never what you can reach or change. The “view” ' +
-  'control switches between them.';
+  'This is the plain-language view. It has every figure the engineer’s view has. Only the wording ' +
+  'and the order differ, never what you can reach or change. The engineer’s view is one switch ' +
+  'away.';

@@ -958,13 +958,13 @@ export function weekSheetOf(
  * of this tower's days, so nothing is run beside the week and the sheet says so.
  */
 export const UNMEASURED_WEEK_HOUSE_LINE =
-  'Nothing was run beside you this week: the week census has not measured this tower, so there is ' +
-  'no standing order to set against your days.';
+  'Nothing was run beside you this week. This tower has not been measured yet, so there is no ' +
+  'standing order to set against your days.';
 
 /** An unmeasured week's note in place of {@link WEEK_SHEET_NOTE}, which speaks of both sides. */
 export const UNMEASURED_WEEK_SHEET_NOTE =
-  'Every clean day of this week counted toward its target, because the week census has not measured ' +
-  'which of this tower’s days a player decides.';
+  'Every clean day this week counted toward its target, because nobody has measured yet which of ' +
+  'this tower’s days a player decides.';
 
 /**
  * **The sheet of a week the census does not deal**, closed on Sunday — wave AO lane AO-5,

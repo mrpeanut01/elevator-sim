@@ -154,7 +154,7 @@ describe.skipIf(!HAS_BROWSER)('the lost day — § D1435', () => {
         undefined,
         { timeout: 15_000 },
       );
-      expect(await textOf(page, '.everyday-stage-pace')).toBe('the day can no longer clear: playing the rest at 30×, and no call is asked');
+      expect(await textOf(page, '.everyday-stage-pace')).toBe('the day can no longer clear: playing the rest at 30×, with no more calls');
       await page.waitForFunction(
         (at) => (document.querySelector('.everyday-stage-clock')?.textContent ?? '').trim() !== at,
         stoppedAt,

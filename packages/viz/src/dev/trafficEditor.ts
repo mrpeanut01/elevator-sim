@@ -141,9 +141,8 @@ export function inertPatternRows(spec: PatternSpec): Readonly<Record<string, str
   const out: Record<string, string> = {};
   if (spec.order === 'two-way') {
     out['interfloorShare'] =
-      'inert under two-way: the lunch template states the period’s own directional mix, and ' +
-      'planDemand refuses a demand.directionalSplit beside it rather than letting one win ' +
-      'silently. Choose up-first or down-first to move this share.';
+      'inert under two-way: the lunch template sets its own directional mix. Choose up-first or ' +
+      'down-first to move this share.';
   }
   return out;
 }
@@ -448,20 +447,18 @@ const USE_THIS_COPY: Readonly<
   saveFirst: Object.freeze({
     label: 'Save it and use it',
     title:
-      'Files this as a pattern of your own and points the shift at it, then runs the day again. A ' +
-      'pattern that has not been saved cannot drive the run: the shift resolves demand by id.',
+      'Saves this as your own pattern, points the shift at it and runs the day again. An unsaved ' +
+      'pattern cannot drive a run.',
   }),
   alreadyDriving: Object.freeze({
     label: 'Already running',
     title:
-      'The shift is already on the demand shown here. Move a slider to make a pattern of your own ' +
-      '— leaving it alone is what keeps a run comparable with this project’s published figures.',
+      'The shift is already on this demand. Move a slider to make your own pattern. Leaving it ' +
+      'alone keeps the run comparable with the published figures.',
   }),
   select: Object.freeze({
     label: 'Use this pattern',
-    title:
-      'Points the shift at the pattern shown here and runs the day again on the same building ' +
-      'and seed.',
+    title: 'Points the shift at this pattern and runs the day again on the same building and seed.',
   }),
 });
 
@@ -479,10 +476,9 @@ const USE_THIS_COPY: Readonly<
  */
 const DRAFT_NOTE =
   commitmentOf('viewer.patternSpec', 'writes-only') === 'draft'
-    ? 'Nothing you move here reaches a run yet — this panel holds a draft, and the shift on ' +
-      `screen keeps the demand it was simulated with. ${USE_THIS_COPY.select.label} is what hands ` +
-      `it over, or ${USE_THIS_COPY.saveFirst.label} while the draft is still unfiled; either one ` +
-      're-runs the whole day from the start rather than steering the one you are watching.'
+    ? 'Nothing you move here reaches a run yet. This panel holds a draft, and the shift on ' +
+      `screen keeps the demand it ran with. ${USE_THIS_COPY.select.label}, or ` +
+      `${USE_THIS_COPY.saveFirst.label} for an unsaved draft, re-runs the whole day with it.`
     : '';
 
 /* -------------------------------------------------------------------------- *
@@ -734,9 +730,9 @@ export function mountTrafficEditor(
 
     setText(
       elements.footnote,
-      'A shift runs the building’s own traffic profile until you pick or save a pattern here — ' +
-        'which is the demand every published figure in this repository was measured under, so ' +
-        'leaving it alone is what keeps a run comparable with the project’s own results.',
+      'A shift runs the building’s own traffic profile until you pick or save a pattern here. ' +
+        'The published figures were measured under that profile, so leaving it alone keeps a run ' +
+        'comparable with them.',
     );
   }
 
@@ -768,7 +764,7 @@ function refusalRow(doc: Document, view: PatternRowView): HTMLElement {
       }),
       el(doc, 'div', {
         className: 'slider-sub',
-        text: `not a control here — ${view.refusal ?? ''}`,
+        text: `not a control here: ${view.refusal ?? ''}`,
         style: { color: 'var(--warn)' },
       }),
     ],

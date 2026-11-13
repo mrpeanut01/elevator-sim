@@ -433,7 +433,7 @@ const DEFAULT_BASE_SPEED = 60;
  * copy of the words, which is the difference between checking a mirror and describing one.
  */
 export const LOOP_WINDOW_IDLE_LABEL =
-  'A–B loop — press to mark the start of a section at the playhead';
+  'A–B loop: press to mark the start at the playhead';
 
 /** Width of the right gutter, where the landing counts and the rider queues are drawn. */
 const QUEUE_GUTTER_PX = 280;
@@ -684,7 +684,7 @@ export function transportStatusOf(
      * a count here would be a figure, and the figures are exactly what has not been earned yet.
      */
     const labels = shown.map((item) => item.label).join(' and ');
-    return `still playing — ${labels} are read over the finished day, and file when the playhead reaches the end`;
+    return `still playing: ${labels} file when the playhead reaches the end`;
   }
 
   const figures = shown.map((item) => {
@@ -809,7 +809,7 @@ function showLoadFailure(ui: Elements, error: unknown, retry: () => Promise<bool
   // the two chrome slots only drawHeader/drawFooter ever fill, and neither runs when data/ does
   // not load. Authored here in the empty state's own vocabulary.
   setText(ui.header.phaseLabel, 'no run yet');
-  setText(ui.footer.statusLine, 'no shift run yet — data/ did not load');
+  setText(ui.footer.statusLine, 'no shift run yet: data/ did not load');
   const again = el(document, 'button', { className: 'chip', text: 'Retry', attrs: { type: 'button' } });
   again.addEventListener('click', () => {
     setText(ui.transport.error, '');
@@ -1363,7 +1363,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * injection and lands here.
    */
   const NO_SERVER_ROWS =
-    'Scenarios, Free play and Settings do not need one; Leaderboard and Account do.';
+    'Scenarios, Free play and Settings work without one.';
   /*
    * Issue #34's empty state, in the one channel this file owns.
    *
@@ -1377,15 +1377,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * would rank the configuration that carried fewest people highest.
    */
   const NO_SERVER_BOARDS =
-    'This site has no leaderboard server behind it, so there are no boards to read. Here is what ' +
-    'one is. A board is a single exact configuration — the same building, dispatcher, traffic ' +
-    'template, arrival rate and run length — and its rows are that configuration played on ' +
-    'different seeds, one row per posted run, so two rows differ only in which passengers turned ' +
-    'up. A seed is the number those passengers are generated from: same seed, same people, same ' +
-    'minute-by-minute demand. Every row carries the average wait, the 95th-percentile wait, the ' +
-    'mean time to destination and the share waiting over a minute, side by side. One of the four ' +
-    'orders the rows; the other three are shown beside it and are never combined into a score. ' +
-    `Picking a different dispatcher moves you to a different board rather than up this one. ${NO_SERVER_ROWS}`;
+    'This site has no leaderboard server behind it, so there are no boards to read. A board has ' +
+    'one row per posted run. Each row shows ' +
+    'the average wait, the 95th-percentile wait, the mean time to destination and the share ' +
+    `waiting over a minute; one of them orders the rows and they are never combined. ${NO_SERVER_ROWS}`;
   /*
    * Issue #32, and the half of it that has nothing to do with the missing server.
    *
@@ -1400,17 +1395,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * is the only surface allowed to say that, and only with a paired-t interval that excludes zero.
    */
   const NO_SERVER_CHALLENGE =
-    'This site has no challenge server behind it, so there is no challenge to load. Here is what ' +
-    'one is. Everybody gets the same building, the same run length and the same numbered seeds — ' +
-    'the same seed generates the same passengers arriving at the same moments, so the only thing ' +
-    'that differs between two players is the dispatcher they chose. A challenge is scored over its ' +
-    'whole seed set rather than a lucky single run, and you submit the set in one go or not at ' +
-    'all: a partial set is a different question, not a smaller score. A challenge opens and closes ' +
-    'on the server’s clock, and the board stays readable after it shuts. Ordering a board on ' +
-    'one metric is a fact about what was posted and never a claim that one dispatcher beats ' +
-    `another — Compare is the only screen allowed to say that. ${NO_SERVER_ROWS}`;
+    'This site has no challenge server behind it, so there is no challenge to load. In a ' +
+    'challenge everybody gets the same building, run length and seeds, so only the dispatcher ' +
+    'differs. It is scored over the whole seed set, submitted in one go. A board ordered on one ' +
+    `metric is not a claim that one dispatcher beats another. ${NO_SERVER_ROWS}`;
   const NO_SERVER_SIGN_IN =
-    'This site has no account server behind it, so there is nowhere to sign in and nothing is ' +
+    'This site has no account server behind it, so there is nowhere to sign in. Nothing is ' +
     `sent anywhere. ${NO_SERVER_ROWS}`;
   /*
    * **One sentence, owned next door** — GitHub issue #221. This used to be a literal here, and the
@@ -1459,25 +1449,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
     {
       afterMs: 4_000,
       text:
-        'Summoning the car. This site’s server shuts down when nobody is playing, which is what ' +
-        'keeps it free to leave running — so the first request after a quiet spell is starting it.',
+        'Summoning the car. The server sleeps when nobody is playing, so the first request ' +
+        'after a quiet spell has to wake it.',
     },
     {
       // 10 s. Under 30 s, which is `breezy` — checked against WAIT_BANDS rather than asserted here.
       afterMs: 10_000,
-      text: 'Still on its way. A tenant waiting this long is one your mood bar calls breezy.',
+      text: 'Still on its way. Your mood bar would call a tenant waiting this long breezy.',
     },
     {
       // 30 s: the breezy → tapping foot boundary, and about where the measured cold start lands.
       afterMs: 30_000,
       text:
-        'Thirty seconds — the exact point where your own mood bar stops calling a wait breezy and ' +
-        'starts calling it tapping foot. We are aware of the irony.',
+        'Thirty seconds. Your mood bar stops calling a wait breezy here and starts calling it ' +
+        'tapping foot.',
     },
     {
       // 60 s: tapping foot gives way to checking watch.
       afterMs: 60_000,
-      text: 'A minute — long enough that your own mood bar has moved a tenant into checking watch.',
+      text: 'A minute. Your mood bar has moved a tenant waiting this long into checking watch.',
     },
     {
       /*
@@ -1488,10 +1478,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       afterMs: 120_000,
       text:
-        'Two minutes — your mood bar’s last band, eyeing the stairs, where a tenant starts ' +
-        'looking for another way up. You ' +
-        'do not have that option, and a cold start was measured at about half a minute, so this is ' +
-        'no longer a sleeping server. Nothing you typed is lost.',
+        'Two minutes: your mood bar’s last band, eyeing the stairs. A cold start was measured ' +
+        'at about half a minute, so this is no longer a sleeping server. Nothing you typed is lost.',
     },
   ]);
 
@@ -2687,7 +2675,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
           ...challengeView,
           runsDone: 0,
           running: false,
-          notice: `This challenge could not be run on this device — ${message}`,
+          notice: `This challenge could not run on this device: ${message}`,
         };
         drawMenu();
       },
@@ -2721,7 +2709,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const posted = await client.submitChallenge(token, body.submission);
     if (posted.ok) {
       challengeView = { ...challengeView, postRefusal: undefined, notice: undefined };
-      accountState = withNotice(accountState, 'Posted. The server replayed every seed and they reproduced.');
+      accountState = withNotice(accountState, 'Posted. The server replayed every seed and each one reproduced.');
       drawMenu();
       void loadChallengeBoard();
       return;
@@ -3772,8 +3760,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       return {
         kind: 'refused',
         detail:
-          'There is no finished run to post yet. Run a shift from Scenarios or Free play, then come ' +
-          'back — the run on screen is what gets posted.',
+          'There is no finished run to post yet. Run a shift from Scenarios or Free play first: ' +
+          'the run on screen is what gets posted.',
       };
     }
     if (client === undefined) return { kind: 'no-server', detail: NO_SERVER_POST };
@@ -4850,8 +4838,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     attrs: {
       type: 'button',
       title:
-        'appends to this day’s record at the playhead and re-simulates the day from the start — ' +
-        'everything before this moment is unchanged, and playback resumes here',
+        'recorded at the playhead, and the day re-simulates from the start: everything before ' +
+        'this moment is unchanged, and playback resumes here',
     },
   });
   /*
@@ -4866,8 +4854,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
     attrs: {
       type: 'button',
       title:
-        'appends to this day’s record at the playhead and re-simulates the day from the start — ' +
-        'everything before this moment is unchanged, and playback resumes here',
+        'recorded at the playhead, and the day re-simulates from the start: everything before ' +
+        'this moment is unchanged, and playback resumes here',
     },
   });
   /*
@@ -4886,8 +4874,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // The pin, stated where the player decides — SWITCH_PINS_NOTE's own docstring (§ D227:
       // a behaviour nothing states is a stale refusal waiting to happen).
       title:
-        'appends to this day’s record at the playhead and re-simulates the day from the start — ' +
-        SWITCH_PINS_NOTE,
+        'recorded at the playhead, and the day re-simulates from the start: ' + SWITCH_PINS_NOTE,
     },
   });
   setHidden(switchButton, switchTarget === undefined);
@@ -7313,16 +7300,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (weekNotice !== undefined) return weekNotice;
     if (state.withheld.length > 0) return state.withheld.join(' ');
     if (view.recording === undefined) {
-      return 'Press play and watch a call appear, a car answer it, and the wait end. That is the whole simulator in one move.';
+      return 'Press play and watch a call appear, a car answer it, and the wait end.';
     }
     const observations = observationsAt(view.recording, view.simTimeS);
     if (observations.arrived < 20) {
-      return 'Nothing is graded before the building wakes up — the goals stay blank until twenty people have called.';
+      return 'The goals stay blank until twenty people have called.';
     }
     if (observations.waitingNow > 25) {
-      return 'This is the crunch. Watch which floor stacks up, then try a different dispatcher in the rail — a smarter one is free, a fifth car is not.';
+      return 'This is the crunch. Watch which floor stacks up, then try a different dispatcher in the Controls rail.';
     }
-    return 'Keep an eye on the goals in the left rail. The building only gets busier tomorrow.';
+    return 'Watch the goals in the left rail. The building only gets busier tomorrow.';
   }
 
   /* ---------------------------------------------------------------------- *
@@ -8621,7 +8608,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * number should be, one container up.
        */
       setHidden(ui.liveMetrics.root, true);
-      canvas.setAttribute('aria-label', 'No shift has been run yet, so the stage is empty.');
+      canvas.setAttribute('aria-label', 'No shift run yet. The stage is empty.');
       return;
     }
 
@@ -8685,7 +8672,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     setHidden(ui.stage.alarm, alarm === undefined);
     if (alarm !== undefined) {
       setText(ui.stage.alarmText, `${String(alarm.waiting)} people stacked up at ${alarm.label}`);
-      setText(ui.stage.alarmSub, 'a car is on its way — or add one under Building');
+      setText(ui.stage.alarmSub, 'a car is on its way, or add one under Building');
     }
     canvas.setAttribute(
       'aria-label',
@@ -8901,13 +8888,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
       chip.setAttribute('aria-pressed', 'true');
       chip.setAttribute(
         'aria-label',
-        `A–B loop over ${clockRange(window.fromS, window.toS, runStartOfDayS ?? DAY_START_S)} — press to go back to the whole shift`,
+        `A–B loop over ${clockRange(window.fromS, window.toS, runStartOfDayS ?? DAY_START_S)}: press for the whole shift`,
       );
     } else if (pendingFromS !== null) {
       chip.setAttribute('aria-pressed', 'mixed');
       chip.setAttribute(
         'aria-label',
-        `A–B loop — start marked at ${clockOf(pendingFromS, runStartOfDayS ?? DAY_START_S)}; press to mark the end at the playhead`,
+        `A–B loop: start marked at ${clockOf(pendingFromS, runStartOfDayS ?? DAY_START_S)}. Press to mark the end at the playhead`,
       );
     } else {
       chip.setAttribute('aria-pressed', 'false');
@@ -9281,7 +9268,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     surface.height = CARD_HEIGHT;
     const ctx = surface.getContext('2d');
     if (ctx === null) {
-      setText(ui.transport.status, 'this browser gave no 2d context, so there is no card to write');
+      setText(ui.transport.status, 'no report image: this browser gave no 2d canvas context');
       return;
     }
     // The same cast `drawScene`'s call site makes, for the same reason: `Canvas2DLike` is the
@@ -9795,13 +9782,13 @@ export function provenanceLineOf(state: ViewerState, resources: BrowserResources
   if (state.ruleRows.length > 0) {
     reasons.push(
       `${String(state.ruleRows.length)} Everyday rule(s) drive this run's dispatcher, and ` +
-        `${CLI_COMMAND} has no flag for a rule list — the line would run the profile's own weights`,
+        `${CLI_COMMAND} has no flag for a rule list`,
     );
   }
   if (state.interventions.length > 0) {
     reasons.push(
       `${String(state.interventions.length)} mid-run intervention(s) are on this day's record, and ` +
-        `${CLI_COMMAND} has no flag for an intervention log — the line would run the day untouched`,
+        `${CLI_COMMAND} has no flag for an intervention log`,
     );
   }
 
@@ -9861,8 +9848,8 @@ function partFlagFor(
     return {
       kind: 'refused',
       reason:
-        `this run covers part of “${templateId}”, and that template declares no hour — ` +
-        '--part takes a clock range, so no CLI line names this window',
+        `this run covers part of “${templateId}”, and that template declares no hour, ` +
+        'so --part has no clock range to name this window',
     };
   }
   const fromMin = startOfDayMin + state.windowStartS / 60;
@@ -10259,10 +10246,9 @@ export function seedEntryOf(raw: string): SeedEntry {
   return {
     kind: 'refuse',
     message: overlong
-      ? `“${trimmed}” is ${String(trimmed.length)} digits — a seed is 1–${String(SEED_MAX_DIGITS)} of ` +
-        'them, so it survives a round trip to a board and back. ' +
+      ? `“${trimmed}” is ${String(trimmed.length)} digits. A seed is 1–${String(SEED_MAX_DIGITS)} digits. ` +
         'The field shows the seed that is still running.'
-      : `“${trimmed}” is not a seed — a seed is 1–${String(SEED_MAX_DIGITS)} digits. ` +
+      : `“${trimmed}” is not a seed. A seed is 1–${String(SEED_MAX_DIGITS)} digits. ` +
         'The field shows the seed that is still running.',
   };
 }

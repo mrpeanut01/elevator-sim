@@ -134,7 +134,7 @@ describe('the rows are the engine’s parameters', () => {
     expect(under(DEFAULT_PATTERN)).toBe(true);
     expect(under({ ...DEFAULT_PATTERN, order: 'down-first' })).toBe(true);
     expect(under(TWO_WAY)).toBe(false);
-    expect(inertPatternRows(TWO_WAY)['interfloorShare']).toContain('planDemand refuses');
+    expect(inertPatternRows(TWO_WAY)['interfloorShare']).toContain('sets its own directional mix');
   });
 
   it('formats each row in its own declared unit', () => {

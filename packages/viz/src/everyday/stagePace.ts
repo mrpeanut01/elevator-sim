@@ -635,7 +635,7 @@ export function stagePaceNoteOf(
      * it, so it does not flip each time a waiter crosses the minute while the chip stays lit.
      */
     case 'watching':
-      return `slowed to your speed, ${rung}, for a wait on a landing of over a minute`;
+      return `slowed to your speed, ${rung}, for a wait of over a minute on a landing`;
     case 'yours':
       return `your speed, ${rung}, until somebody on a landing has waited a minute`;
     /* § D1493: the hold has run out with nothing asked. */
@@ -643,7 +643,7 @@ export function stagePaceNoteOf(
       return stagePlayedOnLineOf(rung);
     /* § D1435: the line *Watch the rest* plays under. */
     case 'lost':
-      return `the day can no longer clear: playing the rest at ${rung}, and no call is asked`;
+      return `the day can no longer clear: playing the rest at ${rung}, with no more calls`;
   }
 }
 

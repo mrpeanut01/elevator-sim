@@ -320,7 +320,9 @@ export const SCENARIO_ENTRIES: readonly ScenarioEntry[] = Object.freeze([
  * **The first row was rewritten again by § D1129**, on the commit that made it false: it read
  * *"The ten stages on the path are played on the Engineer surface. A stage cleared there banks no
  * chimes …"*, and the path now plays in the fix-it editor and a clear pays once. What stays missing
- * is said instead: a clear reaches no career, and nothing sells a stage a wider budget.
+ * is said instead: a clear reaches no career. *Nothing here sells a stage a wider budget yet* went
+ * when the stage page began selling the rungs the census says add a way through (§ D1419,
+ * `everyday/stagePlay.ts#stageRungsOf`).
  *
  * That is why this constant holds only the two **unconditional** rows: it is what
  * `everyday/buildNotes.ts` carries to the Settings panel and what
@@ -331,8 +333,8 @@ export const SCENARIO_ENTRIES: readonly ScenarioEntry[] = Object.freeze([
  * decoration.
  */
 export const SCENARIO_ABSENCES: readonly string[] = Object.freeze([
-  'A stage cleared from the path pays its chimes once and does not reach a career, whose towers are a path of their own. Nothing here sells a stage a wider budget yet.',
-  'Two of the six engineering challenges ship, and you play them in Engineer, not from this list. The other four need something a scenario run cannot do yet, and each says what.',
+  'A stage cleared from the path pays its chimes once and does not reach a career, whose towers are a path of their own.',
+  'Two of the six engineering challenges are playable, in Engineer rather than from this list. The other four need something a scenario run can’t do yet, and each says what.',
 ]);
 
 /* -------------------------------------------------------------------------- *

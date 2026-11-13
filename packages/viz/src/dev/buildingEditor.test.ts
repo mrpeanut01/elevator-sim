@@ -476,7 +476,7 @@ describe('the elevation’s shaft bands', () => {
     const closed = elevationCarsOf({ ...TOWER, bandByCar: { 0: [6, 12] }, noLobby: { 0: true } });
     expect(closed[0]?.canExpress).toBe(true);
     expect(closed[0]?.expressOn).toBe(false);
-    expect(closed[0]?.expressLabel).toBe('stays in its band — click to run express from the lobby');
+    expect(closed[0]?.expressLabel).toBe('stays in its band: click to run express from the lobby');
 
     // A band starting at floor 1 is offered nothing: its express form is the band that starts at
     // the lobby, so the "choice" would be between a building and itself.
@@ -917,7 +917,7 @@ describe('the landing pickers say what they do', () => {
       (choice) => choice.blocked,
     );
     expect(blocked).toHaveLength(1);
-    expect(upper).toMatch(/still listed, disabled/);
+    expect(upper).toMatch(/listed but disabled/);
     expect(upper).not.toMatch(/is not offered/);
   });
 });

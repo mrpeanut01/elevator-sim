@@ -198,10 +198,10 @@ export const DWELL_SETTINGS: Readonly<Record<DwellChoice, DwellSetting>> = Objec
 
 export const DWELL_HINTS: Readonly<Record<DwellChoice, string>> = Object.freeze({
   snappy:
-    'Doors close as soon as the code minimum allows — 4 s on a hall call. Faster round trips, and more riders left behind at a busy floor.',
-  normal: 'The reference dwell for a hall call — 5 s, from data/elevator-specs.json.',
+    'Doors close at the code minimum: 4 s on a hall call. Faster round trips, and more riders left behind at a busy floor.',
+  normal: 'The reference dwell for a hall call: 5 s, from data/elevator-specs.json.',
   patient:
-    'A 7 s hold that extends further while people are still arriving. Everybody gets on, and each stop costs longer — which is what round-trip time is made of.',
+    'A 7 s hold that extends while people are still arriving. Everybody gets on, and each stop takes longer.',
 });
 
 export const DEFAULT_LEVERS: GroupLevers = Object.freeze({
@@ -467,8 +467,8 @@ function termsInertOnBuilding(building: DutyDeclarations | undefined): readonly 
     {
       termId: 'dutyMismatch',
       why:
-        'inert on this building — no car in this building declares a duty, so no call carries one ' +
-        'to be wrong about and this weight changes no decision (§ D549).',
+        'inert on this building: no car in this building declares a duty, so this weight ' +
+        'changes no decision.',
     },
   ];
 }
@@ -504,8 +504,8 @@ export function inertTerms(
     out.push({
       termId: 'rideTime',
       why:
-        'inert until the call carries a destination — turn on “Pool riders by destination” or this ' +
-        'weight changes no decision, which is exactly what destination-eta shipped doing (§ D112).',
+        'inert until the call carries a destination: turn on “Pool riders by destination”, or ' +
+        'this weight changes no decision.',
     });
   }
   for (const inert of termsInertOnBuilding(building)) {
@@ -659,16 +659,16 @@ export function costFunctionLine(
 export function adviceFor(spec: DispatcherSpec): string {
   const w = (term: string): number => spec.weights[term] ?? 0;
   if (Object.values(spec.weights).every((position) => position === 0)) {
-    return 'Every term is zero, so every car costs the same and the first eligible one always wins. Worth watching once.';
+    return 'Every term is zero, so every car costs the same and the first eligible one always wins.';
   }
   if (w('distanceTravelled') + w('stopCount') > w('waitTime')) {
-    return 'Energy outranks people: cars will sit still and let calls age. A real thing to build, and a lesson when you watch it.';
+    return 'Energy outranks people: cars will sit still and let calls age.';
   }
   if (w('loadFactor') + w('crowding') < 15) {
     return 'With load and crowding ignored, a nearly full car can be sent to the busiest floor and drive straight past it.';
   }
   if (w('starvation') > 70) {
-    return 'Starvation this high makes a car pay for delaying a call that has already waited a long time, which aims at the worst wait rather than the average. On some days it changes nobody’s trip.';
+    return 'Starvation this high makes a car pay for delaying a call that has already waited a long time. It aims at the worst wait rather than the average, and on some days it changes nobody’s trip.';
   }
   return `${String(COST_TERMS_BY_ID.size)} terms, the same set the engine scores with. Each is a trade, never a free win.`;
 }

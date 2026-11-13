@@ -458,7 +458,7 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
    * here.
    *
    * 0 against 100 is the plain lever's own travel — `mode/plainLevers.ts#applyPlainLever` writes
-   * this same field for *How much room to leave in a car*, so the two arms are the two ends of a
+   * this same field for *Leave room in a car*, so the two arms are the two ends of a
    * control a player can actually reach.
    */
   'viewer.dispatcherSpec': {

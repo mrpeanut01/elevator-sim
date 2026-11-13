@@ -87,7 +87,7 @@ export const RAIL_NOTE_PLAYER =
 /** L4's note while watching — the same figures, told apart from the day on the stage. */
 export const RAIL_NOTE_WATCHING =
   'Share of riders away within a minute, day by day. The day on the stage is a replay of a record ' +
-  'filed elsewhere, and it is not one of these.';
+  'filed elsewhere, so it isn’t one of these.';
 
 /* -------------------------------------------------------------------------- *
  * The Day report tab
@@ -110,7 +110,7 @@ export const RAIL_NOTE_WATCHING =
 export function reportNoteWhileWatching(name: string): string {
   return (
     `The stage is replaying ${name} from its record. This sheet is the last day filed on this ` +
-    'device — a watched run files nothing, so no figure here was read from the run on screen.'
+    'device. A watched run files nothing, so no figure here comes from the run on screen.'
   );
 }
 

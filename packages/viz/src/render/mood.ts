@@ -510,8 +510,8 @@ export function buildingMood(
       `${offeredPer5Min.toFixed(1)} people arrived every 5 minutes and the lifts carried ` +
         `${personsPer5Min.toFixed(1)}.` +
         (personsPer5Min < offeredPer5Min
-          ? ' More were arriving than leaving, which is what a queue is.'
-          : ' The lifts kept up with the door.'),
+          ? ' More arrived than the lifts carried.'
+          : ' The lifts kept up.'),
     ),
   });
 
@@ -536,9 +536,8 @@ export function buildingMood(
     provisional,
     retraction: provisional ? retractionFor(ordered) : '',
     caveat:
-      'This describes what happened in this one run, at this one seed. It is not a verdict on the ' +
-      'dispatcher: one replication cannot support that, and the same configuration on Secure ' +
-      'Tower returned a quotable average on 6 of 20 consecutive seeds.',
+      'This is one run at one seed, not a verdict on the dispatcher: the same configuration on ' +
+      'Secure Tower returned a quotable average on 6 of 20 consecutive seeds.',
   };
 }
 
@@ -564,10 +563,9 @@ export function buildingMood(
 function retractionFor(drivers: readonly MoodDriver[]): string {
   const withheld = drivers.filter((driver) => driver.basis === 'whole-run').map((d) => d.label);
   return (
-    `The run has not finished, so the readings that fold the whole shift — ${andList(withheld)} — ` +
-    'are withheld until the playhead reaches the end: a whole-day reading beside a clock this ' +
-    'early would be two answers to one question. Play the shift through, or click the far end of ' +
-    'the timeline, and they are here.'
+    `The run has not finished, so the whole-shift readings (${andList(withheld)}) are withheld: ` +
+    'this early they would be two answers to one question. Play the shift through, or click the ' +
+    'far end of the timeline.'
   );
 }
 
@@ -592,6 +590,6 @@ function headlineFor(level: MoodLevel, provisional: boolean): string {
         ? 'The building is falling behind.'
         : 'The building is in trouble.';
   return provisional
-    ? `${body} So far — the run has not finished, so this can still change.`
+    ? `${body} So far: the run has not finished.`
     : body;
 }

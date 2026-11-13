@@ -201,7 +201,7 @@ export function formulaIssueOf(formulas: readonly FormulaSpec[]): string | undef
     return undefined;
   } catch {
     return (
-      'One of these priorities cannot be worked out as it stands, so a run with it would be refused. ' +
+      'One of these priorities cannot be worked out, so a run with it would be refused. ' +
       'Remove it, or write it again with the controls here.'
     );
   }

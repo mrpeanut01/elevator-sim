@@ -107,7 +107,7 @@ describe.skipIf(!HAS_BROWSER)('the career asks on its event days — § D1408', 
       await page.waitForTimeout(3000);
       expect(await page.locator('.everyday-stage-call:not([hidden])').count(), 'an ordinary career day raised a call').toBe(0);
       const ordinary = await closeTheDay(page);
-      expect(ordinary).toContain('No call decided today: the stage raised none.');
+      expect(ordinary).toContain('No call decided today: none came up.');
       await page.click('.everyday-bar-primary');
 
       /* ---- day 17: the booked move-in, so the skip stops at its call ---- */

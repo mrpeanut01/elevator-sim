@@ -596,8 +596,8 @@ export const PRACTICE_ATTEMPT_NOTE =
  * {@link PRACTICE_NOTE}'s reason.
  */
 export const PRACTICE_ENGINEER_NOTE =
-  'Practice. A scored day of yours is under way in Everyday Mode, so a run closed on this surface ' +
-  'banks nothing into any week until that day is closed on its own stage.';
+  'Practice. A scored day of yours is under way in Everyday Mode, so a run closed here banks ' +
+  'nothing into any week until that day is closed on its own stage.';
 
 /**
  * **What a practice sheet says when another tab had already closed the day** — § D1239, seat D
@@ -1268,10 +1268,9 @@ const COMPARE_NEXT_STEP: ReportNextStep = Object.freeze({
   surface: 'compare',
   label: 'Take it to Compare',
   why:
-    'One run cannot tell you a dispatcher is better. Compare runs the alternatives against the ' +
-    'same passengers, fifty or more times each, and reports the paired interval — it is the only ' +
-    'surface here allowed to say one beat the other, and it answers “indistinguishable” when the ' +
-    'interval contains zero.',
+    'One run cannot tell you a dispatcher is better. Compare runs each option fifty or more times ' +
+    'on the same passengers and reports the paired interval. It is the only place allowed to say ' +
+    'one beat the other, and it says “indistinguishable” when the interval contains zero.',
 });
 
 /**
@@ -1773,8 +1772,8 @@ function verdictSideOf(readings: readonly GoalReading[]): PairVerdicts['pressed'
 /** `440 journeys of 440 offered, and 80% of riders away inside a minute` — three counts, no estimate. */
 function countsClause(observations: Observations): string {
   return (
-    `${String(observations.carried)} journeys of ${String(observations.arrived)} offered, and ` +
-    `${String(observations.minutePct)}% of riders away inside a minute`
+    `${String(observations.carried)} of the ${String(observations.arrived)} people who turned up were ` +
+    `carried, and ${String(observations.minutePct)}% of riders were away inside a minute`
   );
 }
 
@@ -1796,7 +1795,7 @@ function clearedLede(summary: VizSummary, observations: Observations): string {
     return (
       `Every goal met, on a day the queues never settled. ${countsClause(observations)}.` +
       `${accountClause(observations)} The backlog was still growing when the window closed, so the ` +
-      'wait figure above is withheld rather than published, and the cell says on which ground.'
+      'average wait is withheld. Its cell says why.'
     );
   }
   return `A day it could handle. ${countsClause(observations)}.${accountClause(observations)}`;
@@ -1865,9 +1864,8 @@ function ungradedLede(
 ): string {
   return (
     `Too quiet to grade. ${String(observations.arrived)} people called and the goals need ` +
-    `${String(WAKE_UP_ARRIVALS)}, so nothing on this sheet was judged — the day is not a miss, ` +
-    'and the streak is untouched. Run a longer shift and the same building will have something ' +
-    'to be graded on.'
+    `${String(WAKE_UP_ARRIVALS)}, so nothing was judged. It is not a miss, and your streak is ` +
+    'untouched. A longer shift on the same building would give the goals something to grade.'
   );
 }
 
@@ -1898,8 +1896,8 @@ function missedLede(
     return (
       `It did not cope. ${String(observations.arrived)} people asked for a lift and ` +
       `${String(observations.carried)} got one, and the backlog was still growing when the window ` +
-      `closed.${accountClause(observations)} That is a building being outrun, not a dispatcher ` +
-      'having a bad day — and it is fixable with the levers below.'
+      `closed.${accountClause(observations)} That is the building being outrun rather than the ` +
+      'dispatcher having a bad day, and the levers below can fix it.'
     );
   }
   const unmet = readings.filter((reading) => reading.state === 'missed');
@@ -1913,10 +1911,10 @@ function missedLede(
    * what it must never do is become *reachable and wrong*, and a dropped clause is the only shape
    * with no sentence to be wrong with.
    */
-  const clause = unmet.length === 0 ? '' : ` — and ${listOf(unmet.map((reading) => `“${reading.goal.label}”`))} still went unmet`;
+  const clause = unmet.length === 0 ? '' : `, and ${listOf(unmet.map((reading) => `“${reading.goal.label}”`))} went unmet`;
   return (
     `Short of what the shift asked for. ${countsClause(observations)}${clause}.` +
-    `${accountClause(observations)} The banner below is counting the same thing this sentence is.`
+    `${accountClause(observations)}`
   );
 }
 
@@ -2082,7 +2080,7 @@ function figuresFor(
       label: 'AWAY INSIDE A MINUTE',
       value: `${String(observations.minutePct)}%`,
       // R13: the share never travels without the count it was taken over.
-      note: `an observation, never suppressed — over ${legCount(observations.servedLegs, 'served ride')}`,
+      note: `counted over ${legCount(observations.servedLegs, 'served ride')}, and never withheld`,
       tone: observations.minutePct >= 75 ? 'good' : observations.minutePct >= 50 ? 'caution' : 'bad',
       axisOnly: false,
     },
@@ -2181,7 +2179,7 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
       value: WITHHELD,
       note:
         summary.awtInvalidReason ??
-        'the queues never settled, so there is no cohort to take a mean over — see the small print',
+        'the queues never settled, so there is no steady set of rides to average over',
       tone: 'withheld',
       axisOnly: false,
       /*
@@ -2262,22 +2260,22 @@ function stairsCohortClause(
   abandonedCarried: number,
   horizon: string,
 ): string {
-  if (abandoned === 0) return `no wait crossed the ${horizon} give-up horizon`;
+  if (abandoned === 0) return `no wait passed the ${horizon} give-up line`;
   if (abandonedCarried === abandoned) {
     return (
-      `waited past the ${horizon} horizon before a car came — every one of them is inside ` +
-      'CARRIED too, so these two cells overlap rather than add'
+      `waited past the ${horizon} give-up line before a car came, and every one of them is in ` +
+      'CARRIED too, so the two figures overlap'
     );
   }
   if (abandonedCarried === 0) {
     return (
-      `waited past the ${horizon} horizon and were never carried — they sit inside CARRIED’s ` +
-      'denominator and not its count'
+      `waited past the ${horizon} give-up line and were never carried, so they are among the ` +
+      'people who turned up and not among those CARRIED'
     );
   }
   return (
-    `waited past the ${horizon} horizon — ${String(abandonedCarried)} of them were still carried ` +
-    'and are inside CARRIED too; the rest were not'
+    `waited past the ${horizon} give-up line, and ${String(abandonedCarried)} of them were still ` +
+    'carried and are in CARRIED too, while the rest were not'
   );
 }
 
@@ -2315,8 +2313,8 @@ function turnedAwayClause(observations: Observations): string {
   const { turnedAway } = observations;
   if (turnedAway === 0) return '';
   return (
-    `a further ${String(turnedAway)} never waited at all — the building turned them away at a ` +
-    'credential check, which is a different outcome and not a slow one'
+    `a further ${String(turnedAway)} never waited at all, because the building turned them away ` +
+    'at a credential check, which is a different outcome from a slow wait'
   );
 }
 
@@ -2349,13 +2347,13 @@ function worstWaitFigure(observations: Observations): ReportFigure {
       axisOnly: false,
     };
   }
-  const shiftClause = 'the worst of the whole shift — the figure the goal row grades';
+  const shiftClause = 'the worst of the whole shift, and the wait the goal is graded on';
   return {
     id: 'worst-wait',
     label: 'WORST WAIT',
     value: `${observations.worstWaitIsCensored ? 'at least ' : ''}${observations.worstWaitS.toFixed(0)} s`,
     note: observations.worstWaitIsCensored
-      ? `a rider who had not boarded when the day ended — a lower bound, not their wait; ${shiftClause}`
+      ? `a rider still waiting when the day ended, so their full wait was longer; ${shiftClause}`
       : `one rider, and they remember it; ${shiftClause}`,
     tone: observations.worstWaitS > LONG_WORST_WAIT_S ? 'bad' : 'plain',
     axisOnly: false,
@@ -2388,7 +2386,7 @@ const LONG_WORST_WAIT_S = 120;
  *
  * **Not `ReportFigure.count`**, which is *"how many observations this cell's value is a mean
  * over"*. This is a maximum, so the structured field would be the wrong claim; the denominator
- * goes where `AWAY INSIDE A MINUTE` and `WORK PER DELIVERED LEG` already put theirs, in the note
+ * goes where `AWAY INSIDE A MINUTE` and `WORK PER DELIVERED RIDE` already put theirs, in the note
  * under the value, which is R13's *"in the same visual unit"* and the unit `honesty/surfaces.ts`
  * reads `countShown` off.
  *
@@ -2436,22 +2434,22 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
       id: ENERGY_FIGURE_IDS[0],
       label: 'WORK DONE',
       value: measured && energy.workKJ !== null ? `${energy.workKJ.toFixed(0)} kJ` : NOT_RECORDED,
-      note: 'out-of-balance mechanical work — an axis beside the waits, never a score',
+      note: 'out-of-balance mechanical work, shown beside the waits and never a score',
       tone: 'unranked',
       axisOnly: true,
     },
     {
       id: ENERGY_FIGURE_IDS[1],
-      label: 'WORK PER DELIVERED LEG',
+      label: 'WORK PER DELIVERED RIDE',
       value:
         measured && energy.workPerServedLegKJ !== null
           ? `${energy.workPerServedLegKJ.toFixed(1)} kJ`
           : NOT_RECORDED,
       note:
         `over ${legCount(energy.deliveredLegCount, 'delivered ride')} in the ` +
-        `${reportWindowNameOf(summary.reportWindow.id)} window — a count that small moves several-fold ` +
-        'from one day’s crowd to the next with nothing changed; a day that spends less by carrying ' +
-        'fewer people has saved nothing',
+        `${reportWindowNameOf(summary.reportWindow.id)} window. A count that small moves several-fold ` +
+        'from one day’s crowd to the next with nothing changed. A day that spends less by carrying ' +
+        'fewer people has saved nothing.',
       tone: 'unranked',
       axisOnly: true,
     },
@@ -2569,8 +2567,8 @@ function diagnosisFor(
       ? {
           id: 'peak-queue',
           when: '—',
-          what: 'No pile-up worth naming',
-          why: 'Demand stayed under what the group could clear, all day.',
+          what: 'No queue worth naming',
+          why: 'Demand stayed under what the lifts could clear, all day.',
           tone: 'plain',
         }
       : {
@@ -2601,10 +2599,7 @@ function diagnosisFor(
               ? 'This recording carries no demand schedule'
               : 'The worst moment fell outside every demand phase',
           why:
-            'The timeline’s segments are the resolved demand template’s own phases, so a run ' +
-            'recorded before that field existed has none to name. No phase is invented to fill ' +
-            'the gap — a label that does not describe the demand under it is the thing this sheet ' +
-            'exists to avoid.',
+            'There is no demand phase to name for that moment, so none is named.',
           tone: 'plain',
         }
       : {
@@ -2862,7 +2857,7 @@ function missedGoalRowOf(
         what: `The work came to ${reading.display} for each of the ${String(recording.summary.energy.deliveredLegCount)} delivered rides`,
         why:
           `The energy goal asked for ${bar} kJ or less for each delivered ride. A day that spends ` +
-          'less by carrying fewer people has saved nothing, which is why the rides are the divisor.',
+          'less by carrying fewer people has saved nothing, so the work is divided by the rides.',
         tone: 'bad',
       };
     default:
@@ -2902,9 +2897,9 @@ function missedGoalRowOf(
 function windowRelationClause(atS: SimTime, reportWindow: VizSummary['reportWindow']): string {
   const inside = atS >= reportWindow.startS && atS < reportWindow.endS;
   return inside
-    ? `That instant is inside the ${reportWindowNameOf(reportWindow.id)} window the means above are read over.`
-    : `That instant is outside the ${reportWindowNameOf(reportWindow.id)} window the means above are read over — the ` +
-      'worst moment of the day and the waits quoted up there are two different parts of it, and ' +
+    ? `That moment is inside the ${reportWindowNameOf(reportWindow.id)} window the averages are read over.`
+    : `That moment is outside the ${reportWindowNameOf(reportWindow.id)} window the averages are read over. The ` +
+      'worst moment of the day and the average waits come from two different parts of it, and ' +
       'both are true.';
 }
 
@@ -2944,7 +2939,7 @@ const LEVERS: readonly ReportLever[] = Object.freeze([
   Object.freeze({
     id: 'add-a-car',
     title: 'Add a car',
-    body: 'The blunt instrument. Costs a shaft, works immediately, and the Building tab will let you feel how much it buys.',
+    body: 'The blunt instrument. It costs a shaft and works straight away.',
   }),
   Object.freeze({
     id: 'zone-the-tower',
@@ -2981,7 +2976,7 @@ const LEVERS: readonly ReportLever[] = Object.freeze([
   Object.freeze({
     id: 'ask-destination',
     title: 'Ask where they’re going',
-    body: 'Destination dispatch asks each rider for their floor before a car is chosen for them. What that does to the waits on this building is a question for paired runs, not for this card.',
+    body: 'Destination dispatch asks each rider for their floor before a car is chosen for them. What that does to the waits on this building takes many runs on the same crowds to say, not one day.',
   }),
 ]);
 
@@ -3147,7 +3142,7 @@ function leverPointersFor(
      */
     const gaveUp = observations.abandoned;
     outrun.push(
-      `${String(gaveUp)} rider${gaveUp === 1 ? '' : 's'} waited past the give-up horizon`,
+      `${String(gaveUp)} rider${gaveUp === 1 ? '' : 's'} waited past the give-up line`,
     );
   }
   if (outrun.length > 0) pointers.set('add-a-car', listOf(outrun));
@@ -3242,11 +3237,11 @@ const DEEP_QUEUE = 24;
 function streakLineFor(verdict: ShiftVerdict, streak: number): string {
   switch (verdict) {
     case 'missed':
-      return 'Streak reset. The building keeps growing either way — nothing here is a game over.';
+      return 'Streak reset. The building keeps growing either way, and nothing here ends the game.';
     case 'ungraded':
       return streak > 0
         ? `Nothing was graded, so your streak of ${String(streak)} stands. The building keeps growing either way.`
-        : 'Nothing was graded, so nothing was lost. The building keeps growing either way — nothing here is a game over.';
+        : 'Nothing was graded, so nothing was lost. The building keeps growing either way, and nothing here ends the game.';
     case 'cleared':
       return streak === 1
         ? 'First clean day. Streak started.'
@@ -3267,9 +3262,9 @@ function contractLineFor(contract: ScenarioContract | undefined, week: WeekState
      * on: they would go looking for the scenario they think they lost.
      */
     if (week.contractId === ENDLESS_CONTRACT_ID) {
-      return 'Endless — no assignment, so nothing is banked and nothing clears. The building grows anyway.';
+      return 'Endless: no assignment, so nothing is banked and nothing clears. The building grows anyway.';
     }
-    return 'Your own building — nothing is being banked, and the goals are still read from what happened.';
+    return 'Your own building: nothing is banked, and the goals are still read from what happened.';
   }
   // SC-05/DR-09 (§ D198): `cleanRun` keeps counting on a contract already cleared, so the raw
   // figure can read "2 of 1". The clamp is on the display only — the data keeps its truth.
@@ -3372,7 +3367,7 @@ function taughtFor(contract: ScenarioContract | undefined, week: WeekState): str
    */
   if (weekHasClosed(week)) return weekDealOf(week) === undefined ? UNMEASURED_WEEK_CLOSED_LINE : WEEK_CLOSED_LINE;
   if (contract === undefined) {
-    return 'A building you drew yourself. Nothing banks here — the sheet is the whole reward.';
+    return 'A building you drew yourself. Nothing banks here. The sheet is the reward.';
   }
   if (contractStatus(week, contract.id) === 'cleared') {
     /*
@@ -3388,7 +3383,7 @@ function taughtFor(contract: ScenarioContract | undefined, week: WeekState): str
     }
     return (
       `${contract.label} is already cleared, and its reward is open: ${contract.reward}. ` +
-      'Nothing more banks against it — days here keep the streak, and the sheet is the reward now.'
+      'Nothing more banks against it. Days here keep the streak, and the sheet is the reward now.'
     );
   }
   const need = weekNeedOf(contract, undefined, week.week);
@@ -3453,21 +3448,20 @@ export function smallPrintFor(
 ): string {
   const { reportWindow } = summary;
   return (
-    'This is one replication of one day on one seed. It cannot tell you that ' +
-    `${dispatcherName.toLowerCase()} is better than anything — that needs 50 or more paired runs ` +
-    'against the same passengers, and a confidence interval that excludes zero. What it can tell ' +
-    'you is what happened today, and today is where the queue was. ' +
-    `Every cohort figure above is the ${reportWindowNameOf(reportWindow.id)} window, ` +
-    `${clockRange(reportWindow.startS, reportWindow.endS, dayStartS)}: “Riders waited twenty-five ` +
-    `seconds on average” is false without “${windowQualifierOf(reportWindow)}”. ` +
+    `This was one day on one crowd, so it shows what happened, not whether ${dispatcherName.toLowerCase()} ` +
+    'is better than anything else. ' +
+    'Saying that takes repeated runs of each on the same crowds. The bar is 50 or more runs and a ' +
+    'confidence interval that excludes zero. ' +
+    `The averages above are read over the ${reportWindowNameOf(reportWindow.id)} window, ` +
+    `${clockRange(reportWindow.startS, reportWindow.endS, dayStartS)}, so “riders waited twenty-five ` +
+    `seconds on average” is only true ${windowQualifierOf(reportWindow)}. ` +
     /*
      * § D1148: WORST WAIT moved to the whole shift with § D1104 and this sentence still put it in
      * the window. `honesty/agreement.ts`'s `worst-wait-scope` pair reads the span it names here
      * against the span the card's own note names.
      */
-    'The counts — carried, ' +
-    'past the give-up line, the deepest queue, the WORST WAIT figure and every goal reading ' +
-    'above — are over the whole shift; the means are over that window and nothing else. ' +
+    'The counts (carried, past the give-up line, the deepest queue, the WORST WAIT figure and ' +
+    'every goal reading) are over the whole shift. ' +
     /*
      * `docs/20` defect 6, and the sentence the two windows needed. *The tightest moment* and *the
      * worst of it* are the whole shift's deepest queue and the demand phase it fell in — 08:50 and
@@ -3479,12 +3473,11 @@ export function smallPrintFor(
      * `worstWaitFigure`'s precedent) because this is the paragraph a reader goes to when the two
      * disagree, and a reconciliation that lives only on the thing being reconciled is not one.
      */
-    'The two rows under the heading above read the whole shift too: the deepest queue is the ' +
-    'deepest of the day and the phase named beside it is the phase that instant fell in, so the ' +
-    'worst moment on this sheet need not be inside the window the means came from. Where it is ' +
-    'not, both are true and neither is a correction of the other. ' +
-    'The levers above are ordered by what today showed, never by what any of them is worth: which ' +
-    'one helps this building is the question that needs the paired runs, not the one day.'
+    'The deepest queue and the phase named beside it are read over the whole shift too, so the ' +
+    'worst moment on this sheet need not be inside the window the averages came from. Where it ' +
+    'is not, both are true. ' +
+    'The levers are in the order today pointed to, not in order of what each is worth. Which one ' +
+    'helps this building takes those repeated runs to say, not one day.'
   );
 }
 

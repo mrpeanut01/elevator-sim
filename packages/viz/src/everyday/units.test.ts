@@ -147,7 +147,7 @@ describe('the preference itself', () => {
      * priced steps are all untouched, and a note promising every figure would be § D227's stale
      * claim written on the day the control shipped.
      */
-    expect(UNITS_ROW_COPY.note).toContain('machine specification');
+    expect(UNITS_ROW_COPY.note).toContain('machine spec');
     expect(UNITS_ROW_COPY.note).not.toMatch(/every|all figures/iu);
   });
 });

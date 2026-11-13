@@ -62,21 +62,21 @@ export const PEAK_ORDER_INFO: Readonly<Record<PeakOrder, PeakOrderInfo>> = Objec
   'up-first': Object.freeze({
     id: 'up-first' as PeakOrder,
     label: 'Up-peak first',
-    note: 'Office. Almost everybody is arriving, and the lobby is the only origin that matters.',
+    note: 'Office. Almost everybody is arriving, so nearly every trip starts in the lobby.',
     split: Object.freeze({ incoming: 0.85, outgoing: 0.05, interfloor: 0.1 }),
     template: 'rise-and-fall' as DemandTemplateId,
   }),
   'down-first': Object.freeze({
     id: 'down-first' as PeakOrder,
     label: 'Down-peak first',
-    note: 'Apartments, hotels. The building empties, so the queue forms on every floor at once instead of in one lobby.',
+    note: 'Apartments, hotels. The building empties, so queues form on every floor at once instead of in one lobby.',
     split: Object.freeze({ incoming: 0.15, outgoing: 0.75, interfloor: 0.1 }),
     template: 'rise-and-fall' as DemandTemplateId,
   }),
   'two-way': Object.freeze({
     id: 'two-way' as PeakOrder,
     label: 'Two-way both ends',
-    note: 'The lunch template: outgoing-dominant early, incoming-dominant late, in one period. The hardest to zone for, because a car can never be empty in the useful direction.',
+    note: 'The lunch template: mostly outgoing early, mostly incoming late, in one period. The hardest to zone for.',
     split: undefined,
     template: 'lunch-two-way' as DemandTemplateId,
   }),
@@ -134,7 +134,7 @@ export const PATTERN_ROWS: readonly PatternRow[] = Object.freeze([
     max: 25,
     step: 0.5,
     unit: ' %pop/5 min',
-    help: 'Arrivals at the peak, as a percentage of the building’s population every five minutes — `demand.arrivalRatePctPop5min`. Lift engineers size buildings on this number: 12% is a standard office up-peak and 16% is a prestige one. Above about 18% most groups on most buildings saturate, which is a legitimate thing to build and watch.',
+    help: 'Arrivals at the peak, as a percentage of the building’s population every five minutes (demand.arrivalRatePctPop5min). 12% is a standard office up-peak and 16% a prestige one. Above about 18% most groups on most buildings saturate.',
   },
   {
     key: 'baselineFraction',
@@ -144,7 +144,7 @@ export const PATTERN_ROWS: readonly PatternRow[] = Object.freeze([
     max: 1,
     step: 0.05,
     unit: ' × peak',
-    help: 'Intensity at both ends of the period as a fraction of the peak — `demand.baselineFraction`. Zero starts the period from an empty building; a high value leaves no ramp at all and turns the template into a flat load.',
+    help: 'Intensity at both ends of the period, as a fraction of the peak (demand.baselineFraction). Zero starts from an empty building. A high value leaves no ramp, only a flat load.',
   },
   {
     key: 'peakWindowS',
@@ -154,7 +154,7 @@ export const PATTERN_ROWS: readonly PatternRow[] = Object.freeze([
     max: 1800,
     step: 30,
     unit: ' s',
-    help: 'Seconds the demand stays at peak before ramping down — `demand.peakWindowS`, which is also the reporting window under `rise-and-fall`. The same number of people crammed into five minutes instead of twenty is a completely different problem, and this is the control that says which one you are running.',
+    help: 'Seconds the demand stays at peak before ramping down (demand.peakWindowS). Under rise-and-fall this is also the reporting window.',
   },
   {
     key: 'mixAmplitude',
@@ -164,7 +164,7 @@ export const PATTERN_ROWS: readonly PatternRow[] = Object.freeze([
     max: 1,
     step: 0.05,
     unit: ' × authored',
-    help: 'How much of the lunch template’s directional arc to keep — `demand.mixAmplitude`. 1 is the arc as authored; **0 holds the mix flat at the period’s own mean with total demand unchanged**, which is the negative control DECISIONS.md § D162 requires beside any result measured under a varying mix.',
+    help: 'How much of the lunch template’s directional arc to keep (demand.mixAmplitude). 1 is the arc as authored. 0 holds the mix flat at the period’s own mean with total demand unchanged: the negative control for any result measured under a varying mix.',
     onlyFor: ['two-way'],
   },
   {
@@ -175,7 +175,7 @@ export const PATTERN_ROWS: readonly PatternRow[] = Object.freeze([
     max: 0.7,
     step: 0.05,
     unit: '',
-    help: 'Share of trips that never touch an entrance floor — the `interfloor` component of `demand.directionalSplit`. High interfloor traffic defeats zoning and lobby parking, because there is no single origin to park against.',
+    help: 'Share of trips that never touch an entrance floor (the interfloor part of demand.directionalSplit). High interfloor traffic defeats zoning and lobby parking, because there is no single origin to park against.',
   },
   {
     key: 'batchMean',
@@ -185,7 +185,7 @@ export const PATTERN_ROWS: readonly PatternRow[] = Object.freeze([
     max: 4,
     step: 0.1,
     unit: ' people',
-    help: 'How many people arrive together — a couple, a meeting turning out, a lift-load off one bus. Writes `traffic-profiles.json`’s `batchSize.mean`, by widening the traffic file this run resolves against and leaving the profile’s own distribution shape alone. Group size changes loading and stopping far more than the arrival rate does; it is the parameter most simulators get wrong by assuming passengers arrive one at a time.',
+    help: 'How many people arrive together: a couple, a meeting turning out, a busload. Writes batchSize.mean in traffic-profiles.json and leaves the profile’s distribution shape alone. Group size changes loading and stopping far more than the arrival rate does.',
   },
   {
     key: 'batchSharesDestination',
@@ -195,7 +195,7 @@ export const PATTERN_ROWS: readonly PatternRow[] = Object.freeze([
     max: 1,
     step: 1,
     unit: '',
-    help: 'Whether everyone in a batch is going to the same floor — `demand.batchSharesDestination`. A family does; a lift-load of strangers arriving at the same revolving door does not, and the difference is one stop or four.',
+    help: 'Whether everyone in a group goes to the same floor (demand.batchSharesDestination). A family does. Strangers arriving at the same door do not, and the difference is one stop or four.',
   },
 ]);
 

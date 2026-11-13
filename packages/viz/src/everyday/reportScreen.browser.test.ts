@@ -162,7 +162,7 @@ describe.skipIf(!HAS_BROWSER)('§ 6.5’s closing block is layered on the page �
        */
       const { drawn, present } = await smallPrint(page);
 
-      expect(wordsIn(present)).toBeGreaterThan(300);
+      expect(wordsIn(present)).toBeGreaterThan(200);
       expect(wordsIn(drawn)).toBeLessThan(wordsIn(present) / 3);
 
       // Both mode wings are present whole. These are `mode/casualDay.ts`'s own constants, imported
@@ -171,8 +171,8 @@ describe.skipIf(!HAS_BROWSER)('§ 6.5’s closing block is layered on the page �
       expect(flat(present)).toContain(flat(CASUAL_REACH_NOTE));
 
       // And the refusal is the part that is *not* folded — the one claim that may not be a click away.
-      expect(flat(drawn)).toContain('This is one replication of one day on one seed.');
-      expect(flat(drawn)).toContain('50 or more paired runs');
+      expect(flat(drawn)).toContain('This was one day on one crowd');
+      expect(flat(drawn)).toContain('repeated runs of each on the same crowds');
     } finally {
       await page.close();
     }

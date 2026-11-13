@@ -322,7 +322,7 @@ export function freePlayIssues(
       field: 'buildingId',
       message:
         selection.buildingId === ''
-          ? 'No building is selected, and none is loaded to select.'
+          ? 'No building is selected, and none is loaded.'
           : `No building "${selection.buildingId}" is loaded. It may have been renamed or removed.`,
     });
   }
@@ -335,7 +335,7 @@ export function freePlayIssues(
   if (!has(catalogue.demandTemplates, selection.demandTemplateId)) {
     issues.push({
       field: 'demandTemplateId',
-      message: `No demand template "${selection.demandTemplateId}" is loaded.`,
+      message: `No traffic shape "${selection.demandTemplateId}" is loaded.`,
     });
   }
   /*
@@ -360,8 +360,8 @@ export function freePlayIssues(
       field: 'windowStartS',
       message:
         parts.length === 0
-          ? `${template.name} declares no period this menu can run.`
-          : `${template.name} does not have that part of the day. It offers ${parts
+          ? `${template.name} has no period that can be run here.`
+          : `${template.name} does not have that part of the day. Pick one of: ${parts
               .map((part) => part.label)
               .join(', ')}.`,
     });
@@ -372,7 +372,7 @@ export function freePlayIssues(
       message:
         `${selected.label} is ${String(Math.round(selected.durationS / 60))} minutes of demand, ` +
         `longer than the ${String(Math.round(LONGEST_OFFERED_RUN_S / 60))} minutes a single run ` +
-        'offers. Pick one of its busy parts instead.',
+        'allows. Pick one of its busy parts instead.',
     });
   }
 
@@ -386,7 +386,7 @@ export function freePlayIssues(
   if (!isSeedText(selection.seed)) {
     issues.push({
       field: 'seed',
-      message: `A seed is 1–${String(SEED_MAX_DIGITS)} digits. It names a run rather than measuring one.`,
+      message: `A seed is 1–${String(SEED_MAX_DIGITS)} digits.`,
     });
   }
 

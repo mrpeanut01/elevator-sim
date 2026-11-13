@@ -129,7 +129,7 @@ function inWords(count: number): string {
 
 describe('the Scenarios tab counts the scenarios there are — § D253', () => {
   /**
-   * The three sentences that carry a count, each with the word **captured** rather than searched
+   * The sentence that carries a count (two more did until the 2026-11 copy pass cut them), with the word **captured** rather than searched
    * for.
    *
    * Reading the number out and comparing it is stronger than asserting the right sentence is
@@ -143,11 +143,9 @@ describe('the Scenarios tab counts the scenarios there are — § D253', () => {
    */
   const COUNTS: readonly (readonly [string, RegExp, (total: number) => number])[] = [
     ['the heading', /Scenarios — ([a-z]+) buildings, any order/, (total) => total],
-    ['the intro', /each building teaches something the other ([a-z]+) cannot/, (total) => total - 1],
-    ['the footnote', /All ([a-z]+) ship with the simulator/, (total) => total],
   ];
 
-  it('names the campaign’s size in all three sentences, from `CONTRACTS`', async () => {
+  it('names the campaign’s size in the heading, from `CONTRACTS`', async () => {
     /*
      * Derived on the expectation side, typed on the page side — which is the whole arrangement.
      * `CONTRACTS` is what `dev/scenariosPanel.ts` draws a card from, so this compares the prose
@@ -165,11 +163,9 @@ describe('the Scenarios tab counts the scenarios there are — § D253', () => {
     // #37's defect was `five` in all three sentences over eight cards. Planting it back is the only
     // way to know these patterns would have found it rather than matching something else.
     const stale = (await scenariosPanel())
-      .replace(/Scenarios — [a-z]+ buildings/, 'Scenarios — five buildings')
-      .replace(/the other [a-z]+ cannot/, 'the other four cannot')
-      .replace(/All [a-z]+ ship/, 'All five ship');
+      .replace(/Scenarios — [a-z]+ buildings/, 'Scenarios — five buildings');
     const read = COUNTS.map(([, pattern]) => pattern.exec(stale)?.[1]);
-    expect(read).toEqual(['five', 'four', 'five']);
+    expect(read).toEqual(['five']);
     expect(read).not.toEqual(COUNTS.map(([, , expected]) => inWords(expected(CONTRACTS.length))));
   });
 

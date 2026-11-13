@@ -531,7 +531,7 @@ export function renderUnsearchable(unsearchable: ReadonlyMap<string, string>): C
       'p',
       {},
       [],
-      `${String(unsearchable.size)} declared ${unsearchable.size === 1 ? 'row is' : 'rows are'} not searchable, and ${unsearchable.size === 1 ? 'it is' : 'they are'} listed rather than hidden:`,
+      `${String(unsearchable.size)} declared ${unsearchable.size === 1 ? 'row is' : 'rows are'} not searchable:`,
     ),
     node('ul', {}, rows),
   ]);

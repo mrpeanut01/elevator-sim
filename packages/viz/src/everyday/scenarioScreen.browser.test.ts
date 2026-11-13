@@ -216,7 +216,7 @@ describe.skipIf(!HAS_BROWSER)('the Scenario hub opens the stage that was pressed
           expect(line).toContain("Its page sells");
           expect(line).toContain("from this device's chimes");
         } else {
-          expect(line).toContain('the census finds no further way through');
+          expect(line).toContain('no further way through was found');
           refusing += 1;
         }
         expect(line).not.toContain('Nothing sells a wider budget for these ten');

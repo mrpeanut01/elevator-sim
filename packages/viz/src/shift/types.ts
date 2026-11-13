@@ -479,7 +479,7 @@ export interface GoalObservations {
   /**
    * Out-of-balance mechanical work per leg that alighted, kilojoules, rounded to the tenth the
    * report sheet prints. It is `VizEnergy.workPerServedLegKJ`, the figure `report.ts#energyFigures`
-   * draws as WORK PER DELIVERED LEG.
+   * draws as WORK PER DELIVERED RIDE.
    *
    * ## Why an energy figure may be graded at all, and what may not be
    *
@@ -607,7 +607,7 @@ export interface ShiftGoal {
    *
    * A closed union rather than a `string`, so a goal cannot invent a unit the report sheet has no
    * matching figure for. ` kJ` joined with the energy bar (§ D468); it is the sheet's own unit on
-   * WORK PER DELIVERED LEG, which is the figure that goal grades.
+   * WORK PER DELIVERED RIDE, which is the figure that goal grades.
    */
   readonly unit: '%' | ' s' | ' kJ' | '';
   /** The bar itself, in {@link unit}. */

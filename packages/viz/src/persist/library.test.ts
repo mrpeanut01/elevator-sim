@@ -963,7 +963,7 @@ describe('the sentence a dropped entry produces', () => {
   it('names what went, whose fault it is not, and what is still there', () => {
     const notice = libraryNoticeFor(dropOf(1)) ?? '';
     expect(notice).toContain('Tower 0');
-    expect(notice, 'not the player’s doing').toMatch(/rather than anything you did/u);
+    expect(notice, 'not the player’s doing').toMatch(/the game’s doing, not yours/u);
     expect(notice, 'what happens now').toMatch(/still here/u);
   });
 

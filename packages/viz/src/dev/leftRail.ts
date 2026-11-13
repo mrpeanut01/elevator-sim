@@ -409,7 +409,7 @@ export function idleStatRowsOf(): readonly StatRow[] {
     row(
       'served promptly',
       PENDING_DISPLAY,
-      'No shift has run, so there is no long-wait threshold to measure a share against.',
+      'No shift has run, so there is no long-wait threshold yet.',
       'unknown',
     ),
   ];
@@ -450,8 +450,8 @@ export function servedTitleFor(thresholdS: number, servedCount: number): string 
   const base =
     Math.round(thresholdS) === 60
       ? SERVED_TITLE
-      : `Share of served calls whose hall wait was under ${thresholdS.toFixed(0)} s — this run's ` +
-        'own long-wait threshold, rather than the conventional sixty.';
+      : `Share of served calls whose hall wait was under ${thresholdS.toFixed(0)} s, this run's ` +
+        'long-wait threshold.';
   // `1 served leg` singular — docs/19 defect 8's `over 1 legs`, on this rail's copy of the idiom.
   return `${base} Over ${String(servedCount)} served leg${servedCount === 1 ? '' : 's'}.`;
 }
@@ -885,8 +885,7 @@ export function idleHonestyCard(): HonestyCard {
     glyph: '·',
     title: 'Nothing measured yet',
     plain:
-      'Run a shift and this card says whether the run’s averages may be quoted, and on what ' +
-      'grounds if they may not.',
+      'Run a shift to see whether its averages can be quoted, and why not if they can’t.',
     hasMaths: false,
     maths: undefined,
     bg: 'transparent',
@@ -939,8 +938,8 @@ export function idleDecisionRow(): DecisionRowView {
     key: 'no-run',
     time: '—',
     head: 'standing by',
-    why: 'no shift on the board yet — the log fills as the group makes decisions',
-    title: 'Every dispatch decision this run made, newest first, with the term that carried it.',
+    why: 'no shift yet: the log fills as the group decides',
+    title: 'Each dispatch decision in this run, newest first, with the term that carried it.',
     color: FAINT,
     empty: true,
   };

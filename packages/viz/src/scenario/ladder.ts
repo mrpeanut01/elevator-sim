@@ -210,9 +210,9 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    * clear of it pays chimes and a second pays nothing"*.
    */
   openNote:
-    'Opens this stage on its own building, at the budget it opens on or a wider one you bought for it. ' +
+    'Opens this stage on its own building, at its opening budget or a wider one you bought. ' +
     `The first clear pays chimes, the first clear at or under a priced par pays ${String(PAR_AWARD_CHIMES)} more, and later clears pay nothing. ` +
-    'Nothing on this path is locked: each stage is open, or held for the reason written on it.',
+    'Nothing here is locked. Each stage is open, or held for the reason shown on it.',
   /** A stage held back. Never the word unwinnable — see the module docstring. */
   heldLead: 'Held back:',
   /*
@@ -224,14 +224,14 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    * happening rather than a hypothetical. So the row says what a zero here is and is not.
    */
   heldBody:
-    'The dials among them were a sample rather than everything there is, so a rare way through is missed here rather than ruled out. It is on the list because it is the next step on the path, and it is not offered to play until one is found or it says outright that there is none.',
+    'The dials tried were a sample, so a rare way through may have been missed, not ruled out. It’s listed because it is the next step on the path. It opens once a way through is found, or once it says outright that there is none.',
   /**
    * **A stage whose count names ways through that its own admission check refuses** — § D1129
    * clause 3. The check's sentence follows it, so the reader meets the price and the budget rather
    * than a summary of them.
    */
   heldRefusedBody:
-    'the ways through its count names are refused by the stage’s own admission check at the budget it opens on, so none of them is a press you could make. The first refusal:',
+    'the stage’s own check refuses every way through its count names at the budget it opens on, so you couldn’t play any of them. The first refusal:',
   /*
    * **The refusal, on every row that has a rung above its base** — § D786.
    *
@@ -250,7 +250,7 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    * add a way through. The reason is the census's, and it is the one the stage page draws per rung.
    */
   rungsNotSold:
-    'Its page sells none of them: the census finds no further way through at a wider budget, so the count below is the count at the budget it opens on.',
+    'Its page sells none of them, because no further way through was found at a wider budget. The count below is at the budget it opens on.',
   /*
    * **A row whose page sells none, where a higher rung does add a way through**, [§ D1608](../../../../DECISIONS.md).
    * A rung is sold only above the base or a sold rung, so a count that rises above an unsold rung is
@@ -258,9 +258,9 @@ export const SCENARIO_LADDER_COPY = Object.freeze({
    * be false of it. Stage 9 has that shape on the census regenerated on the engine § D1603 fixed.
    */
   rungsNotReached:
-    'Its page sells none of them: the census finds no further way through at the first of them, and each wider budget is sold only from the one below it, so the count below is the count at the budget it opens on.',
+    'Its page sells none of them, because no further way through was found at the first, and each wider budget is sold only from the one below it. The count below is at the budget it opens on.',
   /** The count's basis on a row whose page does sell a rung — the same clause, said once. */
-  countAtBase: 'The count below is the count at the budget it opens on.',
+  countAtBase: 'The count below is at the budget it opens on.',
 });
 
 /* -------------------------------------------------------------------------- *
@@ -349,7 +349,7 @@ function budgetLineOf(budget: ScenarioBudget, scenario: PublishedSurvivorScenari
   const base = rungs[0]?.units ?? budget.startingUnits;
   const opens = `Opens on ${String(base)} units of change.`;
   if (budget.steps.length === 0) {
-    return `${opens} No wider budget is authored for it.`;
+    return `${opens} It has no wider budget.`;
   }
   const named = budget.steps.map((step) => step.name).join(', ');
   const ladder =
@@ -378,8 +378,8 @@ function budgetLineOf(budget: ScenarioBudget, scenario: PublishedSurvivorScenari
   }
   const offers = sold.map((step) => `${step.name} for ${String(step.chimes)} ${step.chimes === 1 ? 'chime' : 'chimes'}`).join(' and ');
   return (
-    `${opens} ${ladder} Its page sells ${offers} from this device's chimes, because the census finds more ` +
-    `ways through there. ${SCENARIO_LADDER_COPY.countAtBase}`
+    `${opens} ${ladder} Its page sells ${offers} from this device's chimes, because more ` +
+    `ways through were found there. ${SCENARIO_LADDER_COPY.countAtBase}`
   );
 }
 

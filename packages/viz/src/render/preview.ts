@@ -77,7 +77,7 @@ export function drawPreview(ctx: Canvas2DLike, input: PreviewInput): void {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(
-      'no floors yet — add a floor or a floor range to see the building',
+      'no floors yet: add a floor or a floor range to see the building',
       layout.width / 2,
       layout.height / 2,
     );
@@ -195,7 +195,7 @@ function drawLensLegend(ctx: Canvas2DLike, input: PreviewInput, theme: Theme): v
   let y = layout.height - 8;
   ctx.fillStyle = theme.textDim;
   ctx.fillText(
-    'operational zoning is a dispatcher setting, not building geometry — it has no floor state',
+    'operational zoning is a dispatcher setting, not building geometry: it has no floor state',
     12,
     y,
   );

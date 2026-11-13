@@ -67,6 +67,7 @@ import {
   PREFERRED_BATCH_CANDIDATE,
   preferredId,
 } from './defaults.js';
+import { explainer } from './dom.js';
 
 export interface SuitePanelElements {
   readonly baseline: HTMLSelectElement;
@@ -193,7 +194,7 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
   function requestFromForm(): SuiteRequest | undefined {
     const seedText = ui.seed.value.trim();
     if (seedText === '' || !/^\d+$/.test(seedText)) {
-      fail('a suite needs a whole-number seed, so that every replication in it replays exactly.');
+      fail('the seed must be a whole number, so every replication replays exactly.');
       return undefined;
     }
     const replications = Number(ui.replications.value);
@@ -205,7 +206,7 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
       // Not refused — the bench's own liveness control: a profile against itself reports
       // "not resolved" rather than a winner, on every ticked cell.
       ui.status.textContent =
-        'both arms are the same profile — the difference is exactly zero by construction on every cell.';
+        'both arms are the same profile, so the difference is exactly zero on every cell.';
     }
     return {
       cellIds: tickedCellIds(),
@@ -285,13 +286,13 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
           ui.progress.value = index * perCell + message.progress.completed;
           ui.status.textContent =
             `cell ${String(index + 1)} of ${String(plans.length)} (${plan.cell.label}) — ` +
-            `${String(message.progress.completed)} of ${String(perCell)} replications; the page is still yours.`;
+            `${String(message.progress.completed)} of ${String(perCell)} replications.`;
           return;
         }
         if (message.kind === 'failed') {
           setRunning(false);
           ui.progress.hidden = true;
-          fail(`cell "${plan.cell.id}" failed: ${message.message}. Nothing is reported — a suite with a missing cell would be a different suite.`);
+          fail(`cell "${plan.cell.id}" failed: ${message.message}. Nothing is reported: a suite with a missing cell would be a different suite.`);
           stopWorker();
           return;
         }
@@ -375,8 +376,8 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
     table.className = 'suite-summary';
     const caption = doc.createElement('caption');
     caption.textContent =
-      'Where each cell landed — an index of the full report below. Every word here appears ' +
-      'again underneath, in full; a row names an arm only where the report’s own gate did.';
+      'Where each cell landed: an index of the full report below. A row names an arm only where ' +
+      'the report’s own gate did.';
     table.append(caption);
     const head = doc.createElement('tr');
     for (const label of ['cell', ...summary.metricLabels]) {
@@ -466,7 +467,7 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
     ui.output.append(
       row(
         'the words above',
-        'What each term on this screen means. Definitions only — nothing here is a result.',
+        'What the terms above mean. Definitions only, not results.',
         undefined,
         'figure-observation',
       ),
@@ -489,9 +490,14 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
     ui.output.append(
       row(
         'what the suite is for',
-        'The bench above compares two dispatchers at one operating point. The suite runs the same ' +
-          'two-arm comparison over the experiment matrix’s fixed cells — building × traffic ' +
-          'pattern, each with its measured rationale — one batch per ticked cell.',
+        'The same two-dispatcher comparison as the bench above, run once per ticked cell.',
+        undefined,
+        'figure-observation',
+      ),
+      explainer(doc, {
+        link: 'How cells are reported',
+        title: 'How cells are reported',
+        body: [
         /*
          * `docs/20` defect 9: the identifier is gone and the **fact** it was carrying is not.
          * A reader needed to know two things from that clause — that these eight are the
@@ -501,18 +507,17 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
          * this panel's tick list is rendered from `MATRIX_CELLS` (line 104), never retyped, which
          * is the seam `benchmark/matrixCells.ts` exists to keep open.
          */
-        'The cells are the eight operating points this project measures — building × traffic ' +
-          'pattern, over five buildings — not the eight buildings. Each cell reports with the ' +
-          'same rules as a single batch: an ' +
-          'interval that includes zero is “not resolved”, a suppressed mean shows its reason, and ' +
-          'below 50 replications no winner is named.',
-        'figure-observation',
-      ),
+          'The cells are the eight operating points this project measures (building × traffic ' +
+            'pattern, over five buildings), not the eight buildings.',
+          'Each cell reports with the same rules as a single batch: an interval that includes ' +
+            'zero is “not resolved”, a suppressed mean shows its reason, and below 50 ' +
+            'replications no winner is named.',
+        ],
+      }),
       row(
         'what Run suite will do',
         `${String(ticked)} cells ticked × 2 dispatchers × ${String(Number.isFinite(replications) ? replications : 0)} replications = ${String(simulations)} simulations`,
-        'Cells run one after another; the progress bar counts every replication of the whole ' +
-          'suite. Cancel stops it, which reports nothing, because a stopped suite has no result.',
+        'Cells run one after another. Cancel stops the suite and reports nothing.',
         'figure-observation',
       ),
       row('to begin', 'Tick at least one cell and press Run suite.', undefined, 'figure-observation'),
@@ -539,7 +544,7 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
     stopWorker();
     setRunning(false);
     ui.progress.hidden = true;
-    ui.status.textContent = 'cancelled — a stopped suite has no result, so nothing is reported.';
+    ui.status.textContent = 'cancelled: a stopped suite has no result, so nothing is reported.';
     showingEmptyState = true;
     drawEmptyState();
   });

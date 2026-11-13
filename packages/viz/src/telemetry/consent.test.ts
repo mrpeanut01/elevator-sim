@@ -140,13 +140,18 @@ describe('§ 15.2’s four states, as words', () => {
     // The view carries no field a caller could use to make one look like the way forward. Asserted
     // over the keys rather than described, because § 10 non-goal 3 forbids asymmetric answers and
     // this is the shape that makes one impossible to express.
-    expect(Object.keys(ask ?? {}).sort()).toEqual(['body', 'heading', 'later', 'no', 'notCollected', 'yes']);
+    expect(Object.keys(ask ?? {}).sort()).toEqual(['body', 'details', 'heading', 'later', 'never', 'no', 'notCollected', 'yes']);
   });
 
   it('says what is not collected, because that is what makes the ask credible', () => {
     // § 4.1: the short form of § 2.2's list belongs on the surface. Each clause here is a refusal
     // the schema enforces rather than a promise this copy is making on somebody else's behalf.
     const ask = consentAskViewOf('unasked');
+    // The line drawn without a press names the three a player asks about first.
+    expect(ask?.never).toMatch(/your name/u);
+    expect(ask?.never).toMatch(/your email/u);
+    expect(ask?.never).toMatch(/anything you type/u);
+    // The whole list is one press away, behind the link.
     expect(ask?.notCollected).toMatch(/anything you type/u);
     expect(ask?.notCollected).toMatch(/email address/u);
     expect(ask?.notCollected).toMatch(/where you are/u);
@@ -154,7 +159,13 @@ describe('§ 15.2’s four states, as words', () => {
   });
 
   it('says the game is unchanged by a refusal, which is P-6 on the surface', () => {
-    expect(consentAssertion(consentAskViewOf('unasked')?.notCollected)).toBe(true);
+    // On the visible line, not behind the link.
+    expect(consentAssertion(consentAskViewOf('unasked')?.never)).toBe(true);
+  });
+
+  it('says where the answer can be changed, without a press', () => {
+    // The way to withdraw is part of what a person is agreeing to, so it is on the visible line.
+    expect(consentAskViewOf('unasked')?.never).toMatch(/change your answer in Settings/u);
   });
 
   it('draws the row off on every state but a grant', () => {

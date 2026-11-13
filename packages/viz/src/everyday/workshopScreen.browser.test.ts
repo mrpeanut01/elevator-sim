@@ -122,7 +122,7 @@ async function stateReads(page: Page, text: string): Promise<void> {
  * not the one this file is about.
  */
 const patience = (page: Page) =>
-  page.locator('.everyday-workshop input[aria-label="How long anyone should wait"]');
+  page.locator('.everyday-workshop input[aria-label="Limit the longest wait"]');
 
 /** Open a `<details>` by its summary text, and wait for its body to be in the document. */
 async function disclose(page: Page, summary: string, body: string): Promise<void> {
@@ -248,7 +248,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
    */
   it('moves the printed cost line when a plain lever moves, and says the edit travels', async () => {
     const page = await openWorkshop();
-    await disclose(page, 'show me the maths', '.everyday-workshop-cost-line');
+    await disclose(page, 'Show the maths', '.everyday-workshop-cost-line');
     const before = await page.textContent('.everyday-workshop-cost-line');
 
     await patience(page).fill('64');
@@ -340,7 +340,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
 
   it('discloses the maths in rule 12’s order — sentence, symbols, then the line', async () => {
     const page = await openWorkshop();
-    await disclose(page, 'show me the maths', '.everyday-workshop-cost-line');
+    await disclose(page, 'Show the maths', '.everyday-workshop-cost-line');
     const order = await page.evaluate(() => {
       const box = document.querySelector('.everyday-workshop-maths');
       const nodes = [...(box?.querySelectorAll('*') ?? [])];
@@ -374,7 +374,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday dispatcher workshop', () => {
 
   it('opens another design from the shelf, asking first when that discards unsaved changes', async () => {
     const page = await openWorkshop();
-    await disclose(page, 'show me the maths', '.everyday-workshop-cost-line');
+    await disclose(page, 'Show the maths', '.everyday-workshop-cost-line');
     const before = await page.textContent('.everyday-workshop-cost-line');
 
     // An unsaved change is standing, so the shelf asks before it opens anything over it.

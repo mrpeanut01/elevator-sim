@@ -12,7 +12,7 @@
 > answer has misread the section. The same is true of § 17's position on children.
 >
 > **§ 19 is the reviewer's checklist** — every question this draft could not answer, in one table, so
-> the review is a list rather than a reading. **Nineteen items.** Where an item is also raised in
+> the review is a list rather than a reading. **Twenty items.** Where an item is also raised in
 > the body it is marked `LAWYER` at the point it arises, with the item number beside it.
 >
 > This is the product owner's own condition, stated on issue #202 on 2026-09-09: *"I draft the
@@ -383,7 +383,10 @@ What the question owes:
   renamed or restated, never softened. *"Which screens you reach and how long you play"* is a
   restatement; *"help us improve"* is a request with the content removed.
 - **It says what is not collected** — § 2.2's list is what makes the ask credible, and the short
-  form of it belongs on the surface.
+  form of it belongs on the surface, **read without a press**: one line naming what is never
+  recorded and saying that a no changes nothing about the game. The whole list, how to change the
+  answer and what turning it off does are one press away, behind a link beside the answers. A
+  person can answer from what is in front of them.
 - **It obeys the charter's non-goal 8**: no section number, no filename, no code identifier. The
   consent surface may not cite this document by path.
 - **It enters the honesty corpus.** Every string it draws goes into
@@ -1430,19 +1433,35 @@ is the only one of the four that may be long.
 is the draft. Two answers, equally easy to give and equally easy to reach; no pre-tick, no *by
 continuing you agree*, no styling that makes one look like the way forward (§ 10 non-goal 3).
 
-> **Heading** — *Can we count how the game is going?*
+> **Heading** — *Can we record usage data?*
 >
-> **Body** — *We would like to record which screens you reach, how long you play, and which building
-> and settings each run used. It stays on our own server and goes nowhere else.*
+> **Body** — *That’s which screens you reach, how long you play, and which building and settings
+> each run used. It stays on our own server and goes nowhere else.*
 >
-> *We do not record anything you type, your name, your email address, where you are, or what you do
-> on any other site. Saying no changes nothing about the game — every mode, every screen and every
-> number works exactly the same.*
+> **Under it, and visible** — *It doesn’t include your name, your email or anything you type.
+> Saying no changes nothing about the game, and you can change your answer in Settings.*
 >
-> **Answers** — `No` · `Yes, count it`
+> **Answers** — `No` · `Yes`
 >
-> **Under both** — *You can change this later in Settings. Turning it off there also asks us to
-> delete what was already recorded.*
+> **A link, *What we record*, and behind it** — the body again, then *We do not record anything you
+> type, your name, your email address, where you are, or what you do on any other site.* and *You
+> can change this later in Settings. Turning it off there also asks us to delete what was already
+> recorded.*
+
+**The layout is a short visible assurance with the detail one press away.** The heading, the body
+and the line under it are drawn on the ask itself, so the yes or no can be given without opening
+anything; the complete not-recorded list and the two sentences about Settings are in the popover.
+The Settings row carries the same name for the thing, *Usage data*, and the same link.
+
+**These are not the words this section carried on 2026-09-10, and neither set has been reviewed.**
+The copy edit of 2026-11-13 (GitHub PR #679) replaced the draft #340 shipped: the heading was *Can
+we count how the game is going?*, the yes was *Yes, count it*, and the whole not-recorded list and
+the two sentences about Settings were drawn on the ask rather than behind a link. What is recorded
+is unchanged and no promise was dropped. What a person reads before answering is shorter: *where
+you are*, *any other site* and what turning it off does are one press away, and that the answer
+can be changed in Settings stays on the ask. The banner's condition binds these words exactly as
+it bound those, and a review of the earlier wording is not a review of this one. **`LAWYER` —
+§ 19 item 20.**
 
 **One word in that last line is doing work and is not a hedge.** *Asks* rather than *deletes*: the
 local half is immediate and the server half is a request that can fail (§ 4.3), and a consent screen
@@ -1455,13 +1474,13 @@ Four states, and the third is the one a design usually forgets:
 | State | What the player sees | What the product does |
 |---|---|---|
 | **unasked** | The question | Nothing is collected. **The screen behind it is fully usable** — § 4.4: no screen waits on an answer, and an unanswered question is a no |
-| **granted** | A settings row reading *Counting how the game is going: **on***, with a control to turn it off | Mints the `playerId`, begins the batch (§ 7.1) |
+| **granted** | A settings row reading *Usage data: **on***, with a control to turn it off | Mints the `playerId`, begins the batch (§ 7.1) |
 | **refused** | The same row reading ***off***, and never the question again | Nothing. **Not even the refusal** (§ 4.2) |
-| **withdrawn** | *Off. What was recorded has been asked to be deleted.* | § 4.3's three steps, in order, including the honest sentence about the half that can fail |
+| **withdrawn** | *Off. Recording has stopped, and we were asked to delete what we hold.* | § 4.3's three steps, in order, including the honest sentence about the half that can fail |
 
 **The withdrawn state's sentence is drafted here because it is the one that can lie**, and § 4.3
-already requires it to say so: *"The local half is immediate. Deleting what reached our server is a
-request, and if you were offline it may not have arrived — in that case it is deleted when it ages
+already requires it to say so: *"Off. Recording has stopped, and we were asked to delete what we
+hold. If you were offline the request may not have arrived, and the data is deleted when it ages
 out."* Blunt, and true. **`LAWYER` — § 19 item 8**, on whether that is an adequate description.
 
 ### 15.3 The display name, at the point it is set
@@ -1570,7 +1589,7 @@ so a reviewer can disagree with the reason rather than with the digit.
 | **S10 rate-limit key** | The limiter's own window, in memory | Process restart, and the window. Never written |
 | **S11 `.outbox.jsonl`** | **No horizon, and it is never swept** | Nothing in the product. It is a file on a developer's machine and is unreachable in production (§ 5.3). Stated rather than fixed, because the erasure route makes no claim over files on a development machine |
 | **D1 `elevator-sim.session`** | **Until the player clears it**, or the browser does | *Clear saved progress* on the settings screen — GitHub issue #229, `settingsScreen.ts:459`, a two-press arc whose second press calls `engineerBridge.clearSavedSession()` and then reloads. Also the browser's own site-data clear |
-| **D2 `elevator-sim.everyday-profile`** | **Until the player clears it**, or the browser does | The same control, in the same press: `store.clear()` runs immediately after the bridge call. The row's `ready` string names this slot's contents exactly — *"the solved cases and the ratings, and the name and picture above"* |
+| **D2 `elevator-sim.everyday-profile`** | **Until the player clears it**, or the browser does | The same control, in the same press: `store.clear()` runs immediately after the bridge call. The row's `ready` string names this slot's contents exactly — *"solved cases and ratings, your name and picture"* |
 | **D3 `elevator-sim:career`, `:career:refused`** | **Until the player clears it** | ***Clear saved progress*** removes both keys and seals the store, so the running session cannot write the career back (§ 16.6). Was not reached until 2026-09-09 |
 | **D4 `elevator-sim.viewMode`, `.revealedTabs`** | **Until the browser's own site-data clear** | **Not reached by *Clear saved progress*, deliberately** — `dev/main.ts` calls both *disclosure, per-browser, and neither is progress*, so a control named for progress leaves them (§ 16.6) |
 | **D5 the bearer token** | The tab | Held in memory only (`menu/account.ts:73`); closing the page ends it |
@@ -1850,7 +1869,7 @@ still waiting on rather than one this build discharged.
 
 ## 19. The reviewer's checklist
 
-**Nineteen items.** Each is a question this draft could not answer, with the section it comes from
+**Twenty items.** Each is a question this draft could not answer, with the section it comes from
 and what turns on it. It is a checklist rather than prose because the review is a decision, and a
 decision needs a list.
 
@@ -1875,6 +1894,7 @@ decision needs a list.
 | **17** | 5.1, 5.3 | **Accounts and board entries have no retention horizon** — *"an account nobody deletes is kept"*. Is a stated policy an acceptable answer where a period is expected? | Issue #202's AC2, and whether a horizon has to be invented |
 | **18** | 16.2 | **The error-report horizon is drafted and blank — and the reason it gave is no longer the reason it is blank** ([§ D588](../DECISIONS.md), 2026-09-15). This row said *#242's runbook has to exist before a number here means anything*; [`docs/40-incident-runbook.md`](40-incident-runbook.md) is that runbook, with a severity model in § 1 and a first response with per-level response times in § 2. So the precondition is discharged and the row is unfilled rather than unfillable. **It is left on this list**, because a horizon is still a judgement nobody here has made, and because the thing it now waits on is item 6: no error report is transmitted at all until the basis is chosen, so the horizon has nothing to govern yet | Whether #242's first acceptance criterion can be built at all — which turns on item 6, not on this row |
 | **19** | — | **Is anything in § 13.2 special-category?** The author's reading is no — no health, biometric, political or similar field exists — but the reading is a non-lawyer's | Whether a whole additional regime applies |
+| **20** | 4.1, 15.2 | **The ask's layout, as reworded on 2026-11-13.** One visible line names three of the five things not recorded and says the answer can be changed in Settings; the other two, and what turning it off does, are behind a link, *What we record*. Is that enough to read before answering, or must the whole list and the deletion sentence be read without a press? | The consent surface's copy and layout |
 
 **Two things that are deliberately not on this list.** The **minimum aggregate cell size** (§ 5.4)
 was a statistical judgement this project could make for itself, and it has: **§ 20.3 declares it.**

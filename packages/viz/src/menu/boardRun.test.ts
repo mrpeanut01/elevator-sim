@@ -165,7 +165,7 @@ describe('what the board ran — “how did they do it”', () => {
     expect(reveal).toContain('Conventional collective');
     expect(reveal).toContain('Midtown Office');
     // The clause that keeps it from being a claim about this build's own copy.
-    expect(reveal).toContain('this build’s own');
+    expect(reveal).toContain('this copy of the game’s own');
     expect(boardRevealRefusalOf(configuration)).toBeUndefined();
   });
 
@@ -175,7 +175,7 @@ describe('what the board ran — “how did they do it”', () => {
     expect(configuration.unresolved.map((axis) => axis.axis)).toEqual(['Dispatcher']);
     const refusal = boardRevealRefusalOf(configuration);
     expect(refusal).toContain('not-shipped-here');
-    expect(refusal).toContain('will not invent a name');
+    expect(refusal).toContain('cannot name those ids');
     // And the row itself cannot be run, with the reason `freePlayIssues` would give on Free play.
     expect(beatRefusalOf(unknown, CATALOGUE, issuesFor)).toContain('not-shipped-here');
   });
@@ -397,7 +397,7 @@ describe('a mixed daily board reads as a comparison', () => {
      */
     const view = leaderboardWith([ROW, { ...ROW, dispatcherProfileId: 'predictive-x' }]);
     expect(rowText(beatRowAt(view, 1))).toContain('predictive-x');
-    expect(rowText(beatRowAt(view, 1))).toContain('not in this build');
+    expect(rowText(beatRowAt(view, 1))).toContain('not in this version');
     // It is refused as well as named: this build cannot reproduce a run it cannot resolve.
     expect(beatRowAt(view, 1).enabled).toBe(false);
   });

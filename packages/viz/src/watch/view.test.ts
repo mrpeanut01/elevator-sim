@@ -272,7 +272,7 @@ describe('the watching view', () => {
     for (const text of watchingStrings(view)) {
       expect(text.toLowerCase()).not.toContain('server');
     }
-    expect(view.pill).toContain('RE-SIMULATION');
+    expect(view.pill).toContain('RE-RUNNING');
   });
 
   it('says reference run · not a player for a fixture, and does not for a filed day', () => {

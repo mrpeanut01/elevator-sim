@@ -67,13 +67,13 @@
  *    failing anything.
  * 2. **Nothing is deleted and nothing is re-ordered.** The parts, joined by one space, *are*
  *    `body`; `reportView.test.ts` asserts that equality over a real sheet. Re-ordering is the
- *    subtler half and it is forbidden for a stated reason: Casual's lead announces *"Two phrases
- *    below are worth having before you read them"*, so hoisting the sheet's own refusal above it
+ *    subtler half and it is forbidden for a stated reason: Casual's lead says the window is *"named
+ *    below"*, so hoisting the sheet's own refusal above it
  *    would read better and make that sentence false about its own page — § D227's stale-position
  *    defect, manufactured on purpose.
  * 3. **The refusal is the part that stays open.** What is drawn without a press is
- *    {@link sheetPartsOf}'s first paragraph — *this is one replication of one day on one seed, and
- *    it cannot tell you that anything is better than anything*. Folding that and leaving the
+ *    {@link sheetPartsOf}'s first sentence — *this was one day on one crowd, so it shows what
+ *    happened, not whether a dispatcher is better than anything else*. Folding that and leaving the
  *    translations open would be § D299's *a mode may make this easier to read and may not make it
  *    say less*, dressed as tidying.
  *
@@ -337,8 +337,8 @@ export interface EverydayReportView {
 export const REPORT_PRACTICE_AGAIN = Object.freeze({
   label: 'Play today again, as practice',
   note:
-    'Same crowd, same starting driver, nothing pressed. The day asks its calls again as it reaches ' +
-    'them. It banks nothing: your week keeps the day as you closed it.',
+    'Same crowd, same starting dispatcher, nothing pressed. The day asks its calls again as it ' +
+    'reaches them. It banks nothing: your week keeps the day as you closed it.',
 });
 
 /** The close's two secondary presses — {@link EverydayReportView.secondary}. */
@@ -519,6 +519,24 @@ const EVERYDAY_ROUTE_LABELS: Readonly<Record<'tuner' | 'workshop', string>> = Ob
   workshop: 'Open the dispatcher workshop',
 });
 
+/**
+ * Where the question one day cannot answer is answered, in Everyday's own words. The sheet's
+ * `nextStep.why` names *Compare*, an Engineer tab; the Everyday screen that runs the same batch is
+ * the Test bench, so the pointer names that.
+ */
+const EVERYDAY_POINTER_WHY =
+  'One day can’t tell you a dispatcher is better. The Test bench runs each one many times on the ' +
+  'same crowds, and says so when it can’t tell them apart.';
+
+/**
+ * The sheet's identity line in Everyday's words: the seed is the *crowd* number here and a
+ * replication is a *run*. Anchored on `shift/report.ts#metaLinesFor`'s own format, so a line that
+ * is not that one, or a format that moves, comes back unchanged. The number is never touched.
+ */
+function everydayMetaLineOf(line: string): string {
+  return line.replace(/^seed (\S+) · /u, 'crowd $1 · ').replace(/ · one replication$/u, ' · one run');
+}
+
 /** The Everyday empty state. Names no Engineer control — § 16 rule 11's neighbouring rule. */
 const EMPTY_LEDE =
   'Play a day and press Close the day. Its report shows here.';
@@ -665,18 +683,17 @@ function foldOf(text: string): HonestyPart | undefined {
 }
 
 /**
- * The sheet's own words: its opening paragraph drawn, the rest folded behind its next sentence.
+ * The sheet's own words: its opening sentence drawn, the rest folded behind its next sentence.
  *
- * The opening paragraph is where the refusal lives, and it is the one part of this block that may
- * not be behind a press — see the module docstring's rule 3.
+ * The opening sentence is the refusal (*this was one day on one crowd*), and it is the one part of
+ * this block that may not be behind a press — see the module docstring's rule 3. How a real
+ * comparison is made is the fold's handle and what opens under it.
  */
 function sheetPartsOf(core: string): HonestyPart[] {
-  const groups = grouped(sentencesOf(core));
-  const lead = groups[0];
+  const [lead, ...rest] = sentencesOf(core);
   if (lead === undefined) return [];
-  const rest = groups.slice(1).flat();
   const tail = foldOf(rest.join(' '));
-  return [{ kind: 'open', text: lead.join(' ') }, ...(tail === undefined ? [] : [tail])];
+  return [{ kind: 'open', text: lead }, ...(tail === undefined ? [] : [tail])];
 }
 
 /**
@@ -848,11 +865,12 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
    * the contract's.
    */
   const verdict = input.report?.verdict;
+  const worded = { ...sheet, metaLines: sheet.metaLines.map(everydayMetaLineOf) };
   const careerSheet =
     input.career === undefined || !sheet.filed
-      ? sheet
+      ? worded
       : {
-          ...sheet,
+          ...worded,
           verdictLine: verdict === 'cleared' || verdict === 'missed' ? CAREER_VERDICT_LINES[verdict] : sheet.verdictLine,
           goalsHeading: CAREER_GOALS_HEADING,
         };
@@ -901,7 +919,7 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       pointer:
         sheet.nextStep === undefined
           ? undefined
-          : { label: sheet.nextStep.label, why: sheet.nextStep.why },
+          : { label: sheet.nextStep.label, why: EVERYDAY_POINTER_WHY },
     },
     tomorrow: onwardStepOf(
       input.career,

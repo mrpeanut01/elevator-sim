@@ -940,7 +940,7 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
         {
           label: 'Posted runs',
           value: 'always checked',
-          note: 'Every run you post is re-simulated by the server before it appears on a board.',
+          note: 'Every run you post is re-run by the server before it appears on a board.',
         },
       ],
       telemetryDetail: {
@@ -948,7 +948,7 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
         title: 'What we record',
         body: [
           'With this on, we record which screens you reach, how long you play, and which building and settings each run used. It stays on our own server and goes nowhere else.',
-          'We never record anything you type, your name, your email address, where you are, or what you do on any other site.',
+          'We do not record anything you type, your name, your email address, where you are, or what you do on any other site.',
           'Turning it off stops recording straight away and asks us to delete what was already recorded.',
           'The game works exactly the same either way.',
         ],

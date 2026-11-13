@@ -87,6 +87,7 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
       /*
        * Wave AS, lane AS-1 (GitHub issue #635, finding 8): the dispatcher choice comes before the
        * house's runs on a phone. Red on the base: it sat under every house row, about 2 900 px down.
+       * Since 2026-11-13 it is in the paper column at every width (test 6).
        */
       const order = await page.evaluate(() => ({
         picker: document.querySelector('.everyday-rush-picker')?.getBoundingClientRect().top ?? Number.NaN,
@@ -290,15 +291,36 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
     }
   });
 
-  it('6: side by side, the handoff’s order stands: the house’s runs, then the dispatcher choice — wave AS, lane AS-1', async () => {
+  it('6: side by side too, the dispatcher choice comes before the waves and the house’s runs — the owner’s ruling of 2026-11-13', async () => {
     const page = await coldLoad(1280, 800);
     try {
       await openRushSetup(page);
-      const order = await page.evaluate(() => ({
-        picker: document.querySelector('.everyday-rush-picker')?.getBoundingClientRect().top ?? Number.NaN,
-        firstHouseRow: document.querySelector('.everyday-rush-best, .everyday-rush-house-refusal')?.getBoundingClientRect().top ?? Number.NaN,
-      }));
-      expect(order.picker, JSON.stringify(order)).toBeGreaterThan(order.firstHouseRow);
+      /*
+       * The order at every width: title, lede, your best, who drives, then the waves and the house's
+       * runs. Side by side the house's runs are a column of their own, so *before* is asked two ways:
+       * the picker is in the paper column between the facts and the waves, and it precedes the first
+       * house row in the document, which is the order a keyboard and a screen reader meet them in.
+       * Test 1 holds the same order on a phone, where it is also top to bottom.
+       */
+      const order = await page.evaluate(() => {
+        const picker = document.querySelector('.everyday-rush-picker');
+        const firstHouseRow = document.querySelector('.everyday-rush-best, .everyday-rush-house-refusal');
+        const top = (selector: string): number => document.querySelector(selector)?.getBoundingClientRect().top ?? Number.NaN;
+        return {
+          inPaper: picker?.closest('.everyday-rush-setup') !== null && picker !== null,
+          beforeHouseRows:
+            picker !== null &&
+            firstHouseRow !== null &&
+            (picker.compareDocumentPosition(firstHouseRow) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+          facts: top('.everyday-rush-facts'),
+          picker: top('.everyday-rush-picker'),
+          waves: top('.everyday-rush-bands'),
+        };
+      });
+      expect(order.inPaper, JSON.stringify(order)).toBe(true);
+      expect(order.beforeHouseRows, JSON.stringify(order)).toBe(true);
+      expect(order.picker, JSON.stringify(order)).toBeGreaterThan(order.facts);
+      expect(order.picker, JSON.stringify(order)).toBeLessThan(order.waves);
       /* § D1545 (GitHub issue #636, R5): the house run on this crowd is stated as the line to beat, for the dispatcher standing. */
       const line = (): Promise<string> => page.evaluate(() => document.querySelector('.everyday-rush-to-beat')?.textContent ?? '');
       const pattern = /^(Time to pass: \d+:\d\d, into wave \d+\. That’s the house run with .+ \(no changes\) on these waves|The house run with .+ \(no changes\) holds all \d+ waves)\.$/u;
@@ -329,9 +351,18 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
         timeout: 30_000,
       });
       await page.locator('.everyday-stage-skip').click();
-      /* Red on the base: the result cut in on the same frame and this line was never drawn. */
+      /*
+       * Red on the base: the result cut in on the same frame and this line was never drawn. The line,
+       * the crossing's figures and no result are asked for in one read of the page, so the three hold
+       * together rather than in two reads a frame apart.
+       */
       await page.waitForFunction(
-        () => (document.querySelector('.everyday-stage-status-text')?.textContent ?? '') === '40 / 40, the building stopped draining',
+        () =>
+          (document.querySelector('.everyday-stage-status-text')?.textContent ?? '') === '40 / 40, the building stopped draining' &&
+          /past two minutes, of 40\s*4\d/u.test(
+            [...document.querySelectorAll('.everyday-stage-figure')].map((node) => node.textContent ?? '').join(' '),
+          ) &&
+          document.querySelectorAll('.everyday-rush-result').length === 0,
         undefined,
         { timeout: 30_000 },
       );

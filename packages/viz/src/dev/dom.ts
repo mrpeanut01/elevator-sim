@@ -649,3 +649,43 @@ export function fillSelect(
   );
   if (wanted !== undefined) select.value = wanted;
 }
+
+/** The face of the button that closes an {@link explainer} popover. */
+export const EXPLAINER_CLOSE_LABEL = 'Got it';
+
+/**
+ * An explanation behind a link: a short link in the flow of a panel, and the long text in a
+ * popover that opens when it is pressed. The Engineer surface's twin of
+ * `everyday/screenDom.ts#explainer`, styled from `index.html` (`.explain-link`, `.explain-pop`)
+ * because this surface has a stylesheet and that one does not.
+ *
+ * The text stays in the document while the popover is closed, so a sweep and a screen reader's
+ * virtual cursor still reach it. It is the platform's own `popover`: light dismiss, Escape and the
+ * top layer are the browser's. A string in `body` becomes a paragraph; a node is appended as it is.
+ */
+export function explainer(
+  doc: Document,
+  parts: { readonly link: string; readonly title: string; readonly body: readonly (string | Node)[] },
+): HTMLElement {
+  const link = el(doc, 'button', { className: 'explain-link', text: parts.link, attrs: { type: 'button' } });
+  const close = el(doc, 'button', {
+    className: 'explain-close',
+    text: EXPLAINER_CLOSE_LABEL,
+    attrs: { type: 'button' },
+  });
+  const popover = el(doc, 'div', {
+    className: 'explain-pop',
+    attrs: { popover: 'auto', role: 'dialog', 'aria-label': parts.title },
+    children: [
+      el(doc, 'h2', { className: 'explain-title', text: parts.title }),
+      ...parts.body.map((part) => (typeof part === 'string' ? el(doc, 'p', { text: part }) : part)),
+      close,
+    ],
+  });
+  /* The element properties rather than `popovertarget` ids: no id has to be unique on the page. */
+  (link as HTMLButtonElement & { popoverTargetElement: Element | null }).popoverTargetElement = popover;
+  const closer = close as HTMLButtonElement & { popoverTargetElement: Element | null; popoverTargetAction: string };
+  closer.popoverTargetElement = popover;
+  closer.popoverTargetAction = 'hide';
+  return el(doc, 'span', { className: 'explain', children: [link, popover] });
+}

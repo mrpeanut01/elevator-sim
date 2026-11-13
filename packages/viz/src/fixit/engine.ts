@@ -728,7 +728,7 @@ export const REST_DROP_LIMIT_POINTS = 2;
 
 /** The basis line, printed under the before/after exactly as § 10.4 words it. */
 export const BASIS_LINE =
-  'one run before, one run after — enough to see a repair this size; not enough to split hairs.';
+  'One run before, one run after. Enough to see a repair this size, not enough to split hairs.';
 
 /**
  * The basis line for a pair whose repair **changed the crowd** — GitHub issue #349.
@@ -745,7 +745,7 @@ export const BASIS_LINE =
  * not have; `run.ts#assertPairMatchesRepairs` then holds the patch and the legs to each other.
  */
 export const DEMAND_BASIS_LINE =
-  'one run before, one run after — and the repair changed who arrives, so the second run meets the same crowd less the people it moved. Enough to see a repair this size; not enough to split hairs.';
+  'One run before, one run after. The repair changed who arrives, so the second run meets the same crowd less the people it moved. Enough to see a repair this size, not enough to split hairs.';
 
 /**
  * The basis line for a pair whose order **changed which trips the lifts can carry** — [§ D1160](../../../../DECISIONS.md),
@@ -758,7 +758,7 @@ export const DEMAND_BASIS_LINE =
  * says so in the words the other two basis lines use. Chosen from the legs, like the others.
  */
 export const ROUTES_BASIS_LINE =
-  'one run before, one run after — and your order changes which trips the lifts can carry, so the second run meets a crowd drawn for the building as you changed it rather than the same crowd twice. Enough to see a repair this size; not enough to split hairs.';
+  'One run before, one run after. Your order changes which trips the lifts can carry, so the second run meets a crowd drawn for the building as you changed it, not the same crowd twice. Enough to see a repair this size, not enough to split hairs.';
 
 /**
  * Whether a repair changes **who arrives** rather than what carries them — the one patch field that

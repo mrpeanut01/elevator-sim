@@ -660,8 +660,8 @@ export type EverydayPostOutcome =
  * posted has lost nothing, and this is the one place the product can say so before they wonder.
  */
 export const POST_RUN_NO_SERVER =
-  'This site has no leaderboard server behind it, so this run cannot be posted. It is still on ' +
-  'screen and still in the report — nothing about it is lost.';
+  'This site has no leaderboard server, so this run can’t be posted. Nothing is lost: it is still on ' +
+  'screen and in the report.';
 
 /**
  * **Why a career top-up was refused before the ledger was asked** — GitHub issue #557.
@@ -684,7 +684,7 @@ export const POST_RUN_NO_SERVER =
  */
 export const CAREER_TOP_UP_NO_TOWER =
   'This tops up a tower\u2019s purse, and you have no building on the Career screen with a month ' +
-  'still running \u2014 so there is nowhere for the units to go. Nothing was spent; open one and ' +
+  'still running, so the units have nowhere to go. Nothing was spent. Open one and ' +
   'press it again.';
 
 /**
@@ -695,10 +695,10 @@ export const CAREER_TOP_UP_NO_TOWER =
  */
 export const DEVICE_SPEND_COPY = Object.freeze({
   short: (shortBy: number): string =>
-    `There are not enough chimes on this device for that yet: it is short by ${String(shortBy)} ` +
+    `Not enough chimes on this device yet: you’re short by ${String(shortBy)} ` +
     `${shortBy === 1 ? 'chime' : 'chimes'}. Nothing was spent.`,
   owned: 'This device has already bought as much of that as one run can use. Nothing was spent.',
-  unknown: 'This build does not sell that from this device. Nothing was spent.',
+  unknown: 'That isn’t for sale from this device. Nothing was spent.',
 });
 
 /**
@@ -711,7 +711,7 @@ export const RUSH_DEVICE_HELD_THROUGH =
 
 /** The account bridge has not answered, so whose tally would pay is not yet known. Nothing is sent. */
 export const CHIME_HOME_BOOTING =
-  'Still finding out whether you are signed in, so it is not yet known whose tally this would come ' +
+  'Still checking whether you’re signed in, so it isn’t known yet whose chimes this would come ' +
   'out of. Nothing was spent.';
 
 /**

@@ -117,11 +117,11 @@ describe.skipIf(!HAS_BROWSER)('what decided the day — swarm DQ Q2 rule 3', () 
        * today* on a counted day closed under another driver with a press.
        */
       if (first.startsWith('The call that decided today')) {
-        expect(first).not.toMatch(/Your driver|Your presses|Nothing you chose/u);
+        expect(first).not.toMatch(/Your dispatcher|Your presses|Nothing you chose/u);
         return;
       }
       expect(first).toMatch(/^No call decided today: [^.]+\. /u);
-      expect(first).toMatch(/still being run|waits on the house|Your driver did|Your presses did|Nothing you chose decided it either/u);
+      expect(first).toMatch(/still being run|waits on the house|Your dispatcher did|Your presses did|Nothing you chose decided it either/u);
       await page.waitForFunction(
         () => !/still being run|waits on the house/u.test(document.querySelector('.everyday-report-close-call')?.textContent ?? ''),
         undefined,
@@ -129,7 +129,7 @@ describe.skipIf(!HAS_BROWSER)('what decided the day — swarm DQ Q2 rule 3', () 
       );
       const answered = await text(page, '.everyday-report-close-call');
       expect(answered).toMatch(
-        /(Your driver did: on this crowd, the same day with the tower’s standing order picked in place of yours and every press kept read Shift (cleared|missed)\.|Your presses did, together: left alone, the tower’s standing order read Shift (cleared|missed)\.|Nothing you chose decided it either: on this crowd, the tower’s standing order read Shift (cleared|missed) too, both with every press kept and left alone\.)$/u,
+        /(Your dispatcher did: on this crowd, the same day with the tower’s standing order picked in place of yours and every press kept read Shift (cleared|missed)\.|Your presses did, together: left alone, the tower’s standing order read Shift (cleared|missed)\.|Nothing you chose decided it either: on this crowd, the tower’s standing order read Shift (cleared|missed) too, both with every press kept and left alone\.)$/u,
       );
       expect(answered).not.toContain('could not be run');
     } finally {

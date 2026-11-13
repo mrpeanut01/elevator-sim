@@ -219,7 +219,7 @@ export function signedIn(state: AccountState, token: string, user: AccountSummar
     form: Object.freeze({ ...state.form, displayName: user.displayNameChosen ? state.form.displayName : '' }),
     notice: user.displayNameChosen
       ? undefined
-      : 'You are signed in. Pick the name that goes on the boards — it is the only thing about you ' +
+      : 'You are signed in. Pick the name that goes on the boards. It is the only thing about you ' +
         'anybody else sees, and you can change it later.',
   });
 }
@@ -358,7 +358,7 @@ export function formIssues(state: AccountState): readonly FormIssue[] {
 
   const email = state.form.email.trim();
   if (email.length === 0) {
-    issues.push({ field: 'email', message: 'Enter your email address. A sign-in link is posted to it.' });
+    issues.push({ field: 'email', message: 'Enter your email address. A sign-in link is emailed to it.' });
   } else if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email)) {
     // Minimal on purpose, and the same expression the server uses. A regex claiming to implement
     // RFC 5321 rejects addresses that work, and the mail is the real check — it either arrives or
@@ -401,8 +401,8 @@ export function canSubmitForm(state: AccountState): boolean {
  */
 export function postingRefusal(state: AccountState): string | undefined {
   if (state.token === undefined || state.user === undefined) {
-    return 'Sign in to post this run to a leaderboard. It takes an email address and no password: ' +
-      'a link is emailed to you, and opening it signs you in.';
+    return 'Sign in to post this run to a leaderboard. There is no password: a link is emailed to ' +
+      'you, and opening it signs you in.';
   }
   return undefined;
 }

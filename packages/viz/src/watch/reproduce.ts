@@ -108,8 +108,8 @@ export function reproductionRefusalFor(
     (row) => `${row.label} was filed as ${String(row.posted)} and replays as ${String(row.replayed)}`,
   );
   return (
-    `this record no longer reproduces the result it was filed with — ${listOf(clauses)} — so it ` +
-    'cannot be watched, because a replay that does not reproduce is a different run'
+    `this record no longer reproduces the result it was filed with (${listOf(clauses)}), so it ` +
+    'can’t be watched: a replay that does not reproduce is a different run'
   );
 }
 
@@ -171,8 +171,8 @@ export function claimRefusalFor(claim: PostedClaim, recording: VizRecording): st
     (row) => `${row.label} was posted as ${String(row.posted)} and replays here as ${String(row.replayed)}`,
   );
   return (
-    `this build does not reproduce the result the board ranked — ${listOf(clauses)} — so the run ` +
-    'cannot be watched here. The server verified it against its own data; this build carries ' +
+    `this version of the game does not reproduce the result the board ranked (${listOf(clauses)}), so the run ` +
+    'can’t be watched here. The server verified it against its own data; this version carries ' +
     'different data, and a replay that does not reproduce is a different run'
   );
 }

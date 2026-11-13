@@ -1817,6 +1817,50 @@
       .control-disabled .control-help { opacity: 0.65; }
       /* Wave AO, lane AO-4 (§ D1323): a control that runs nothing while a scored attempt stands, drawn so before it is pressed. */
       .watch-only { opacity: 0.55; cursor: not-allowed; }
+      /* An explanation behind a link: `dev/dom.ts#explainer`. No `display` on `.explain-pop`: a
+         closed popover is hidden by a user-agent rule that any author `display` would outrank. */
+      .explain-link {
+        border: 0;
+        background: none;
+        padding: 0;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        color: var(--accent);
+        text-decoration: underline dotted;
+        text-underline-offset: 3px;
+      }
+      .explain-pop {
+        border: 1px solid var(--edge-mid);
+        border-radius: 12px;
+        background: var(--card);
+        color: var(--dim);
+        padding: 18px 20px;
+        width: min(52ch, calc(100vw - 32px));
+        max-height: min(80vh, 640px);
+        overflow: auto;
+        box-shadow: 0 18px 48px rgb(0 0 0 / 0.28);
+      }
+      .explain-pop p {
+        margin: 0 0 10px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .explain-title {
+        margin: 0 0 10px;
+        font-size: 16px;
+        color: var(--text);
+      }
+      .explain-close {
+        border: 1px solid var(--edge-mid);
+        border-radius: 8px;
+        background: var(--raised);
+        color: var(--text);
+        font: inherit;
+        font-size: 12.5px;
+        padding: 6px 13px;
+        cursor: pointer;
+      }
     </style>
   </head>
   <body>
@@ -1906,7 +1950,7 @@
                   `localStorage` last held. The header wraps now (see `.topbar`), so the control
                   costs a row rather than a reader. -->
           <label class="dim" for="view-mode" style="font: 500 10px var(--mono)"
-                 title="Casual and Engineer change how much of a run is shown and nothing it computes — same shift, same seed, same result. Casual states every figure in plain language and leaves out the interval spread, the energy proxy and the measurement window's exact bounds. Engineer adds those three, the machines nameplate, the rule behind an average this run refuses to publish, and every editor tab from the first frame — Casual reveals those as you open them from the Controls rail, and the strip says how many are left. Neither mode hides a warning, a failure, or the seed.">view</label>
+                 title="Casual and Engineer change how much of a run is shown and nothing it computes. Engineer adds the interval spread, the energy proxy, the measurement window's exact bounds, the machines nameplate and every editor tab from the first frame. Neither hides a warning, a failure or the seed.">view</label>
           <!-- The font is stated rather than inherited, and that is a consequence of the fix above
                rather than a preference: `select { font-family: inherit }` used to reach `var(--mono)`
                through the label that wrapped this control, and unwrapping it left the select
@@ -2083,8 +2127,8 @@
             <div class="stage-wrap">
               <canvas id="stage" role="img" aria-label="No run yet.">
                 <p id="stage-fallback">
-                  This view draws a building on a canvas. Your browser has not rendered it; the
-                  description of the current frame is in this element's label.
+                  Your browser has not drawn the building. A description of the current frame is
+                  in this canvas's label.
                 </p>
               </canvas>
               <div class="alarm" id="alarm" role="status" hidden>
@@ -2139,7 +2183,7 @@
                  the palette-in-three-places defect the tokens block above exists to prevent.
                  `main.ts`'s `drawLegend` fills them; the title is static and stays. -->
             <div class="legend" id="legend">
-              <span class="legend-title" id="legend-title">How long they have stood</span>
+              <span class="legend-title" id="legend-title">Time waiting</span>
             </div>
 
             <!-- ============================================================
@@ -2173,7 +2217,7 @@
                  id added to that list for a block that is *meant* to be static would be a handle
                  offered to a future mount that should not exist. Keyed on its class instead. -->
             <div class="legend legend-stage">
-              <span class="legend-title">What the building is showing</span>
+              <span class="legend-title">Stage key</span>
               <span class="legend-entry"><span class="legend-swatch" style="background: var(--band-0)" aria-hidden="true"></span>car with room</span>
               <span class="legend-entry"><span class="legend-swatch" style="background: var(--accent)" aria-hidden="true"></span>carrying a load</span>
               <span class="legend-entry"><span class="legend-swatch" style="background: var(--car-heavy)" aria-hidden="true"></span>at design load</span>
@@ -2184,7 +2228,7 @@
               <span class="legend-entry"><span class="legend-glyph">◂▸</span>opening</span>
               <span class="legend-entry"><span class="legend-glyph">▯</span>open</span>
               <span class="legend-entry"><span class="legend-glyph">▸◂</span>closing</span>
-              <span class="legend-entry"><span class="legend-glyph">OOS</span>out of service, and dimmed</span>
+              <span class="legend-entry"><span class="legend-glyph">OOS</span>out of service (dimmed)</span>
               <span class="legend-entry"><span class="legend-glyph">⏻</span>in service</span>
             </div>
 
@@ -2290,16 +2334,16 @@
                        sits with the speed chips because it is the same kind of claim: how the
                        transport behaves, not what the run contains. -->
                   <button type="button" class="chip" id="loop" aria-pressed="false"
-                          aria-label="loop — when the transport reaches the end of the loop, start it again"
-                          title="when the transport reaches the end of the loop, start it again">loop</button>
+                          aria-label="loop: restart when playback reaches the end of the loop"
+                          title="restart when playback reaches the end of the loop">loop</button>
                   <!-- PB-09 — window selection, then loop. One control rather than a mark-start and
                        a mark-end, because the classic A–B repeat is three presses of one button and
                        `aria-pressed="mixed"` is exactly the half-marked state ARIA has for it. The
                        three faces are written by `main.ts#setLoopMark`, which is the only writer of
                        both representations. -->
                   <button type="button" class="chip" id="loop-window" aria-pressed="false"
-                          aria-label="A–B loop — press to mark the start of a section at the playhead"
-                          title="press to mark the start of a section at the playhead, again to mark its end, and again to go back to the whole shift">A–B</button>
+                          aria-label="A–B loop: press to mark the start at the playhead"
+                          title="press to mark the start at the playhead, again to mark the end, and again for the whole shift">A–B</button>
                 </div>
               </div>
               <div class="transport-row" style="margin-top: 8px">
@@ -2323,7 +2367,7 @@
                      same rule the menu's Seed field states under its own box. `dev/main.ts#seedEntryOf`
                      is what enforces it, and `menu/menu.ts#SEED_MAX_DIGITS` is the one place the
                      number lives; this line is the sentence a player reads before typing. -->
-                <span class="eyebrow-note">every run carries its seed and replays from it · 1–20 digits, or blank to draw one</span>
+                <span class="eyebrow-note">every run replays from its seed · 1–20 digits, or blank to draw one</span>
               </div>
               <div class="provenance">
                 <label class="field-inline" for="seed">seed
@@ -2338,7 +2382,7 @@
                 <!-- Issue #118 § 1: this writes the Day report card, not the stage. The label says
                      which, because a control called "Export PNG" beside a canvas reads as a
                      screenshot button and the artefact it produces is a report sheet. -->
-                <button type="button" class="chip" id="export-png" title="write the day's report card as a 1200×630 image">Export report PNG</button>
+                <button type="button" class="chip" id="export-png" title="save the day's report card as a 1200×630 image">Export report PNG</button>
                 <span class="provenance-rule" aria-hidden="true"></span>
                 <label class="field-inline" for="bank-filter">bank
                   <select id="bank-filter"><option value="">all</option></select></label>
@@ -2361,7 +2405,7 @@
                 <p id="report-spectator-note" class="report-spectator-note" role="note" hidden></p>
                 <div class="report-head">
                   <div>
-                    <div class="eyebrow">Vertical transportation — daily observation sheet</div>
+                    <div class="eyebrow">Daily observation sheet</div>
                     <h2 id="report-title">Nothing filed yet</h2>
                   </div>
                   <div class="report-meta" id="report-meta"></div>
@@ -2390,7 +2434,7 @@
                 <h3>Where it went wrong</h3>
                 <div style="display: grid; gap: 9px" id="report-diagnosis"></div>
 
-                <h3>Levers you actually have</h3>
+                <h3>Levers you have</h3>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px" id="report-levers"></div>
 
                 <div style="display: flex; flex-wrap: wrap; gap: 9px; margin: 26px 0 0">
@@ -2423,7 +2467,7 @@
 
                 <div class="small-print">
                   <div class="eyebrow" style="letter-spacing: 0.08em; color: var(--dim)">
-                    The small print, which is actually the point
+                    The small print
                   </div>
                   <p style="font-size: 12.5px; line-height: 1.55; color: var(--dim); margin: 7px 0 0" id="report-small-print"></p>
                 </div>
@@ -2463,15 +2507,14 @@
                   <div>
                     <div class="eyebrow">Scenarios — sixteen buildings, any order</div>
                     <p style="font-size: 13px; color: var(--dim); line-height: 1.5; margin: 6px 0 0; max-width: 640px">
-                      Every scenario is open from the start. Bank the clean shifts one asks for, or just run
-                      it and watch what breaks — each building teaches something the other fifteen cannot.
+                      Every scenario is open from the start. Bank the clean shifts one asks for, or just
+                      run it and watch what breaks.
                     </p>
                   </div>
                 </div>
                 <div style="display: grid; gap: 10px" id="scenario-list"></div>
                 <p style="font-size: 12px; color: var(--dimmer); margin: 16px 0 0; max-width: 660px; line-height: 1.55">
-                  All sixteen ship with the simulator — same floor heights, same car specs, same
-                  populations. Taking an assignment restarts the week on that building.
+                  Taking an assignment restarts the week on that building.
                 </p>
               </div>
             </div>
@@ -2482,7 +2525,7 @@
             <div class="sheet">
               <div class="editor-grid" style="max-width: 1000px">
                 <div>
-                  <div class="eyebrow-row"><span class="eyebrow">The group controllers</span></div>
+                  <div class="eyebrow-row"><span class="eyebrow">Dispatchers</span></div>
                   <div class="pick-list" id="dispatcher-list"></div>
                 </div>
                 <div>
@@ -2509,7 +2552,7 @@
                       <div style="border: 1px solid var(--edge); border-radius: var(--r-card); overflow: hidden">
                         <div id="group-levers"></div>
                         <div style="padding: 10px 12px; background: var(--panel)">
-                          <div class="helpful" title="How long the doors stand open after the last person crosses the beam. Snappy dwell buys round trips and irritates everyone; patient dwell is kinder and costs capacity at the peak."
+                          <div class="helpful" title="How long the doors stay open after the last person crosses the beam. A short dwell buys round trips; a long one is kinder and costs capacity at the peak."
                                style="font-size: 12.5px; font-weight: 600; display: inline-block">Door dwell</div>
                           <div class="chip-row" style="margin-top: 6px" id="dwell-chips"></div>
                           <div style="font-size: 11.5px; color: var(--dim); line-height: 1.4; margin-top: 4px" id="dwell-hint"></div>
@@ -2532,7 +2575,7 @@
                         <div style="margin-top: 12px" id="selector-patterns"></div>
                         <div class="selector-refusal" id="selector-map-issue" hidden></div>
                         <div class="editor-actions">
-                          <button type="button" class="chip" id="selector-reset">Back to the shipped switching</button>
+                          <button type="button" class="chip" id="selector-reset">Reset to shipped switching</button>
                           <span class="dirty" id="selector-changed" hidden></span>
                         </div>
                       </div>
@@ -2556,16 +2599,15 @@
                     <div class="editor-actions">
                       <button type="button" class="secondary" id="dispatcher-close">Close</button>
                       <button type="button" class="primary" id="dispatcher-save">Save as a new dispatcher</button>
-                      <span class="dirty" id="dispatcher-dirty" hidden>edited — not saved</span>
+                      <span class="dirty" id="dispatcher-dirty" hidden>unsaved changes</span>
                       <span role="alert" id="dispatcher-error"></span>
                     </div>
                   </div>
                   <div class="eyebrow-row"><span class="eyebrow">Your dispatchers</span></div>
                   <div style="display: grid; gap: 7px" id="dispatcher-yours"></div>
                   <p style="font-size: 12px; color: var(--dimmer); line-height: 1.55; margin: 12px 0 0">
-                    One run cannot tell you yours is better than ETA — that needs fifty paired runs against the
-                    same passengers, which is what <strong>Compare</strong> is for. It can tell you what it did
-                    today, which is where the queue was.
+                    One run cannot tell you yours is better than ETA. That needs fifty paired runs against
+                    the same passengers, which is what <strong>Compare</strong> is for.
                   </p>
                 </div>
               </div>
@@ -2592,7 +2634,7 @@
                   <div class="editor-actions">
                     <button type="button" class="secondary" id="traffic-close">Close</button>
                     <button type="button" class="primary" id="traffic-save">Save as a new pattern</button>
-                    <span class="dirty" id="traffic-dirty" hidden>edited — not saved</span>
+                    <span class="dirty" id="traffic-dirty" hidden>unsaved changes</span>
                     <span role="alert" id="traffic-error"></span>
                   </div>
                 </div>
@@ -2618,13 +2660,13 @@
                   <div class="editor-actions">
                     <button type="button" class="secondary" id="machines-close">Close</button>
                     <button type="button" class="primary" id="machines-save">Save as a new class</button>
-                    <span class="dirty" id="machines-dirty" hidden>edited — not saved</span>
+                    <span class="dirty" id="machines-dirty" hidden>unsaved changes</span>
                     <span role="alert" id="machines-error"></span>
                   </div>
                 </div>
                 <p style="font-size: 12px; color: var(--dim); line-height: 1.5; margin: 12px 0 0">
-                  Editing a shipped class never overwrites it — save the changes as a class of your own and it
-                  joins the list, ready to fit to a building.
+                  A shipped class is never overwritten. Save your changes as a new class and it joins the
+                  list, ready to fit to a building.
                 </p>
               </div>
             </div>
@@ -2647,12 +2689,12 @@
                          title="Capacity is what the building was designed to hold; occupancy is how much of it is let today. Population — the number the lifts must move — is the product of the two."></div>
                     <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline)">
                       <div class="eyebrow helpful"
-                           title="The machine class, from the specification tables this simulator ships. It sets the speed band, the rise the class can serve and the loads it is built in — choosing one is choosing the physics, not a label.">
+                           title="Sets the speed band, the rise the class can serve and the loads it is built in.">
                         Machine class
                       </div>
                       <button type="button" id="building-open-machines"
                               style="background: none; border: 0; padding: 0; margin-top: 3px; color: var(--accent-soft); font: 500 10.5px var(--mono); cursor: pointer">
-                        edit the classes themselves on the Machines tab →
+                        Edit classes on the Machines tab →
                       </button>
                       <div class="chip-row" style="margin-top: 7px" id="building-class-chips"></div>
                       <div style="font-size: 11.5px; color: var(--dim); line-height: 1.55; margin-top: 8px" id="building-class-plain"></div>
@@ -2661,7 +2703,7 @@
                     </div>
                     <div class="chip-row" style="margin-top: 12px">
                       <span class="helpful" style="font-size: 11.5px; color: var(--dim); margin-right: 4px"
-                            title="Rated load in pounds, at 150 lb per person — the shipped capacities table. Each class is only built in part of the range.">rated load</span>
+                            title="Rated load in pounds, at 150 lb per person. Each class is built in only part of the range.">rated load</span>
                       <span class="chip-row" id="building-load-chips"></span>
                     </div>
                     <div class="chip-row" style="margin-top: 8px">
@@ -2679,7 +2721,7 @@
                     <div class="editor-actions">
                       <button type="button" class="secondary" id="building-close">Close</button>
                       <button type="button" class="primary" id="building-save">Save as a new building</button>
-                      <span class="dirty" id="building-dirty" hidden>edited — not saved</span>
+                      <span class="dirty" id="building-dirty" hidden>unsaved changes</span>
                       <span role="alert" id="building-spec-error"></span>
                     </div>
                   </div>
@@ -2688,9 +2730,9 @@
                 <div>
                   <div class="eyebrow-row"><span class="eyebrow">Elevation — floors, occupancy and shafts</span></div>
                   <div style="font: 500 10px var(--mono); color: var(--faint); margin: 0 0 9px; line-height: 1.5">
-                    click a floor's sky dot to make it a transfer level · drag a floor's bar to let that floor
-                    alone, 0–120% of design capacity · drag a shaft's top or bottom edge to restrict it to a band
-                    of floors
+                    click a floor's sky dot to make it a transfer level · drag a floor's bar to set that
+                    floor's occupancy, 0–120% of design capacity · drag a shaft's top or bottom edge to limit
+                    the floors it serves
                   </div>
                   <div class="elevation">
                     <!-- § D253 — head and body inside one box, so one horizontal scroll moves both
@@ -2703,7 +2745,7 @@
                         <div class="elevation-head">
                           <span style="width: var(--elev-floor-w); flex: none">FLOOR</span>
                           <span style="width: var(--elev-sky-w); flex: none; text-align: center"
-                                title="Click a floor's dot to make it a sky lobby — a transfer level where riders change between an express shaft and the locals above.">SKY</span>
+                                title="Click a floor's dot to make it a sky lobby: a transfer level where riders change between an express shaft and the locals above.">SKY</span>
                           <span style="width: var(--elev-occ-w); flex: none">OCCUPIED</span>
                           <span style="width: var(--elev-people-w); flex: none; text-align: right">PEOPLE</span>
                           <span style="flex: 1; text-align: center">SHAFTS</span>
@@ -2727,9 +2769,8 @@
                       <button type="button" class="secondary" id="elevation-remove-shaft">− Remove a shaft</button>
                     </div>
                     <p style="font-size: 12px; color: var(--dim); line-height: 1.5; margin: 9px 0 0">
-                      Everything here shapes the building on paper — the day already running keeps its old plan
-                      until you save the building or run a fresh day from it. A smarter dispatcher is free; a
-                      fifth shaft is not.
+                      The day already running keeps its old plan until you save the building or run a fresh
+                      day from it.
                     </p>
                   </div>
                 </div>
@@ -2748,26 +2789,26 @@
                 </div>
                 <div style="font: 500 10px var(--mono); color: var(--faint); margin: 0 0 9px; line-height: 1.5">
                   pick a zone, then click the floors it covers and the credential groups it admits ·
-                  a floor in no zone is unrestricted · the matrix is floors × credential groups
+                  a floor in no zone is unrestricted
                 </div>
                 <div class="editor-panel">
                   <div class="chip-row">
                     <span class="helpful" style="font-size: 11.5px; color: var(--dim); margin-right: 4px"
-                          title="An access zone is a set of floors and the credential groups permitted to reach them. Floors in no zone are unrestricted — that is core's own semantics, not a default this editor invented.">zone</span>
+                          title="A set of floors and the credential groups permitted to reach them. Floors in no zone are unrestricted.">zone</span>
                     <span class="chip-row" id="building-zone-chips"></span>
                     <button type="button" class="chip" id="building-add-zone">+ zone</button>
                     <button type="button" class="chip" id="building-remove-zone">− zone</button>
                   </div>
                   <div style="margin-top: 11px">
                     <div class="eyebrow helpful"
-                         title="The floors this zone covers. A multi-select over the building's own floors, so a zone can never name a floor the document does not have.">
+                         title="The floors this zone covers, picked from the building's own floors.">
                       Floors in this zone
                     </div>
                     <div class="zone-floors" style="margin-top: 6px" id="building-zone-floors"></div>
                   </div>
                   <div style="margin-top: 11px">
                     <div class="eyebrow helpful"
-                         title="The credential groups permitted on those floors. The options are the groups this building already names — there is no fixed vocabulary, because core has none and inventing one would be a second source of truth.">
+                         title="The credential groups permitted on those floors. The options are the groups this building already names.">
                       Credential groups admitted
                     </div>
                     <div class="chip-row" style="margin-top: 6px" id="building-zone-groups"></div>
@@ -2780,7 +2821,7 @@
                   </div>
                   <div style="margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--hairline)">
                     <div class="eyebrow helpful"
-                         title="Coverage: every floor against every credential group this building names. A row no column opens is a floor whose trips are never generated at all.">
+                         title="Every floor against every credential group this building names. A row no column opens is a floor whose trips are never generated.">
                       Coverage — floors × credential groups
                     </div>
                     <div class="zmatrix" style="margin-top: 7px" id="building-access-matrix"></div>
@@ -2805,27 +2846,27 @@
                   <span class="eyebrow">Sky lobbies — escalators, not shafts</span>
                 </div>
                 <div style="font: 500 10px var(--mono); color: var(--faint); margin: 0 0 9px; line-height: 1.5">
-                  a two-level lobby is joined by an escalator, not by a lift · pick the two landings ·
+                  an escalator joins the two levels of a lobby · pick the two landings ·
                   a journey may change lifts only at a transfer level, so mark one of them a sky lobby above
                 </div>
                 <div class="editor-panel">
                   <div class="chip-row">
                     <span class="helpful" style="font-size: 11.5px; color: var(--dim); margin-right: 4px"
-                          title="An escalator pair joining two floors at a declared landing-to-landing time. The router rides it in preference to a lift leg, so the lifts stop being charged for a crossing the real building does not charge them for.">escalator</span>
+                          title="An escalator pair joining two floors at a declared landing-to-landing time. A journey takes it in preference to a lift leg.">escalator</span>
                     <span class="chip-row" id="building-transport-chips"></span>
                     <button type="button" class="chip" id="building-add-transport">+ escalator</button>
                     <button type="button" class="chip" id="building-remove-transport">− escalator</button>
                   </div>
                   <div style="margin-top: 11px">
                     <div class="eyebrow helpful"
-                         title="The lower landing. Pick one floor; a picker over the building's own floors, so a connection can never name a floor the document does not have.">
+                         title="The lower landing. Pick one floor.">
                       Lower landing
                     </div>
                     <div class="zone-floors" style="margin-top: 6px" id="building-transport-lower"></div>
                   </div>
                   <div style="margin-top: 11px">
                     <div class="eyebrow helpful"
-                         title="The upper landing. Pick one floor. The floor already holding the other end is still listed, disabled: a machine that starts and ends on the same floor moves nobody, and the loader refuses one.">
+                         title="The upper landing. Pick one floor. The floor holding the other end is listed but disabled.">
                       Upper landing
                     </div>
                     <div class="zone-floors" style="margin-top: 6px" id="building-transport-upper"></div>
@@ -2835,7 +2876,7 @@
                       <input id="building-transport-seconds" type="number" min="0.1" max="600" step="0.1" size="8" />
                     </label>
                     <span class="helpful" style="font: 500 10px var(--mono); color: var(--faint)"
-                          title="Seconds, including stepping on and stepping off. A new machine is seeded from this building's own rise by the EN 115-1 derivation vertical-city performs by hand — 30 degrees, 0.5 m/s nominal, two flat steps at each landing — and the seed is a starting point, not a measurement of your building.">seconds · seeded from the rise, EN 115-1</span>
+                          title="Seconds, including stepping on and off. A new escalator starts from this building's own rise by the EN 115-1 derivation (30 degrees, 0.5 m/s nominal, two flat steps at each landing). That is a starting point, not a measurement of your building.">seconds · seeded from the rise, EN 115-1</span>
                   </div>
                   <div style="font: 500 10.5px var(--mono); color: var(--accent-soft); margin-top: 9px; line-height: 1.5"
                        id="building-transport-note"></div>
@@ -2900,8 +2941,8 @@
                     <fieldset>
                       <legend><em>Access</em> zoning — credentials</legend>
                       <p class="dim" style="margin: 0 0 6px">
-                        Which credential groups may select which floors. A separate concept from service
-                        zoning above: the two are routinely different sets on the same building.
+                        Which credential groups may select which floors. Separate from service zoning
+                        above.
                       </p>
                       <div id="ed-zones"></div>
                       <button id="ed-add-zone">Add access zone</button>
@@ -2919,10 +2960,11 @@
                     </fieldset>
                     <fieldset>
                       <legend>Document</legend>
-                      <label for="ed-json" class="dim">JSON — edit here or above; both write the same document.</label>
+                      <label for="ed-json" class="dim">JSON. Edit here or above: both write the same document.</label>
                       <textarea id="ed-json" spellcheck="false" aria-describedby="ed-json-help"></textarea>
                       <p id="ed-json-help" class="dim" style="margin: 4px 0 0">
-                        Applied on blur. A parse error is reported with its position and your text is kept.
+                        Applied when you leave the field. A parse error is reported with its position and
+                        your text is kept.
                       </p>
                     </fieldset>
                     <fieldset>
@@ -2948,7 +2990,7 @@
               <label>candidate <select id="batch-candidate"></select></label>
               <label>duration <input id="batch-duration" type="number" min="60" max="7200" step="60" value="900" size="5" /></label>
               <label>seed <input id="batch-seed" size="18" inputmode="numeric" value="20260729" /></label>
-              <label title="50–200 replications per configuration is this project’s budget; ten produced a 12 % error against the converged mean in the reference study">
+              <label title="budget 50–200 replications per configuration; ten produced a 12 % error against the converged mean in the reference study">
                 replications <input id="batch-replications" type="number" min="1" max="400" step="1" value="50" size="4" />
               </label>
               <label title="blank runs the building's own traffic profile at the band point beside it">
@@ -2995,7 +3037,7 @@
             <div class="instrument-bar">
               <label>baseline <select id="suite-baseline"></select></label>
               <label>candidate <select id="suite-candidate"></select></label>
-              <label title="50–200 replications per configuration is this project’s budget; below 50 every separating row refuses to name a winner">
+              <label title="budget 50–200 replications per configuration; below 50 a row that separates still names no winner">
                 replications <input id="suite-replications" type="number" min="1" max="400" step="1" value="50" size="4" />
               </label>
               <label>seed <input id="suite-seed" size="18" inputmode="numeric" value="20260729" /></label>
@@ -3109,8 +3151,8 @@
             <div class="eyebrow-row"><span class="eyebrow">Schedule</span></div>
             <div class="plate" id="rail-building-plate"></div>
             <p class="rail-prose">
-              Shafts, floors, occupancy and machine class all live in the building editor — a car can be taken
-              out of service from the badge under its shaft in the picture.
+              Shafts, floors, occupancy and machine class are in the building editor. To take a car out of
+              service, use the badge under its shaft on the stage.
             </p>
             <button type="button" class="ghost" id="rail-open-building">Open building editor →</button>
           </div>
@@ -3126,9 +3168,8 @@
               <div class="eyebrow-row"><span class="eyebrow">Nameplate</span></div>
               <div class="plate" id="rail-machines-plate"></div>
               <p class="rail-prose">
-                Figures follow CIBSE Guide D and ISO 8100-32, as the simulator's own reference does. Cars fill
-                to 80% of rated load, never the nameplate — using the nameplate is how a study ends up
-                flattering.
+                Figures follow CIBSE Guide D and ISO 8100-32. Cars fill to 80% of rated load, never the
+                nameplate figure.
               </p>
             </div>
             <p class="rail-prose" id="rail-machines-warning"></p>
@@ -3145,7 +3186,7 @@
         <span style="color: var(--dim); white-space: nowrap" id="seed-line"></span>
         <button type="button" id="copy-run" title="copy a link that opens this run — seed, building, dispatcher, traffic and window">copy run</button>
         <button type="button" id="copy-cli" title="copy the elevator-sim flags that reproduce this run outside a browser">copy CLI</button>
-        <span id="footer-right">observations only — nothing on this screen is averaged over a queue that never settled</span>
+        <span id="footer-right">observations only · no average over a queue that never settled</span>
       </footer>
     </div>
 

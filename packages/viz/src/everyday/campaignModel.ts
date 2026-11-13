@@ -719,10 +719,6 @@ export const TOWERS_COPY = Object.freeze({
    * and the take moved the Scenario week to the offered building.
    */
   offersKeepsWeek: 'Taking an offer adds the building on a month of its own. Your Scenario week stays as it is.',
-  /* One line: the heading and the sub are drawn together, then the refusal. */
-  incidentsHeading: 'LATELY',
-  incidentsSub: 'at your buildings',
-  incidentsRefusal: 'Nothing to report. There is no news feed in this game.',
   /**
    * § 8.11's footnote, **reworded from the design file's own sentence and stated as a frequency**.
    *
@@ -1082,7 +1078,6 @@ export interface TowersView {
   readonly help: ReturnType<typeof careerHelpOf>;
   /** One {@link TowerCardView} per tower held, in the table's order. */
   readonly cards: { readonly heading: string; readonly sub: string; readonly rows: readonly TowerCardView[] };
-  readonly lately: { readonly heading: string; readonly sub: string; readonly refusal: string };
   readonly oddsFootnote: string;
   /** The career-load refusal, if the last load refused. Never a bare blank. */
   readonly careerNotice: string | undefined;
@@ -1443,11 +1438,6 @@ export function towersView(input: CampaignInput): TowersView {
       heading: TOWER_CARD_COPY.heading,
       sub: TOWER_CARD_COPY.sub,
       rows: career.towers.map((tower) => towerCardView(input, tower)),
-    },
-    lately: {
-      heading: TOWERS_COPY.incidentsHeading,
-      sub: TOWERS_COPY.incidentsSub,
-      refusal: TOWERS_COPY.incidentsRefusal,
     },
     oddsFootnote: TOWERS_COPY.oddsFootnote,
   };

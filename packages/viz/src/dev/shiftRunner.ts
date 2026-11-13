@@ -257,9 +257,8 @@ function runningLineOf(job: ShiftJob, elapsedMs: number): string {
   const seconds = Math.max(0, Math.floor(elapsedMs / 1000));
   const size = `about ${String(job.cost.arrivals)} people expected`;
   return (
-    `simulating the ${job.label}${job.cost.heavy ? ' — a big one' : ''}: ${String(seconds)} s so far, ${size}. ` +
-    'Elapsed seconds, not progress — a shift is one uninterruptible call, so nothing here can say how ' +
-    'far through it is. The page stays yours; press Cancel this run to stop.'
+    `simulating the ${job.label}${job.cost.heavy ? ' (a big one)' : ''}: ${String(seconds)} s so far, ${size}. ` +
+    'Elapsed time, not progress. Press Cancel this run to stop.'
   );
 }
 
@@ -358,8 +357,8 @@ export function createShiftRunner(options: ShiftRunnerOptions): ShiftRunnerHandl
       stop();
       onRunning(false);
       onStatus(
-        `the ${job.label} was cancelled after ${String(seconds)} s. Nothing was measured, so nothing ` +
-          'is reported — the run on screen is the one before it.',
+        `the ${job.label} was cancelled after ${String(seconds)} s. Nothing was measured: the run ` +
+          'on screen is the one before it.',
       );
     },
 

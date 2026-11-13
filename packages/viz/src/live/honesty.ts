@@ -248,15 +248,15 @@ function closedPlain(recording: VizRecording, suppressed: boolean): string {
   }
   if (recording.summary.saturated) {
     return (
-      'The queues never settled, so there is no single number for what the wait was — asking for ' +
-      'one would only say when we stopped watching. Every count on this rail is real; the ' +
-      'average is the thing we are withholding.'
+      'The queues never settled, so there is no single number for the wait: an average ' +
+      'would only say when we stopped watching. Every count on this rail is real. Only the ' +
+      'average is withheld.'
     );
   }
   return (
-    'This shift does not pass every check an average has to pass, so the simulator withholds the ' +
-    'average rather than printing one nothing could lean on. Every count on this rail is real; ' +
-    'switch to Engineer for the rule that refused it.'
+    'This shift does not pass every check an average has to pass, so the ' +
+    'average is withheld. Every count on this rail is real. ' +
+    'Engineer shows the rule that refused it.'
   );
 }
 

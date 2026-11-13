@@ -280,7 +280,7 @@ export function shaftTintOf(bankIndex: number): string {
 export function specFieldOf(key: SpecRow['key']): string {
   switch (key) {
     case 'floors':
-      return 'floors[] — plus the lobby, which is always floor 0';
+      return 'floors[], plus the lobby, which is always floor 0';
     case 'floorHeightM':
       return 'floors[].heightM';
     case 'capacityPerFloor':
@@ -322,11 +322,11 @@ function playerFieldOf(key: SpecRow['key']): string {
     case 'floors':
       return 'Served floors, not counting the lobby. Every extra floor is another possible stop.';
     case 'floorHeightM':
-      return 'Slab to slab — about 3.6 m in an office, 3.0 m in flats. Taller floors, longer trips.';
+      return 'Slab to slab: about 3.6 m in an office, 3.0 m in flats. Taller floors, longer trips.';
     case 'capacityPerFloor':
-      return 'How many people the floor was built to hold. This is the number the lifts were sized for.';
+      return 'How many people the floor was built to hold. The lifts were sized for this number.';
     case 'occupancyPct':
-      return 'How much of that capacity is let today. This is the number the lifts actually carry.';
+      return 'How much of that capacity is let today. The lifts actually carry this number.';
     case 'cars':
       return 'Lifts answering as one group. The most expensive thing in the building.';
   }
@@ -410,9 +410,9 @@ export function formatSpecValue(spec: BuildingSpec, row: SpecRow): string {
 /** The sentence the occupancy row shows once the building is let past what it was designed for. */
 export function overCapacityNote(spec: BuildingSpec): string {
   return (
-    `${String(Math.round(spec.occupancyPct - 100))}% over design capacity — ` +
+    `${String(Math.round(spec.occupancyPct - 100))}% over design capacity: ` +
     `${String(populationAt(spec, 1))} people on a floor built for ${String(spec.capacityPerFloor)}. ` +
-    'The lifts were sized for the smaller number, and this is the run that shows what that costs.'
+    'The lifts were sized for the smaller number.'
   );
 }
 
@@ -677,9 +677,9 @@ export function elevationRowsOf(spec: BuildingSpec): readonly ElevationRow[] {
       labelTitle: isEntrance
         ? floor === 0
           ? 'The lobby. Every bank lands here, and it carries no resident population.'
-          : `Floor ${floorId} is below the lobby and is an entrance too — floors[].isEntrance. It carries no resident population.`
+          : `Floor ${floorId} is below the lobby and is an entrance too (floors[].isEntrance). It carries no resident population.`
         : isSky
-          ? `Floor ${floorId} is a transfer level — floors[].isTransferFloor.`
+          ? `Floor ${floorId} is a transfer level (floors[].isTransferFloor).`
           : `Floor ${floorId}.`,
       isEntrance,
       isSky,
@@ -695,8 +695,8 @@ export function elevationRowsOf(spec: BuildingSpec): readonly ElevationRow[] {
        * `buildingFromSpec` reads only above the lobby.
        */
       skyTitle: isEntrance
-        ? `This dot writes skyFloors, which buildingFromSpec reads only above the lobby, so on an entrance it writes nothing. A transfer flag already on a floor at or below the lobby is carried through from the document${isSky ? ` — floor ${floorId} has one, which is what the ⇄ beside it means.` : '.'}`
-        : `Make floor ${floorId} a transfer level. Transfer levels cut the tower into segments and the cars are dealt round-robin into them, which is what makes a sky lobby worth building.`,
+        ? `This dot writes skyFloors, which buildingFromSpec reads only above the lobby, so on an entrance it writes nothing. A transfer flag already on this floor is carried through from the document${isSky ? `, and floor ${floorId} has one: that is the ⇄ beside it.` : '.'}`
+        : `Make floor ${floorId} a transfer level. Transfer levels cut the tower into segments, and the cars are dealt round-robin into them.`,
       skyToggles: !isEntrance,
       occupancyPct,
       handSet,
@@ -709,8 +709,8 @@ export function elevationRowsOf(spec: BuildingSpec): readonly ElevationRow[] {
       peopleText: isEntrance ? 'entrance' : `${String(people)} / ${String(spec.capacityPerFloor)}`,
       peopleColor: occupancyPct > 100 ? 'var(--over)' : handSet ? 'var(--accent-soft)' : 'var(--dim)',
       occTitle: isEntrance
-        ? 'buildingFromSpec writes an entrance floor population = 0, so there is nothing here to let.'
-        : `${String(Math.round(occupancyPct))}% of ${String(spec.capacityPerFloor)} — drag to let this floor alone, 0–${String(OCCUPANCY_MAX_PCT)}%. Past 100 is over design capacity.`,
+        ? 'An entrance floor is written with population = 0, so there is nothing here to let.'
+        : `${String(Math.round(occupancyPct))}% of ${String(spec.capacityPerFloor)}. Drag to let this floor alone, 0–${String(OCCUPANCY_MAX_PCT)}%. Past 100 is over design capacity.`,
     });
   }
   return rows;
@@ -821,7 +821,7 @@ export function elevationCarsOf(spec: BuildingSpec): readonly ElevationCar[] {
         ? ''
         : lobby
           ? `✓ express from the lobby, skipping ${floorIdOf(spec, 1)}–${floorIdOf(spec, low - 1)}`
-          : 'stays in its band — click to run express from the lobby',
+          : 'stays in its band: click to run express from the lobby',
       expressTitle: EXPRESS_TITLE,
     });
   }
@@ -1204,8 +1204,8 @@ export function transportNoteOf(spec: BuildingSpec): string {
   const rides =
     stairs === choices.length
       ? ''
-      : ' The router rides an escalator in preference to a lift leg, so a crossing it carries is a ' +
-        'crossing the lifts are no longer charged for.';
+      : ' A rider takes an escalator in preference to a lift leg, so the lifts are not charged ' +
+        'for a crossing it carries.';
   /*
    * Both stair sentences are true of a stair and of nothing else in this panel, so they are said
    * only when there is one — a note that explained stairs on Vertical City would be describing a
@@ -1216,13 +1216,11 @@ export function transportNoteOf(spec: BuildingSpec): string {
   const said =
     stairs === 0
       ? ''
-      : ` ${String(stairs)} of them ${stairs === 1 ? 'is a stair' : 'are stairs'}. The router ` +
-        'never plans a journey over a stair — one is offered to the rider whose journey already ' +
-        'begins and ends on its two floors, and taken when the drawn propensity clears — so a ' +
-        'stair on a transfer level is still not a way through. A stair also declares two ' +
-        'traversal times, one up and one down, and the seconds control here writes one number: ' +
-        'it is disabled on a stair, and the pair on the loaded document is carried through ' +
-        'untouched rather than half-written. Edit it in the building JSON.';
+      : ` ${String(stairs)} of them ${stairs === 1 ? 'is a stair' : 'are stairs'}. No journey ` +
+        'is routed over a stair: it is offered only to a rider whose journey begins and ends on ' +
+        'its two floors, so a stair on a transfer level is still not a way through. A stair has ' +
+        'two traversal times, one up and one down, so the seconds control is disabled on it and ' +
+        'the pair in the loaded document is kept. Edit it in the building JSON.';
   const lead =
     `${String(written.length)} of ${String(choices.length)} ${noun}${choices.length === 1 ? '' : 's'} ` +
     `written to the document.${rides}${said}`;
@@ -1236,8 +1234,8 @@ export function transportNoteOf(spec: BuildingSpec): string {
   if (escalators === 0) return lead;
   return (
     `${lead} ${String(through)} of ${String(escalators)} touch a transfer level and are a way ` +
-    'through the building; the rest carry only the people who start on one of their two floors ' +
-    'and finish on the other.'
+    'through the building. The rest carry only people who start on one of their two floors and ' +
+    'finish on the other.'
   );
 }
 
@@ -1248,11 +1246,11 @@ export function elevationNoteOf(spec: BuildingSpec): string {
   const closed = banks.some((bank) => bank.band[0] > 0 && !bank.lobby);
   const plural = banks.length === 1 ? '' : 's';
   return (
-    `${String(spec.cars)} shaft${spec.cars === 1 ? '' : 's'} in ${String(banks.length)} bank${plural} — ` +
-    'a bank is the set of cars that open onto the same floors, so dragging one car off the rest ' +
+    `${String(spec.cars)} shaft${spec.cars === 1 ? '' : 's'} in ${String(banks.length)} bank${plural}. ` +
+    'A bank is the set of cars that open onto the same floors, so dragging one car off the rest ' +
     'splits it.' +
     (express
-      ? ' A band that starts above the lobby still lands in the lobby and runs non-stop past the floors beneath it.'
+      ? ' A band that starts above the lobby still lands in the lobby and runs non-stop past the floors below it.'
       : '') +
     /*
      * Said only when a band is actually closed, because it is the sentence that stops the one above
@@ -1286,9 +1284,9 @@ function accessNoteOf(spec: BuildingSpec): string {
   return (
     ` ${String(restricted)} of ${String(total)} floors sit in an access zone (${runs}) and ` +
     `${String(groups)} credential group${groups === 1 ? '' : 's'} ` +
-    `${groups === 1 ? 'is' : 'are'} named. That is a credential and not a shaft: every one of those ` +
-    'floors is physically served, and a rider whose credential does not open one is not waiting — ' +
-    'the trip is never generated. A floor in no zone is unrestricted.' +
+    `${groups === 1 ? 'is' : 'are'} named. That is a credential and not a shaft: each of those ` +
+    'floors is physically served, and a trip a rider’s credential does not open is never ' +
+    'generated. A floor in no zone is unrestricted.' +
     (stranded === 0
       ? ''
       : ` ${String(stranded)} of them ${stranded === 1 ? 'is' : 'are'} open to no group at all.`)
@@ -1379,29 +1377,28 @@ interface CarHandles {
  */
 
 const ZONE_FLOOR_TITLE =
-  'Click to put this floor in the selected zone, or take it out. The options are this building’s own ' +
-  'floors, so a zone can never name one the document does not have.';
+  'Click to put this floor in the selected zone, or take it out.';
 
 const ZONE_LOBBY_TITLE =
-  'The lobby. Restricting it is a building where nobody may enter from the ground — a legitimate ' +
-  'thing to draw and watch, and not usually what is meant: every shipped building leaves it open.';
+  'The lobby. Restrict it and nobody may enter from the ground. Every shipped building leaves ' +
+  'it open.';
 
 const ZONE_GROUP_TITLE =
-  'Click to admit this credential group to the selected zone, or withdraw it. Permission on a floor ' +
-  'is the union over every zone covering it.';
+  'Click to admit this credential group to the selected zone, or withdraw it. A floor’s ' +
+  'permission is the union over every zone covering it.';
 
 /*
  * Module-private, like `EXPRESS_TITLE` above and for the constraint stated there: a string literal
  * carrying an `a.b` inside a template becomes an unclassified prose surface in `honesty/derive`.
  */
 const TRANSPORT_LANDING_TITLE =
-  'One of the escalator’s two landings. The picker offers this building’s own floors, so a connection can never name a floor the document does not have.';
+  'One of the escalator’s two landings.';
 
 const TRANSPORT_TRANSFER_TITLE =
-  'A transfer level: a journey may change onto a lift here, so an escalator landing here is a way through the building rather than a trip between two floors.';
+  'A transfer level: a journey may change onto a lift here, so an escalator landing here is a way through the building.';
 
 const TRANSPORT_BLOCKED_TITLE =
-  'The other landing already stands here. The loader refuses a connection whose two ends name one floor — a machine that starts and ends on the same floor moves nobody.';
+  'The other landing is already here. A connection needs two different floors.';
 
 /**
  * The verb the save's confirmation offers, hoisted so {@link DRAFT_NOTE} can name it — issue #104.
@@ -1427,11 +1424,9 @@ const RUN_SAVED_LABEL = 'Run a day on it';
  */
 const DRAFT_NOTE =
   commitmentOf('viewer.buildingSpec', 'writes-only') === 'draft'
-    ? 'Nothing you draw here reaches a run yet — this panel holds a draft, and the shift on screen ' +
-      'keeps the building it was simulated in. Save as a new building files it and points nothing ' +
-      `at it; ${RUN_SAVED_LABEL}, which appears beside Save afterwards, is what hands it to the ` +
-      'shift, and that re-runs the whole day from the start rather than steering the one you are ' +
-      'watching.'
+    ? 'Nothing you draw here reaches a run yet. This panel holds a draft, and the shift on screen ' +
+      'keeps the building it ran in. Save as a new building files it without running it. ' +
+      `${RUN_SAVED_LABEL}, which then appears beside Save, re-runs the whole day in it.`
     : '';
 
 /*
@@ -1448,9 +1443,9 @@ const DRAFT_NOTE =
  * interval as a promise about AWT.
  */
 const SIZING_NOTE =
-  'Computed by the same closed-form up-peak arithmetic the correctness oracle checks the ' +
-  'simulator against — a prediction from the geometry, not a measurement of a run. It has no ' +
-  'queueing model, so it says nothing about how long anyone waits: run a day for that.';
+  'The same closed-form up-peak arithmetic the simulator is checked against: a prediction from ' +
+  'the geometry, not a measurement of a run. It has no queueing model, so it says nothing about ' +
+  'how long anyone waits. Run a day for that.';
 
 /*
  * Issue #43 § 4: this said *"core’s own semantics"* — `core` is a source package and means nothing to
@@ -1460,18 +1455,16 @@ const SIZING_NOTE =
  * number that goes stale the next time a building lands. See § D230.
  */
 const MATRIX_EMPTY =
-  'No access zone, so every floor is open to every credential — that is what a floor no zone covers ' +
-  'means, here and in the run. Add a zone to restrict the floors it names; every floor outside it ' +
-  'stays unrestricted.';
+  'No access zone, so every floor is open to every credential. Add a zone to restrict the ' +
+  'floors it names. Every floor outside it stays unrestricted.';
 
 const MATRIX_LEGEND =
   'A row is a floor, a column is a credential group. ● this group opens the floor · ▩ it does not · ' +
-  '○ the floor is in no zone, so every credential opens it. Service zoning is a different question ' +
-  'and is drawn in the elevation above: a floor no shaft reaches is ⊘ there, never ▩ here.';
+  '○ the floor is in no zone, so every credential opens it. Service zoning is drawn in the ' +
+  'elevation above: a floor no shaft reaches is ⊘ there, never ▩ here.';
 
 const MATRIX_DISPATCHER_NOTE =
-  'Which dispatchers can read a credential at all is a third question again — the note beside the ' +
-  'dispatcher list answers it for the pairing you have selected.';
+  'Whether the selected dispatcher can read a credential is noted beside the dispatcher list.';
 
 /* -------------------------------------------------------------------------- *
  * Saving, and the two halves of it that were missing — issue #54
@@ -1813,7 +1806,7 @@ export function mountBuildingEditor(
     text: RUN_SAVED_LABEL,
     title:
       'Makes the building you just saved the one the week runs, and runs a day on it. It belongs ' +
-      'to no scenario, so the week keeps its day and stops claiming to be an assignment.',
+      'to no scenario, so the week keeps its day and is no longer an assignment.',
     attrs: { type: 'button' },
   });
   setHidden(savedNote, true);
@@ -1914,7 +1907,7 @@ export function mountBuildingEditor(
       });
       setText(elements.error, '');
       confirmedId = saved.id;
-      setText(savedNote, `Saved — “${saved.config.name}” is now in your buildings.`);
+      setText(savedNote, `Saved “${saved.config.name}” to your buildings.`);
       setHidden(savedNote, false);
       setHidden(runSaved, false);
     } catch (error) {
@@ -2490,10 +2483,10 @@ export function mountBuildingEditor(
       elements.accessWarning,
       stranded.length === 0
         ? ''
-        : `No credential opens floor ${stranded.join(', ')} — every group has been withdrawn from ` +
-            `the zone covering ${stranded.length === 1 ? 'it' : 'them'}, so the trips to ` +
-            `${stranded.length === 1 ? 'that floor' : 'those floors'} are never generated at all ` +
-            'and the run would report a mean over the people it could still carry.',
+        : `No credential opens floor ${stranded.join(', ')}: every group has been withdrawn from ` +
+            `the zone covering ${stranded.length === 1 ? 'it' : 'them'}. Trips to ` +
+            `${stranded.length === 1 ? 'that floor' : 'those floors'} are never generated, so ` +
+            'the run would report a mean over only the people it could still carry.',
     );
 
     const restricted = matrix.restrictedIds.length;
@@ -2532,11 +2525,11 @@ export function mountBuildingEditor(
             selected: choice.selected,
             title: choice.written
               ? choice.stairs
-                ? `${choice.id} is a stair joining ${choice.lowerId} and ${choice.upperId}: ${took}. The router never plans a journey over a stair — it is offered to a rider whose journey already begins and ends on those two floors — so a transfer level makes no difference to it, and the seconds control cannot edit its two times.`
+                ? `${choice.id} is a stair joining ${choice.lowerId} and ${choice.upperId}: ${took}. No journey is routed over a stair: it is offered only to a rider whose journey begins and ends on those two floors. The seconds control cannot edit its two times.`
                 : choice.wayThrough
                   ? `${choice.id} joins ${choice.lowerId} and ${choice.upperId} in ${took}, and one of the two is a transfer level, so a journey can change onto a lift there.`
-                  : `${choice.id} joins ${choice.lowerId} and ${choice.upperId} in ${took}. Neither is a transfer level, so it carries only the people who start on one of those floors and finish on the other.`
-              : `${choice.id} is not written to the saved document — the elevation's warnings say why.`,
+                  : `${choice.id} joins ${choice.lowerId} and ${choice.upperId} in ${took}. Neither is a transfer level, so it carries only people who start on one of those floors and finish on the other.`
+              : `${choice.id} is not written to the saved document. The elevation's warnings say why.`,
             onPick: () => {
               selectedTransportId = choice.id;
               // A selection is not a document edit, so it redraws rather than going through `patch`.
@@ -2649,7 +2642,7 @@ export function mountBuildingEditor(
     setText(
       elements.classPlain,
       machineClass === undefined
-        ? `No class "${current.specClass}" — the loader will refuse this building until one is chosen.`
+        ? `No class "${current.specClass}". Choose one, or the loader will refuse this building.`
         : plainDescription(machineClass),
     );
     setText(
@@ -2667,7 +2660,7 @@ export function mountBuildingEditor(
         loadChipsOf(current, machineClass).map((entry) => ({
           label: entry.label,
           selected: entry.pressed,
-          title: `${String(entry.ratedLoadLb)} lb is ${String(entry.persons)} persons in the capacities table — not lb ÷ 150, which would quietly add a passenger.`,
+          title: `${String(entry.ratedLoadLb)} lb is ${String(entry.persons)} persons in the capacities table, not lb ÷ 150.`,
           onPick: () => {
             patch({ ratedLoadLb: entry.ratedLoadLb });
           },
@@ -2683,8 +2676,8 @@ export function mountBuildingEditor(
             label: entry.label,
             selected: entry.pressed,
             title:
-              'Contract speed. On a short rise it is never reached, so door and stop time dominate ' +
-              'and this does less than it looks like it should.',
+              'Contract speed. A short rise never reaches it, so door and stop time dominate ' +
+              'there.',
             onPick: () => {
               patch({ ratedSpeedMps: entry.speed });
             },
@@ -2702,7 +2695,7 @@ export function mountBuildingEditor(
           title:
             entry.every === 0
               ? 'No transfer levels: one bank serves the whole tower.'
-              : `Transfer levels at ${entry.floors.map((floor) => floorIdOf(current, floor)).join(', ')} — floors[].isTransferFloor. The cars are dealt round-robin into the segments those levels cut.`,
+              : `Transfer levels at ${entry.floors.map((floor) => floorIdOf(current, floor)).join(', ')} (floors[].isTransferFloor). The cars are dealt round-robin into the segments those levels cut.`,
           onPick: () => {
             patch({ skyFloors: entry.floors, bandByCar: {} });
           },

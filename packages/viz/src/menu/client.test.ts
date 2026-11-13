@@ -749,7 +749,7 @@ describe('the account form', () => {
     expect(refusal).toMatch(/Sign in/u);
     // Said here because it is the moment somebody decides whether to bother, and "no password" is
     // the part that changes the answer.
-    expect(refusal).toMatch(/no password/u);
+    expect(refusal).toMatch(/no password/iu);
   });
 
   it('keeps a notice until the player types again', () => {

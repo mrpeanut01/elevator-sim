@@ -91,7 +91,7 @@ export const MACHINE_ROWS: readonly MachineRow[] = Object.freeze([
     max: 20,
     step: 0.01,
     unit: ' m/s',
-    help: 'The bottom of the class’s rated-speed band — `ratedSpeedMps.min`. Nothing in the class is built slower than this, and the loader refuses a car outside the band.',
+    help: 'The bottom of the class’s rated-speed band (ratedSpeedMps.min). The loader refuses a car outside the band.',
   },
   {
     key: 'speedTypicalMps',
@@ -101,7 +101,7 @@ export const MACHINE_ROWS: readonly MachineRow[] = Object.freeze([
     max: 20.5,
     step: 0.01,
     unit: ' m/s',
-    help: 'The speed a building gets when it picks this class — `ratedSpeedMps.typical`. On a short rise it is never reached, so door and stop time dominate and this control does less than it looks like it should.',
+    help: 'The speed a building gets when it picks this class (ratedSpeedMps.typical). A short rise never reaches it, so door and stop time dominate there.',
   },
   {
     key: 'speedMaxMps',
@@ -111,7 +111,7 @@ export const MACHINE_ROWS: readonly MachineRow[] = Object.freeze([
     max: 20.5,
     step: 0.01,
     unit: ' m/s',
-    help: 'The top of the band — `ratedSpeedMps.max`. Shanghai Tower’s 20.5 m/s is the fastest lift ever built, so that is the ceiling here.',
+    help: 'The top of the band (ratedSpeedMps.max). The ceiling is 20.5 m/s, Shanghai Tower’s, the fastest lift ever built.',
   },
   {
     key: 'accelerationMps2',
@@ -121,7 +121,7 @@ export const MACHINE_ROWS: readonly MachineRow[] = Object.freeze([
     max: 1.5,
     step: 0.05,
     unit: ' m/s²',
-    help: 'How hard the car pulls away — `acceleration.typical`. This is real in the simulation: 0.6 is a hydraulic, 1.0 a traction car, and above about 1.2 riders start to complain. On a short hop it matters more than rated speed does.',
+    help: 'How hard the car pulls away (acceleration.typical). 0.6 is a hydraulic, 1.0 a traction car, and above about 1.2 riders start to complain. On a short hop it matters more than rated speed.',
   },
   {
     key: 'jerkMps3',
@@ -131,7 +131,7 @@ export const MACHINE_ROWS: readonly MachineRow[] = Object.freeze([
     max: 2,
     step: 0.1,
     unit: ' m/s³',
-    help: 'Rate of change of acceleration — the lurch — `jerk.typical`. Comfort standards keep it around 1.0–1.6; lower feels smoother and costs time on every short hop, which is most of them.',
+    help: 'Rate of change of acceleration, the lurch (jerk.typical). Comfort standards keep it around 1.0–1.6. Lower feels smoother and costs time on every short hop.',
   },
   {
     key: 'maxRiseM',
@@ -141,7 +141,7 @@ export const MACHINE_ROWS: readonly MachineRow[] = Object.freeze([
     max: 700,
     step: 1,
     unit: ' m',
-    help: 'How far up the class can serve — `maxRiseM`. A hydraulic runs out at 18 m; only the gearless classes reach a real tower. A building past it is an advisory rather than a refusal, so the run happens and the figures describe a machine outside its class.',
+    help: 'How far up the class can serve (maxRiseM). A hydraulic runs out at 18 m. A building past the limit gets a warning, not a refusal: it runs, and its figures describe a machine outside its class.',
   },
   {
     key: 'maxFloors',
@@ -151,7 +151,7 @@ export const MACHINE_ROWS: readonly MachineRow[] = Object.freeze([
     max: 130,
     step: 1,
     unit: '',
-    help: 'Floor-count limit for the class — `maxFloors`. A building past it raises the same warning the loader does.',
+    help: 'Floor-count limit for the class (maxFloors). A building past it gets the loader’s warning.',
   },
   {
     key: 'loadMinLb',
@@ -161,7 +161,7 @@ export const MACHINE_ROWS: readonly MachineRow[] = Object.freeze([
     max: 5000,
     step: 100,
     unit: ' lb',
-    help: 'Bottom of the rated-load range the class is built in — `capacityLbRange[0]`. Loads outside the range disappear from the building editor’s chips, because they are not cars this class comes in.',
+    help: 'Bottom of the class’s rated-load range (capacityLbRange[0]). The building editor offers only loads inside the range.',
   },
   {
     key: 'loadMaxLb',
@@ -171,7 +171,7 @@ export const MACHINE_ROWS: readonly MachineRow[] = Object.freeze([
     max: 5000,
     step: 100,
     unit: ' lb',
-    help: 'Top of the range — `capacityLbRange[1]`. 5 000 lb is 33 persons: a service car or a supertall shuttle.',
+    help: 'Top of the range (capacityLbRange[1]). 5 000 lb is 33 persons: a service car or a supertall shuttle.',
   },
 ]);
 

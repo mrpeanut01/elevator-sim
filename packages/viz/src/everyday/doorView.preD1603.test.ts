@@ -37,7 +37,7 @@ const TODAY: TodayRecord = {
   facts: [],
   load: undefined,
   asks: [],
-  seedLine: 'tower chancery-house · crowd 424242 · today’s date, so everyone playing today meets this crowd',
+  seedLine: 'tower chancery-house · crowd 424242 · today’s crowd, the same for everyone playing today',
   crowdIsToday: true,
   crowdIsPinned: false,
   firstSessionLine: undefined,

@@ -173,7 +173,7 @@ describe('the two days are alike everywhere the defect lives', () => {
 
 /** `20 of 40 waited past the 15-minute give-up horizon, none of them carried; …` */
 const EXPECTED_BESIDE =
-  '20 of 40 waited past the 15-minute give-up horizon, none of them carried; ' +
+  '20 of 40 waited past the 15-minute give-up line, none of them carried; ' +
   'this share is over the rides that boarded';
 
 describe('the derivation itself', () => {
@@ -312,7 +312,7 @@ describe('the overlap moves inside one run, so it is an outcome rather than a re
      * clause is § D106's content. None of the three is an outcome, so none is withheld.
      */
     expect(live).toContain(`${String(MIDWAY.abandoned)} of ${String(MIDWAY.arrived)}`);
-    expect(live).toContain('15-minute give-up horizon');
+    expect(live).toContain('15-minute give-up line');
     expect(live).toContain('this share is over the rides that boarded');
     expect(live).toContain('so far');
     // And the withholding is *said*, which is § D223's remedy rather than a quieter figure.
@@ -469,7 +469,7 @@ describe('the two screens differ, on every surface that grades the bar', () => {
 
   it('the campaign desk’s away test, which reads the same share', () => {
     expect(campaignRow(MOVED)).not.toContain('waited past');
-    expect(campaignRow(LEFT)).toContain('waited past the 15-minute give-up horizon');
+    expect(campaignRow(LEFT)).toContain('waited past the 15-minute give-up line');
     expect(campaignRow(LEFT)).not.toBe(campaignRow(MOVED));
   });
 

@@ -273,7 +273,7 @@ function scheduleNow(): PriceSchedule {
   const open = (): void => {
     root.style.display = 'block';
     if (cases === undefined && loadFailure === undefined) {
-      fill(root, el(doc, 'p', { text: 'Loading the case file…', style: { padding: '2rem' } }));
+      fill(root, el(doc, 'p', { text: 'Loading cases…', style: { padding: '2rem' } }));
       host
         .loadCases()
         .then((loaded) => {
@@ -298,7 +298,7 @@ function scheduleNow(): PriceSchedule {
           style: { padding: '2rem', 'max-width': '48rem' },
           children: [
             el(doc, 'h1', { text: 'Fix a building' }),
-            el(doc, 'p', { text: `The case file could not be loaded: ${loadFailure}` }),
+            el(doc, 'p', { text: `The cases could not be loaded: ${loadFailure}` }),
             closeButton(),
           ],
         }),
@@ -310,7 +310,7 @@ function scheduleNow(): PriceSchedule {
       cases.cases.find((candidate) => candidate.id === selectedId && isOffered(candidate.id)) ??
       cases.cases.find((candidate) => isOffered(candidate.id));
     if (entry === undefined) {
-      fill(root, el(doc, 'p', { text: 'The case file holds no cases.', style: { padding: '2rem' } }), closeButton());
+      fill(root, el(doc, 'p', { text: 'No cases to show.', style: { padding: '2rem' } }), closeButton());
       return;
     }
     const fixedCount = cases.cases.filter(
@@ -658,7 +658,7 @@ function scheduleNow(): PriceSchedule {
       children: [
         minus,
         plus,
-        el(doc, 'span', { text: `${label}${canBuy ? '' : ' — at the budget'}`, style: { color: MUTED } }),
+        el(doc, 'span', { text: `${label}${canBuy ? '' : ' · at the budget'}`, style: { color: MUTED } }),
       ],
     });
   }
@@ -723,7 +723,7 @@ function scheduleNow(): PriceSchedule {
     const plus = el(doc, 'button', { text: '+', style: buttonStyle(false) });
     minus.disabled = floors === 0;
     plus.disabled = atCeiling || atBudget;
-    if (atCeiling) plus.title = 'the banks already reach as far into each other as this building lets them';
+    if (atCeiling) plus.title = 'The banks already overlap as far as this building allows';
     else if (atBudget) plus.title = 'at the budget';
     minus.addEventListener('click', () => {
       session.state = stepZoneOverlap(entry, session.state, -1, ceiling, scheduleNow());
@@ -733,7 +733,7 @@ function scheduleNow(): PriceSchedule {
       session.state = stepZoneOverlap(entry, session.state, 1, ceiling, scheduleNow());
       render();
     });
-    const suffix = atCeiling ? ' — as far as this building goes' : atBudget ? ' — at the budget' : '';
+    const suffix = atCeiling ? ' · as far as this building goes' : atBudget ? ' · at the budget' : '';
     return el(doc, 'div', {
       style: { display: 'flex', 'align-items': 'center', gap: '0.5rem', 'margin-bottom': '0.5rem' },
       children: [
@@ -790,7 +790,7 @@ function scheduleNow(): PriceSchedule {
         el(doc, 'span', {
           text:
             price === 0
-              ? 'Where idle cars wait · no charge — telling a controller where to send an empty car costs nothing'
+              ? 'Where idle cars wait · no charge'
               : `Where idle cars wait · ${String(price)} u`,
           style: { color: MUTED },
         }),
@@ -816,7 +816,7 @@ function scheduleNow(): PriceSchedule {
     const plus = el(doc, 'button', { text: '+', style: buttonStyle(false) });
     minus.disabled = metres === 0;
     plus.disabled = atCeiling || atBudget;
-    if (atCeiling) plus.title = 'this is as far as a repair budget moves a floor';
+    if (atCeiling) plus.title = 'As far as a repair budget moves a floor';
     else if (atBudget) plus.title = 'at the budget';
     minus.addEventListener('click', () => {
       session.state = stepTopFloorRaise(entry, session.state, -1, ceiling, scheduleNow());
@@ -826,7 +826,7 @@ function scheduleNow(): PriceSchedule {
       session.state = stepTopFloorRaise(entry, session.state, 1, ceiling, scheduleNow());
       render();
     });
-    const suffix = atCeiling ? ' — as far as a repair budget goes' : atBudget ? ' — at the budget' : '';
+    const suffix = atCeiling ? ' · as far as a repair budget goes' : atBudget ? ' · at the budget' : '';
     return el(doc, 'div', {
       style: { display: 'flex', 'align-items': 'center', gap: '0.5rem', 'margin-bottom': '0.5rem' },
       children: [

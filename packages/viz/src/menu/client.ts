@@ -290,9 +290,8 @@ export function claimedMetricsOf(summary: {
     return {
       ok: false,
       detail:
-        'This run has no long-wait share to post — nothing waited long enough for the figure to ' +
-        'have a denominator, so it was never measured. A score is a claim about every figure it ' +
-        'carries, and there is no number that would be true here.',
+        'This run cannot be posted: it has no long-wait share. Nothing waited long enough for the ' +
+        'figure to have a denominator, so it was never measured, and a score carries every figure.',
     };
   }
   return {
@@ -539,10 +538,10 @@ export const CLIENT_FAILURES: Readonly<Record<'unreachable' | 'unexpected-respon
     // Says the run survives, because the reading people assume — "my score is gone" — is both
     // wrong and the one that makes them stop playing.
     unreachable:
-      'The leaderboard server could not be reached. Your run is not lost — it can be posted when ' +
-      'the connection is back.',
+      'The leaderboard server could not be reached. Your run is not lost. Post it when the ' +
+      'connection is back.',
     'unexpected-response':
-      'The server answered in a shape this build does not understand. It may be a newer version.',
+      'The server sent an answer this page cannot read. It may be a newer version. Try reloading.',
     // The fallback when a 4xx carried no `detail` of its own. Deliberately says nothing about why:
     // inventing a reason here would be a second place deciding what a refusal means.
     refused: 'The server refused that request.',

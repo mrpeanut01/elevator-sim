@@ -130,8 +130,7 @@ export function selectorAvailability(context: SelectorContext): SelectorAvailabi
     offered: false,
     note:
       'This dispatcher library declares no traffic patterns, so there is nothing to switch ' +
-      'between and no policy on offer. The patterns and the weight set each one runs are ' +
-      'authored file-level, in data/dispatcher-profiles.json.',
+      'between. Patterns and their weight sets are authored in data/dispatcher-profiles.json.',
   };
 }
 
@@ -157,27 +156,26 @@ export const POLICY_HINTS: Readonly<Record<WeightSetPolicy, { readonly label: st
     off: Object.freeze({
       label: 'One setting, all shift',
       hint:
-        'The dispatcher keeps the weights you gave it from the first second to the last. This is ' +
-        'what every shipped dispatcher does and what every published figure here was measured under.',
+        'The dispatcher keeps the weights you gave it all shift. Every shipped dispatcher does ' +
+        'this, and every published figure was measured this way.',
     }),
     fuzzy: Object.freeze({
       label: 'Watch the traffic and change',
       hint:
         'The dispatcher counts arrivals over a trailing window, decides which pattern the building ' +
-        'is in, and runs that pattern’s weights until another pattern takes over.',
+        'is in, and runs that pattern’s weights until another takes over.',
     }),
     contextual: Object.freeze({
       label: 'Watch the traffic, with your tuning',
       hint:
-        'The same detector, with three gains on what it reads and a margin a challenging pattern ' +
-        'must beat the incumbent by. At their defaults it is arithmetically the rule above.',
+        'The same detector, with three gains on what it reads and a margin a new pattern must ' +
+        'beat the current one by. At their defaults it is arithmetically the rule above.',
     }),
     rules: Object.freeze({
       label: 'Follow your own rules',
       hint:
-        'Your when/then rows drive the weights, read top to bottom, first match wins. Entered by ' +
-        'writing rules in the rules editor, not here — a rules policy with no rows is refused by ' +
-        'name at Run.',
+        'Your when/then rows drive the weights, read top to bottom, first match wins. Write them ' +
+        'in the rules editor, not here: a rules policy with no rows is refused at Run.',
     }),
   });
 
@@ -219,8 +217,8 @@ export function rulesOverrideNoteOf(ruleRowCount: number): string {
   if (ruleRowCount <= 0) return '';
   return (
     `You have ${String(ruleRowCount)} Everyday rule${ruleRowCount === 1 ? '' : 's'} written, so ` +
-    'the next run follows them — first match wins — and the switching configured here is not ' +
-    'consulted. Delete the rules to hand the run back to this panel.'
+    'the next run follows them (first match wins) and the switching set here is not used. ' +
+    'Delete the rules to hand the run back to this panel.'
   );
 }
 
@@ -442,7 +440,7 @@ export function changedNoteOf(
   context: SelectorContext,
 ): string {
   if (!specIsDirty(spec, profile, context)) return '';
-  return 'changed — this run is not the shipped configuration';
+  return 'changed: this run is not the shipped configuration';
 }
 
 /* -------------------------------------------------------------------------- *
@@ -467,10 +465,8 @@ export function changedNoteOf(
  */
 const APPLIES_NEXT_RUN =
   commitmentOf('viewer.selectorSpec', 'writes-only') === 'next-run'
-    ? 'Locked for this shift: changes apply to your next run. The policy itself does switch ' +
-      'weight sets while a day runs — that is what it is for — but choosing one here is still a ' +
-      'setting the next run is simulated with, and the shift on screen keeps the switching it was ' +
-      'simulated under.'
+    ? 'Locked for this shift: changes apply to your next run. The policy does switch weight sets ' +
+      'while a day runs, but the shift on screen keeps the policy it started with.'
     : '';
 
 /** Nodes of one arm row, kept so a redraw writes into the row instead of replacing it. */

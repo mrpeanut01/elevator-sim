@@ -99,7 +99,7 @@ export function plainLeversOf(
   return [
     {
       id: 'patience',
-      label: 'How long anyone should wait',
+      label: 'Limit the longest wait',
       reads: 'chases the longest wait first',
       atZero: 'let it slide',
       atFull: 'nobody waits',
@@ -132,7 +132,7 @@ export function plainLeversOf(
     },
     {
       id: 'room',
-      label: 'How much room to leave in a car',
+      label: 'Leave room in a car',
       reads: 'stops sending pickups to a crowded car',
       atZero: 'cram them in',
       atFull: 'leave room',
@@ -180,12 +180,12 @@ export function plainLeverHelp(view: PlainLeverView): string {
  */
 export function plainLeverEchoOf(view: PlainLeverView): string {
   if (view.kind === 'toggle') {
-    return `${view.label} is now ${view.value === true ? 'on' : 'off'} — that wrote ${view.writes}.`;
+    return `${view.label} is now ${view.value === true ? 'on' : 'off'}. It sets ${view.writes}.`;
   }
   const position = typeof view.value === 'number' ? view.value : 0;
   return (
-    `${view.label} is now ${String(position)} — that wrote ${view.writes}, ` +
-    'the same number the term slider below holds.'
+    `${view.label} is now ${String(position)}. It sets ${view.writes}, ` +
+    'the same number as the term slider below.'
   );
 }
 

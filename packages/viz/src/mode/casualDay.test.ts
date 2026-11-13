@@ -125,9 +125,9 @@ describe('a Casual note leads the engineer’s note and never replaces it', () =
      */
     const first = casualNoteFor(cell('stairs')).split('. ')[0] ?? '';
     expect(first).toMatch(/^The give-up line is /u);
-    expect(casualNoteFor(cell('stairs'))).toContain(
-      glossaryPlain('abandonment-horizon').charAt(0).toLowerCase() + glossaryPlain('abandonment-horizon').slice(1),
-    );
+    /* The glossary's own opening sentence, read by reference; the rest of the entry is the glossary's. */
+    const opening = glossaryPlain('abandonment-horizon').split('. ')[0] ?? '';
+    expect(casualNoteFor(cell('stairs'))).toContain(`${opening.charAt(0).toLowerCase()}${opening.slice(1)}.`);
   });
 
   /*
@@ -153,9 +153,9 @@ describe('a Casual note leads the engineer’s note and never replaces it', () =
      */
     for (const id of ['minute', 'average-wait', 'stairs', 'energy-work']) {
       const source = cell(id);
-      expect(casualNoteFor(source), id).toContain('The cell’s own note:');
+      expect(casualNoteFor(source), id).toContain('In detail:');
     }
-    expect(casualNoteFor(cell('worst-wait'))).not.toContain('The cell’s own note:');
+    expect(casualNoteFor(cell('worst-wait'))).not.toContain('In detail:');
   });
 
   it('claims nothing about which day it is drawn on — docs/19 defect 8’s AWAY caption', () => {
@@ -252,7 +252,7 @@ describe('the sentences Casual adds are as true as the ones they lead', () => {
   it('does not soften what one day can support', () => {
     // The small print's whole point. A lead that shortened this claim would be the module doing
     // the thing it was built to refuse.
-    expect(CASUAL_SMALL_PRINT_LEAD).toContain('one day cannot clear it');
+    expect(CASUAL_SMALL_PRINT_LEAD).toContain('One day cannot clear it');
     expect(CASUAL_SMALL_PRINT_LEAD).toMatch(/fifty or more/i);
   });
 
@@ -317,7 +317,7 @@ function leadFor(id: string): string | undefined {
   const source = cell(id, { note: 'ZZ-NOTE-ZZ' });
   const written = casualNoteFor(source);
   if (written === source.note) return undefined;
-  const seam = written.indexOf('The cell’s own note:');
+  const seam = written.indexOf('In detail:');
   expect(seam, `a led note for "${id}" carried no seam`).toBeGreaterThan(0);
   return written.slice(0, seam).trim();
 }

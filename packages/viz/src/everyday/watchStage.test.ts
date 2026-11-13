@@ -150,7 +150,7 @@ describe('the Everyday watching surface', () => {
       expect(firstPersonWordsIn(text)).toEqual([]);
     }
     /* § 16 rule 2: the lede states the basis, which is the substitution § D407 argues. */
-    expect(WATCH_ROWS_LEDE).toContain('re-simulates');
+    expect(WATCH_ROWS_LEDE).toContain('re-runs');
     expect(WATCH_ROWS_LEDE).toContain('no longer reproduces');
     /* And the third source is named, and where it lives — today's board — rather than left for a
        reader to infer (GitHub issue #337; until then the sentence said it needed a server). */

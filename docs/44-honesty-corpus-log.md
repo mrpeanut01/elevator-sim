@@ -19,6 +19,21 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave BE
+
+**Wave BE moves +75.69 strings a case always-on, with the surface set unchanged.** One wave of copy
+editing in two pull requests: #675, the Everyday screens, and this one, the report sheet, shared
+strings, `data/` prose and the Engineer panel. The base is `main` at `5b497c86`, which carries #675
+and #677 and had not been measured; it stands +2 235 over wave BD's row. The same 80 surfaces
+speak. The move is link labels and popover text on existing producers, less the words cut.
+The deep row still names `c181913`.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| wave BD's row | 1 170 394 | | | 80 |
+| base, `main` at `5b497c86` (#675 and #677 integrated) | 1 172 629 | +2 235 | +45.61 | 80, same set |
+| wave BE's head, integrated on that base | **1 176 338** | **+3 709** | **+75.69** | 80, **same set** |
+
 ## Wave BD
 
 **Wave BD moves +70.00 strings a case always-on, with the surface set unchanged.** One lane: the

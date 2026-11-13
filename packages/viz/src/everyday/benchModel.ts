@@ -124,7 +124,7 @@ export const BENCH_COPY = Object.freeze({
   repsBelowBudget:
     'Under fifty days no row here will name a winner, however far apart the two look.',
   matrixCaption:
-    'away in a minute, and the longest anybody stood · green is the best in that test',
+    'Away in a minute, and the longest anybody stood. Green is the best in that test.',
   standingNoteCrowds:
     'Same crowds for everyone. Every dispatcher meets identical arrivals in each test, so only ' +
     'the decisions differ.',

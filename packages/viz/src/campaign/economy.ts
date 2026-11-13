@@ -157,7 +157,7 @@ export const DIFFICULTIES: Readonly<Record<DifficultyId, Difficulty>> = Object.f
      * It read *the whole month pays 53 units*, and 53 is § 8.1's on-hand total: the month pays 50 and
      * opens with 3 (§ D1377). `economy.test.ts` derives both from this row.
      */
-    note: `${missAllowanceSentence(0)} A perfect month leaves 53 units on hand, the 3 it opens with among them. It has been cleared — with staggered start times bought on day one and never a wasted trip after.`,
+    note: `${missAllowanceSentence(0)} A perfect month leaves 53 units on hand, the 3 it opens with among them. It has been cleared, with staggered start times bought on day one and never a wasted trip after.`,
   }),
 });
 
@@ -1400,7 +1400,7 @@ export function oddsAfterWorksPct(tower: TowerEconomy): number {
 export const SLOTS: readonly { readonly standing: number; readonly note: string }[] = Object.freeze([
   Object.freeze({ standing: 0, note: 'where everybody starts' }),
   Object.freeze({ standing: 14, note: 'a second building, once the first is steady' }),
-  Object.freeze({ standing: 30, note: 'a third — this is where most people overreach' }),
+  Object.freeze({ standing: 30, note: 'a third, where most people overreach' }),
   Object.freeze({ standing: 60, note: 'a fourth, and the month stops fitting in an evening' }),
   Object.freeze({ standing: 110, note: 'a fifth, which means letting maintenance decide more' }),
   Object.freeze({ standing: 180, note: 'a sixth — nobody supervises six towers by watching them' }),

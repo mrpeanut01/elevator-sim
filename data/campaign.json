@@ -8,7 +8,7 @@
       "name": "Two cars, low demand",
       "teaches": "a call, a car, a wait",
       "brief": [
-        "Garden Apartments is a small building with a gentle trickle of demand. Watch a call appear at a landing, a car answer it, and the wait end \u2014 those three things are what every dispatcher in this simulator is made of.",
+        "Garden Apartments is a small building with a gentle trickle of demand. Watch a call appear at a landing, a car answer it, and the wait end. Every dispatcher is built from those three things.",
         "There is so little traffic here that most of the wait is decided before anyone presses a button: between calls the two cars simply sit wherever the last passenger left them, which is rarely where the next one is standing.",
         "You can tell them where to wait instead, and the ground floor is only the first guess \u2014 try a few, and let the runs say which one this building actually wants."
       ],
@@ -102,10 +102,10 @@
     {
       "id": "stage-2-morning-rush",
       "name": "The morning rush",
-      "teaches": "rise and fall, and the gap between demand offered and demand carried",
+      "teaches": "Demand rises and falls, and people arriving is not the same as people carried.",
       "brief": [
         "Midtown Office at two and a half percent of its population arriving every five minutes: busy, and still under the level at which it stops coping.",
-        "Two counts matter here \u2014 how many people arrived, and how many were carried \u2014 and the gap between them is the thing a dispatcher can move.",
+        "Two counts matter here: how many people arrived, and how many were carried. The gap between them is what a dispatcher can move.",
         "This is the first stage that also counts runs, and asks your setting to pass at least as many of them as the building's own."
       ],
       "building": "midtown-office",
@@ -216,7 +216,7 @@
     {
       "id": "stage-3-overwhelmed",
       "name": "Overwhelmed",
-      "teaches": "saturation, and why a diverging queue has no average",
+      "teaches": "A queue that keeps growing has no average wait.",
       "brief": [
         "The same building at the demand it actually ships with.",
         "As the building stands, the queues grow faster than the cars empty them on every one of the stage's runs, so the tool refuses to average a wait that never settles.",
@@ -326,10 +326,10 @@
     {
       "id": "stage-4-two-banks",
       "name": "Two banks",
-      "teaches": "service zoning, and a journey with two waits",
+      "teaches": "Two lift groups serve different floors, so some trips need a change.",
       "brief": [
         "Mixed-Use High-Rise has two banks that reach different parts of the building, so a single journey can involve two waits and a transfer.",
-        "Service zoning is which floors a shaft physically reaches \u2014 not who is allowed in, and not how the dispatcher thinks; the three are different concepts with different fixes.",
+        "Service zoning is which floors a shaft physically reaches. It is not who is allowed in, and not how the dispatcher thinks. Each of the three has its own fix.",
         "Keep the queues from running away while you learn to tell them apart."
       ],
       "building": "mixed-use-high-rise",
@@ -447,7 +447,7 @@
     {
       "id": "stage-5-credentials",
       "name": "Credentials",
-      "teaches": "access zoning, and the one problem no dial reaches",
+      "teaches": "Some floors need a pass, and no dial carries a rider without one.",
       "brief": [
         "Secure Tower puts a credential on most of its floors, and a few people every run are heading for one their badge does not open.",
         "Those riders are turned away where they stand. It is not congestion and it is not the dispatcher: more cars would not carry them, and neither would a setting that reads the badge \u2014 a reader that can see the wrong badge still says no.",
@@ -559,7 +559,7 @@
     {
       "id": "stage-6-the-tall-one",
       "name": "The tall one",
-      "teaches": "that at a hundred floors the geometry decides more than the weights do",
+      "teaches": "At a hundred floors, the building's shape decides more than the settings do.",
       "brief": [
         "Vertical City is a hundred floors served by banks that each reach a slice of it, with sky lobbies where journeys change hands.",
         "At this scale the shape of the building sets the outcome more than the weight vector does, and this stage is where that stops being an assertion.",
@@ -692,11 +692,11 @@
     {
       "id": "stage-7-prove-it",
       "name": "Tune it",
-      "teaches": "that an improvement you cannot measure is not one",
+      "teaches": "An improvement only counts if you can measure it.",
       "brief": [
-        "Back to Midtown Office, which starts this time on operational zoning for the up-peak, and busy enough that some of the settings you can pick here refuse to stand behind their own numbers.",
+        "Back to Midtown Office. This time it starts with its cars zoned for the morning rush, and it is busy enough that some settings you can pick here give no average wait.",
         "The stage page moves the standing order and where idle cars wait, the Engineer surface moves every dial the budget reaches, and the bar is no longer whether something looked better: it is a paired interval over fifty runs, on the difference itself, that does not contain zero.",
-        "Tune on the seeds you are given. The holdout set exists so that a gain living only in these passenger traces has somewhere to fail."
+        "Tune on the crowds you are given. A second set you never see checks that a gain is not just luck with these ones."
       ],
       "building": "midtown-office",
       "traffic": {
@@ -788,7 +788,7 @@
     {
       "id": "stage-8-the-headline-address",
       "name": "The headline address",
-      "teaches": "that spare cars are not the same as a short interval",
+      "teaches": "Spare cars do not guarantee short waits.",
       "brief": [
         "Nineteen floors, 612 people, six cars at 5 m/s \u2014 the smallest crowd in the campaign on the tightest promise.",
         "This is the only building here with more lift than it needs, and the stage still asks it to keep up with arrivals and to come out ahead of the building\u2019s own setting. Capacity is not the constraint; where the spare cars wait between bursts is.",
@@ -890,7 +890,7 @@
     {
       "id": "stage-9-both-ways-at-once",
       "name": "Both ways at once",
-      "teaches": "demand with no dominant direction, and a car unlike its neighbours",
+      "teaches": "Traffic runs both ways all day, and one car is unlike the others.",
       "brief": [
         "Guests arrive and leave all day, so there is no rush hour to point a dispatcher at \u2014 the traffic is two-way from the first minute to the last.",
         "Four guest cars share the bank with one service lift at 1.75 m/s, less than two thirds their speed. Nothing in the configuration says it is the wrong car for a guest; only its speed and its capacity do.",
@@ -996,7 +996,7 @@
     {
       "id": "stage-10-the-bed-and-the-visitor",
       "name": "The bed and the visitor",
-      "teaches": "that two cars in one bank can be the wrong car",
+      "teaches": "Two cars in a bank can be the wrong car for the call.",
       "brief": [
         "A hospital never empties, and its busiest moments are shift changes rather than a morning arrival.",
         "Two of the five cars are bed lifts: bigger, slower, and the wrong answer to an ordinary hall call. They are in the same bank as the other three, and the dispatcher you start with tells them apart only by their speed and capacity.",

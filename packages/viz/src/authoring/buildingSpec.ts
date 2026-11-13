@@ -587,7 +587,7 @@ export const SPEC_ROWS: readonly SpecRow[] = Object.freeze([
     max: 120,
     step: 1,
     unit: '',
-    help: 'Served floors, not counting the lobby. More floors means more possible stops per trip, which costs far more time than the extra distance does.',
+    help: 'Served floors, not counting the lobby. More floors means more possible stops per trip, which costs far more time than the extra distance.',
   },
   {
     key: 'floorHeightM',
@@ -607,7 +607,7 @@ export const SPEC_ROWS: readonly SpecRow[] = Object.freeze([
     max: 200,
     step: 5,
     unit: ' people',
-    help: 'How many people the floor was designed to hold — the number the lifts were sized for. This does not change when tenants come and go.',
+    help: 'How many people the floor was designed to hold: the number the lifts were sized for. It does not change when tenants come and go.',
   },
   {
     key: 'occupancyPct',
@@ -618,7 +618,7 @@ export const SPEC_ROWS: readonly SpecRow[] = Object.freeze([
     step: 5,
     unit: '% let',
     overFrom: 100,
-    help: 'How much of that capacity is actually let today. Population = capacity × occupancy, and population is what the lifts have to move. A building sized at 100% and let at 60% feels like a different building.',
+    help: 'How much of that capacity is let today. Population = capacity × occupancy, and population is what the lifts have to move.',
   },
   {
     /*
@@ -635,7 +635,7 @@ export const SPEC_ROWS: readonly SpecRow[] = Object.freeze([
     max: 40,
     step: 1,
     unit: '',
-    help: 'Lifts answering as one group. A shaft is the most expensive thing in the building — this is the lever you are meant to avoid pulling.',
+    help: 'Lifts answering as one group. A shaft is the most expensive thing in the building.',
   },
 ]);
 
@@ -2238,9 +2238,9 @@ function carryLosses(spec: BuildingSpec): readonly string[] {
     const deckWord =
       decks === 0
         ? ''
-        : ` — including ${String(decks)} double-deck car${decks === 1 ? '' : 's'} and ${String(pairs)} paired floor stop${pairs === 1 ? '' : 's'}, which no control here authors`;
+        : `, including ${String(decks)} double-deck car${decks === 1 ? '' : 's'} and ${String(pairs)} paired floor stop${pairs === 1 ? '' : 's'}, which no control here authors`;
     said.push(
-      `Saving now replaces the ${banksWord} and ${String(authoredCars)} cars this building was authored with${deckWord}. The shafts are re-dealt from the sliders instead: ${String(spec.cars)} car${spec.cars === 1 ? '' : 's'} in contiguous bands. Re-open the building to get the authored lifts back; nothing on disk has changed.`,
+      `Saving now replaces the ${banksWord} and ${String(authoredCars)} cars this building was authored with${deckWord}. The shafts are re-dealt from the sliders: ${String(spec.cars)} car${spec.cars === 1 ? '' : 's'} in contiguous bands. Re-open the building to get the authored lifts back. Nothing on disk has changed.`,
     );
   } else if (carriedBanksOf(spec) !== undefined && !carriedHardwareHolds(spec) && variants.size > 1) {
     /*
@@ -2341,13 +2341,13 @@ export function validateSpec(
         ? `${String(stranded.length)} floors have a shaft`
         : `Floor${stranded.length === 1 ? '' : 's'} ${stranded.map((floor) => floorIdOf(spec, floor)).join(', ')} ${stranded.length === 1 ? 'has' : 'have'} a shaft`;
     problems.push(
-      `${named} nobody can board from the lobby — nothing connects ${stranded.length === 1 ? 'it' : 'them'} to the entrance, directly or through a transfer level. The loader builds this without a word; the run then generates no trip to those floors at all, so the mean it reports is over the people it could still carry.`,
+      `${named} nobody can board from the lobby: nothing connects ${stranded.length === 1 ? 'it' : 'them'} to the entrance, directly or through a transfer level. The loader builds this without a warning. The run then generates no trip to those floors, so the mean it reports is over only the people it could still carry.`,
     );
   }
   if (orphans.length > 0) {
     problems.push(
       orphans.length > 6
-        ? `No shaft serves ${String(orphans.length)} floors — a call there is one nobody may answer, which looks nothing like a slow one.`
+        ? `No shaft serves ${String(orphans.length)} floors. A call there is one no car can answer.`
         /*
          * Through {@link floorIdOf} like every other crossing. This branch minted its own id —
          * `floor === 0 ? 'G' : String(floor)` — which is neither the id the document carries nor
@@ -2355,7 +2355,7 @@ export function validateSpec(
          * where the building calls it `7`. A second rule for turning a number into an id is the
          * same defect as a second floor vocabulary, at the width of one message.
          */
-        : `No shaft serves floor ${orphans.map((floor) => floorIdOf(spec, floor)).join(', ')} — a call there is one nobody may answer, which looks nothing like a slow one.`,
+        : `No shaft serves floor ${orphans.map((floor) => floorIdOf(spec, floor)).join(', ')}. A call there is one no car can answer.`,
     );
   }
   /*
@@ -2375,10 +2375,8 @@ export function validateSpec(
     const floors = zoneFloorsOf(spec, zone).map((floor) => floorIdOf(spec, floor));
     problems.push(
       `Access zone ${zone.id} covers floor ${floors.join(', ')} and names no credential group, so ` +
-        'no credential opens those floors at all. Those are calls no car may legally answer, and the ' +
-        'trips are never generated rather than served slowly — the run would report a mean over the ' +
-        'people it could still carry. The loader refuses a zone with no group, so this building will ' +
-        'not build until one is named or the zone is removed.',
+        'no credential opens those floors. The loader refuses a zone with no group, so this ' +
+        'building will not build. Name a group, or remove the zone.',
     );
   }
   const trimmed = spec.accessZones.filter(
@@ -2387,9 +2385,8 @@ export function validateSpec(
   if (trimmed.length > 0) {
     problems.push(
       `Access zone ${trimmed.map((zone) => zone.id).join(', ')} name${trimmed.length === 1 ? 's' : ''} ` +
-        `a floor this tower does not have — it is ${String(floorCountOf(spec))} floors tall now. Those ` +
-        'floors are left out of the saved document rather than refused, so the zone covers fewer ' +
-        'floors than it says.',
+        `a floor this tower does not have: it is ${String(floorCountOf(spec))} floors tall now. Those ` +
+        'floors are left out of the saved document, so the zone covers fewer floors than it says.',
     );
   }
   const unwritten = spec.accessZones.filter((zone) => zoneFloorsOf(spec, zone).length === 0);
@@ -2409,19 +2406,16 @@ export function validateSpec(
   if (offTower.length > 0) {
     problems.push(
       `${machineNoun(offTower)} ${offTower.map((mode) => mode.id).join(', ')} connect${offTower.length === 1 ? 's' : ''} ` +
-        `a floor this tower does not have — it is ${String(floorCountOf(spec))} floors tall now. ` +
-        'A connection is a pair of floors, so there is nothing to shorten the way a zone shortens ' +
-        'its floor list: the whole machine is left out of the saved document rather than refused, ' +
-        'and the run routes as though it had never been there.',
+        `a floor this tower does not have: it is ${String(floorCountOf(spec))} floors tall now. ` +
+        'The whole machine is left out of the saved document, and the run routes without it.',
     );
   }
   const selfJoined = spec.transportModes.filter((mode) => mode.connects[0] === mode.connects[1]);
   for (const mode of selfJoined) {
     problems.push(
       `${machineNoun([mode])} ${mode.id} starts and ends on floor ${floorIdOf(spec, mode.connects[0])}. The loader ` +
-        'refuses a connection whose two ends name one floor — a machine that starts and ends on ' +
-        'the same floor moves nobody — so it is left out of the saved document instead of being ' +
-        'written and refused.',
+      'refuses a connection whose two ends name one floor, so it is left out of the saved ' +
+      'document. Give it two different floors.',
     );
   }
   for (const mode of writtenTransportModes(spec)) {
@@ -2440,8 +2434,7 @@ export function validateSpec(
     problems.push(
       `${machineNoun([mode])} ${mode.id} takes ${traversalTimeLabel(mode.traversalTimeS)} to ride. The loader refuses a ` +
         'traversal time that is not greater than zero, so this building will not build until it ' +
-        'is raised. Unlike a floor this tower no longer has, it is written to the document as it ' +
-        'stands, because it is a number on a control the reader can see.',
+        'is raised.',
     );
   }
   /*
@@ -2454,10 +2447,9 @@ export function validateSpec(
   for (const mode of writtenTransportModes(spec)) {
     if ((mode.kind ?? 'escalator') !== 'stairs' || mode.use !== undefined) continue;
     problems.push(
-      `Stair ${mode.id} declares no use pair. Stairs are chosen rather than structural — the ` +
-        'router never plans a journey over one — so without a propensity for each direction ' +
-        'nobody would ever take it, and the loader refuses the building rather than shipping a ' +
-        'machine that moves no one.',
+      `Stair ${mode.id} declares no use pair. No journey is routed over a stair: riders choose ` +
+      'it, so without a propensity for each direction nobody would take it. The loader refuses ' +
+      'the building.',
     );
   }
   const skies = new Set(spec.skyFloors);
@@ -2478,10 +2470,9 @@ export function validateSpec(
     problems.push(
       `Escalator ${mode.id} joins floor ${floorIdOf(spec, mode.connects[0])} and floor ` +
         `${floorIdOf(spec, mode.connects[1])}, and neither is a transfer level. A journey may only ` +
-        'change onto a lift at a transfer level, so this machine carries the people who start on ' +
-        'one of those two floors and finish on the other, and nobody else — it is not a way ' +
-        'through. The loader builds it without a word. Mark one of the two a sky lobby if it was ' +
-        'meant to be one.',
+        'change onto a lift at a transfer level, so this machine carries only people who start on ' +
+        'one of those two floors and finish on the other. The loader builds it without a warning. ' +
+        'Mark one of the two a sky lobby if it was meant to be a way through.',
     );
   }
   if (machineClass !== undefined) {
@@ -2490,9 +2481,8 @@ export function validateSpec(
       problems.push(
         `${String(Math.round(rise))} m of rise is past the reference envelope for ` +
           `${machineClass.name.toLowerCase()} (${String(machineClass.maxRiseM)} m). The loader raises ` +
-          'this as an advisory and builds the bank anyway — the envelope is application guidance, ' +
-          'not a hard limit — so the run happens and its round-trip times describe a machine ' +
-          'outside its class.',
+          'this as an advisory and builds the bank anyway, so the run happens and its ' +
+          'round-trip times describe a machine outside its class.',
       );
     }
     if (floorCountOf(spec) > machineClass.maxFloors) {
@@ -2568,7 +2558,7 @@ export function buildingSummary(spec: BuildingSpec): string {
 export function buildingAdvice(spec: BuildingSpec): string {
   const perShaft = totalPopulation(spec) / Math.max(1, spec.cars);
   if (perShaft > 320) {
-    return 'That is a lot of people per shaft. Expect the lobby to stack up — which is a legitimate thing to build and watch.';
+    return 'That is a lot of people per shaft. Expect the lobby to stack up.';
   }
   if (spec.ratedSpeedMps < 1.6 && spec.floors > 8) {
     return 'A hydraulic car over eight floors will feel like a very long morning. On purpose?';
@@ -2708,7 +2698,7 @@ export function upPeakAnalysisOf(spec: BuildingSpec, specs: ElevatorSpecs): Spec
      */
     return {
       refusal:
-        'The loader refuses this building, so there is nothing to size — its refusal is printed on this panel.',
+        'The loader refuses this building, so there is nothing to size. Its refusal is printed on this panel.',
       banks: [],
     };
   }
@@ -2857,11 +2847,11 @@ function readingOf(result: RoundTripResult): string {
   const stopped = result.stopTimeS + result.transferTimeS;
   if (stopped >= result.travelTimeS) {
     return (
-      'Round-trip time here is dominated by stops and door time, not by speed — ' +
+      'Round-trip time here is dominated by stops and door time, not by speed: ' +
       'a faster machine buys very little.'
     );
   }
-  return 'Round-trip time here is dominated by travel — speed and rise are what you are paying for.';
+  return 'Round-trip time here is dominated by travel: speed and rise are what you are paying for.';
 }
 
 /**
@@ -2886,7 +2876,7 @@ function warningSentenceOf(warning: UpPeakWarning, analysis: UpPeakAnalysis): st
       const terminal = analysis.terminalFloorId;
       return (
         `This bank serves more than one entrance floor, and the closed form boards everyone at ` +
-        `${terminal} alone — a real round trip runs longer than these figures say.`
+        `${terminal} alone, so a real round trip runs longer than these figures say.`
       );
     }
     case UP_PEAK_WARNING_CODES.nonUniformFloorPopulations:
@@ -2896,7 +2886,7 @@ function warningSentenceOf(warning: UpPeakWarning, analysis: UpPeakAnalysis): st
       );
     case UP_PEAK_WARNING_CODES.unpopulatedFloorsExcluded:
       return (
-        'Served floors with nobody on them were left out of the stop count — they are not ' +
+        'Served floors with nobody on them were left out of the stop count. They are not ' +
         'up-peak destinations, though a run may still stop there for other traffic.'
       );
     case UP_PEAK_WARNING_CODES.nonUniformInterfloorDistance: {
@@ -2915,21 +2905,21 @@ function warningSentenceOf(warning: UpPeakWarning, analysis: UpPeakAnalysis): st
     }
     case UP_PEAK_WARNING_CODES.doubleDeck:
       return (
-        'This bank has double-deck cars and this is the single-deck round trip — it under-counts ' +
-        'stops and over-states capacity, so a simulated day on this bank is deliberately not ' +
-        'comparable with these figures.'
+        'This bank has double-deck cars and this is the single-deck round trip. It under-counts ' +
+        'stops and over-states capacity, so a simulated day on this bank is not comparable with ' +
+        'these figures.'
       );
     case UP_PEAK_WARNING_CODES.directionalSpeedAsymmetry:
       return (
         'Cars in this bank cannot descend as fast as they climb, and the closed form charges one ' +
-        'speed in both directions — the way down runs longer than these figures say, and a ' +
-        'simulated day on this bank is deliberately not comparable with them.'
+        'speed in both directions. The way down runs longer than these figures say, so a ' +
+        'simulated day on this bank is not comparable with them.'
       );
     case UP_PEAK_WARNING_CODES.expressZone: {
       const rise = analysis.expressRiseM.toFixed(1);
       const each = (analysis.expressRiseM / analysis.ratedSpeedMps).toFixed(1);
       return (
-        `The bank runs ${rise} m express below its served zone — about ${each} s each way, ` +
+        `The bank runs ${rise} m express below its served zone: about ${each} s each way, ` +
         'charged as its own term here and left out of the textbook expression.'
       );
     }
@@ -2938,21 +2928,21 @@ function warningSentenceOf(warning: UpPeakWarning, analysis: UpPeakAnalysis): st
       const floors = String(analysis.floorsAboveTerminal);
       return (
         `A design-load car carries ${people} people over ${floors} served floors, so it stops at ` +
-        'most of them on every trip — the round trip has stopped responding to load.'
+        'most of them on every trip: the round trip has stopped responding to load.'
       );
     }
     case UP_PEAK_WARNING_CODES.destinationsAreTransferFloors:
       return (
         'These destination floors hand riders on to another bank, so the population behind the ' +
-        'percentage is not the population this bank lifts — the percentage is not meaningful, ' +
+        'percentage is not the population this bank lifts. The percentage is not meaningful, ' +
         'and nothing in this editor can state the true figure.'
       );
     case UP_PEAK_WARNING_CODES.implausibleHandlingCapacity: {
       const pct = result.percentPopulation5Min.toFixed(1);
       const bound = String(IMPLAUSIBLE_PERCENT_POPULATION_5MIN);
       return (
-        `${pct} % of population in five minutes is past the ${bound} % sanity bound — real ` +
-        'demand runs 3 to 17 % — so the population behind this figure is smaller than what the ' +
+        `${pct} % of population in five minutes is past the ${bound} % sanity bound (real ` +
+        'demand runs 3 to 17 %), so the population behind this figure is smaller than what the ' +
         'bank really lifts.'
       );
     }

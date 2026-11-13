@@ -119,7 +119,7 @@ describe.skipIf(!HAS_BROWSER)('a day a press decides is reachable from the front
         const seed = (await page.textContent('.everyday-door-seed')) ?? '';
         expect(seed).toContain(buildingId);
         expect(seed).toContain(press?.seedText ?? 'no pinned seed');
-        expect(seed, 'the line must not call a pinned crowd the day’s').toContain('not the day’s');
+        expect(seed, 'the line must not call a pinned crowd the day’s').toContain('not today’s');
         /*
          * The brief's moot sentence is drawn only when every gate of the measurement holds of the
          * run the next press takes — including the horizon, which is what #595 added.
@@ -159,7 +159,7 @@ describe.skipIf(!HAS_BROWSER)('a day a press decides is reachable from the front
        */
       expect(crowdOf(before)).not.toBe('');
       expect(crowdOf(after), 'the pinned crowd did not follow the player').toBe(dailySeedAt(deviceNowMs()).toString());
-      expect(after).toContain('today’s date');
+      expect(after).toContain('today’s crowd');
       expect(crowdOf(after)).not.toBe(pressDayFor('c7')?.seedText);
     } finally {
       await page.close();

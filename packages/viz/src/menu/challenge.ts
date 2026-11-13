@@ -382,7 +382,7 @@ export function challengeRunConfigs(
     return {
       ok: false,
       code: 'unknown-building',
-      detail: `This build does not ship a building “${config.buildingId}”, so this challenge cannot be run here.`,
+      detail: `This version has no building “${config.buildingId}”, so this challenge cannot be run here.`,
     };
   }
   const dispatcherProfile = resources.dispatcherProfiles.profiles.find(
@@ -392,7 +392,7 @@ export function challengeRunConfigs(
     return {
       ok: false,
       code: 'unknown-dispatcher',
-      detail: `This build does not ship a dispatcher “${dispatcherProfileId}”.`,
+      detail: `This version has no dispatcher “${dispatcherProfileId}”. Pick another one.`,
     };
   }
   const template = resources.trafficProfiles.demandTemplates.find(
@@ -403,7 +403,7 @@ export function challengeRunConfigs(
       ok: false,
       code: 'unknown-template',
       detail:
-        `This build does not ship a demand template “${config.demandTemplateId}”, so this ` +
+        `This version has no traffic shape “${config.demandTemplateId}”, so this ` +
         'challenge cannot be run here.',
     };
   }
@@ -412,8 +412,8 @@ export function challengeRunConfigs(
       ok: false,
       code: 'too-many-seeds',
       detail:
-        `This challenge names ${String(seeds.length)} seeds and this build runs at most ` +
-        `${String(MAX_CHALLENGE_SEEDS)} for one challenge.`,
+        `This challenge names ${String(seeds.length)} seeds, and at most ` +
+        `${String(MAX_CHALLENGE_SEEDS)} can be run here for one challenge.`,
     };
   }
 
@@ -613,7 +613,7 @@ export function challengeSubmissionOf(
         ok: false,
         code: 'unknown-seed',
         detail:
-          `Seed ${recording.seed} is not one “${challenge.name}” names. Its seeds are ` +
+          `Seed ${recording.seed} is not part of “${challenge.name}”. Its seeds are ` +
           `${challenge.seeds.join(', ')}.`,
       };
     }
@@ -621,7 +621,7 @@ export function challengeSubmissionOf(
       return {
         ok: false,
         code: 'duplicate-seed',
-        detail: `Seed ${recording.seed} was run twice. One run per seed — the same run twice is not a larger sample.`,
+        detail: `Seed ${recording.seed} was run twice. Each seed is run once: the same run twice is not a larger sample.`,
       };
     }
     if (recording.buildingId !== challenge.config.buildingId) {
@@ -629,8 +629,8 @@ export function challengeSubmissionOf(
         ok: false,
         code: 'wrong-run',
         detail:
-          `The run recorded for seed ${recording.seed} is of ${recording.buildingId}, and ` +
-          `“${challenge.name}” is set on ${challenge.config.buildingId}. Re-run the set before posting it.`,
+          `The run recorded for seed ${recording.seed} is of ${recording.buildingId}, but ` +
+          `“${challenge.name}” is set on ${challenge.config.buildingId}. Run the set again before posting it.`,
       };
     }
     if (recording.dispatcherProfileId !== dispatcherProfileId) {
@@ -638,7 +638,7 @@ export function challengeSubmissionOf(
         ok: false,
         code: 'wrong-run',
         detail:
-          `The run recorded for seed ${recording.seed} used ${recording.dispatcherProfileId} and this ` +
+          `The run recorded for seed ${recording.seed} used ${recording.dispatcherProfileId}, but this ` +
           `entry is for ${dispatcherProfileId}. Every seed of a challenge is run with one dispatcher.`,
       };
     }
@@ -652,7 +652,7 @@ export function challengeSubmissionOf(
       code: 'missing-seed',
       detail:
         `“${challenge.name}” is ${String(challenge.seeds.length)} seeds and ` +
-        `${String(bySeed.size)} have been run — ${missing.join(', ')} still to go. Every seed is ` +
+        `${String(bySeed.size)} have been run. Still to go: ${missing.join(', ')}. Every seed is ` +
         'replayed and every seed has to reproduce, so a set that is short by one is not a partial ' +
         'result.',
     };
@@ -679,8 +679,8 @@ export function challengeSubmissionOf(
           ok: false,
           code: 'figure-not-measured',
           detail:
-            `Seed ${seed} has no ${name}: nothing was measured in its report window, so there is ` +
-            'no figure to claim. The run is real; there is nothing to post about it.',
+            `Seed ${seed} has no ${name}. Nothing was measured in its report window, so there is ` +
+            'no figure to post. The run itself is real.',
         };
       }
     }

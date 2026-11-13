@@ -778,7 +778,7 @@ describe('machineWarningOf', () => {
   it('is an advisory and never says the loader refuses', () => {
     const line = machineWarningOf(machineClass('hydraulic'), requireBuilding(config, 'vertical-city'));
     expect(line.startsWith('⚠')).toBe(true);
-    expect(line).toContain('advisory rather than a refusal');
+    expect(line).toContain('Advisory, not a refusal');
     expect(line.toLowerCase()).not.toContain('refuses');
     expect(line.toLowerCase()).not.toContain('will not build');
   });
@@ -825,7 +825,7 @@ describe('machineWarningOf', () => {
       `${ultra.speedMinMps.toFixed(2)}–${ultra.speedMaxMps.toFixed(2)} m/s`,
     );
     // Still an advisory: the loader raises this one as a warning too, and builds the bank.
-    expect(line).toContain('advisory rather than a refusal');
+    expect(line).toContain('Advisory, not a refusal');
     expect(line.toLowerCase()).not.toContain('refuses');
   });
 
@@ -918,7 +918,7 @@ describe('the Machines segment says it writes nothing — § D227', () => {
    * about, and that the three segments which *do* write make no such claim. That is weaker than
    * driving the mount and is said rather than dressed up.
    */
-  const REFUSAL = 'Nothing here is pickable';
+  const REFUSAL = 'Read-only: these are the classes';
 
   const sourceOf = (path: string): string =>
     readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
