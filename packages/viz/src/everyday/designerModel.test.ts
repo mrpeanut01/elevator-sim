@@ -149,6 +149,8 @@ describe('§ 10.1 — speed and load are steps within a class', () => {
         expect(step).toBeLessThanOrEqual(machineClass.speedMaxMps);
         expect(CATALOGUE_SPEEDS_MPS).toContain(step);
       }
+      /* A shipped building at its class's typical speed keeps it: Garden Apartments runs at 0.63. */
+      expect(steps, machineClass.id).toContain(machineClass.speedTypicalMps);
     }
   });
 

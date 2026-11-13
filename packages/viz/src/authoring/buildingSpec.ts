@@ -1696,11 +1696,11 @@ function transportCommentFor(spec: BuildingSpec, mode: SpecTransportMode): strin
       `mode, and the EN 115-1 escalator derivation this editor performs for an escalator is ` +
       `deliberately NOT printed beside it: a stair's two times come from a climbing and a ` +
       `descending speed over the rise, not from a belt on a 30 degree incline at 0.5 m/s, so ` +
-      `quoting that method here would be a citation for a machine this is not. The pair arrived ` +
-      `on the document this spec was read from and no control in this editor authors one, so it ` +
-      `is carried through unchanged and the document's own comment — which carried whatever ` +
-      `citation it had — does not survive the round trip. See the declaring building in ` +
-      `data/buildings/ for it. This spec's own rise between these two landings is ${rise} m ` +
+      `quoting that method here would be a citation for a machine this is not. The pair was ` +
+      `typed on the design board or arrived on the document this spec was read from. Either way ` +
+      `it is carried through unchanged, and a comment the source document carried — with ` +
+      `whatever citation it had — does not survive the round trip. For a pair that arrived on a ` +
+      `shipped building, see that building in data/buildings/. This spec's own rise between these two landings is ${rise} m ` +
       `(${where}), stated as geometry and NOT as the rise the pair was measured over: the round ` +
       `trip cannot preserve an uneven floor pitch, so the two need not agree and the numbers ` +
       `above are not re-derived from this one.`

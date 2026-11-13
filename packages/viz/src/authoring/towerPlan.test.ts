@@ -67,6 +67,7 @@ import {
   withEscalatorCapacity,
   withEscalatorToggled,
   withFloors,
+  withFloorHeight,
   withPopulation,
   withShaftAdded,
   withShafts,
@@ -457,6 +458,24 @@ describe('the drawing board is not decoration — every control moves the legs',
     expect(written?.$comment).toContain('ASSUMED, not cited');
     /* A taller storey is a longer flight. */
     expect(stairsSuggestionFor({ ...base, floorHeightM: base.floorHeightM * 2 }).upS).toBeGreaterThan(suggested.upS);
+  });
+
+  it('carries a derived stair and escalator time with the floor height, and leaves a typed one alone', () => {
+    const fitted = withEscalatorToggled(withStairsAdded(base, 0, stairsSuggestionFor(base)), 1);
+    const taller = withFloorHeight(fitted, base.floorHeightM + 1);
+    const stair = stairsAbove(taller, 0);
+    expect(stair?.traversalTimeS).toEqual({
+      upS: stairsSuggestionFor(taller).upS,
+      downS: stairsSuggestionFor(taller).downS,
+    });
+    expect(escalatorAbove(taller, 1)?.traversalTimeS).toBeGreaterThan(
+      escalatorAbove(fitted, 1)?.traversalTimeS as number,
+    );
+    expect(buildingFromPlan(taller, SPECS).transportModes?.[0]?.$comment).toContain('Traversal time DERIVED');
+    /* A pair the reader typed is not the board's to move. */
+    const typed = withStairsAdded(base, 0, { upS: 40, downS: 30, up: 0.2, down: 0.4 });
+    expect(stairsAbove(withFloorHeight(typed, base.floorHeightM + 1), 0)?.traversalTimeS).toEqual({ upS: 40, downS: 30 });
+    expect(withFloorHeight(base, base.floorHeightM)).toBe(base);
   });
 
   it('writes the rope and the regenerative drive on traction banks only', () => {

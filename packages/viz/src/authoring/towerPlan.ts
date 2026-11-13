@@ -1174,8 +1174,9 @@ export function stairsAreValid(stairs: PlanStairs): boolean {
  *
  * **Every number is the caller's.** `core`'s `StairsUseConfig` has no default in code on purpose:
  * who walks is a claim about this building's people. The board offers {@link stairsSuggestionFor}
- * in its form and the reader confirms or changes it, and `buildingSpec.ts#transportModesOf` writes
- * the four into the document as set by hand and not cited.
+ * in its form and the reader confirms or changes it. `buildingSpec.ts#transportModesOf` writes the
+ * times as derived when they are still the suggested pair and as set by hand otherwise, and the
+ * shares as an assumption either way.
  * A stair that is not {@link stairsAreValid} changes nothing.
  */
 export function withStairsAdded(plan: TowerPlan, floor: number, stairs: PlanStairs): TowerPlan {
@@ -1252,6 +1253,35 @@ export function withAccessZoneAdded(plan: TowerPlan, floors: readonly number[], 
 /** Lift one access zone, by its id. */
 export function withAccessZoneRemoved(plan: TowerPlan, id: string): TowerPlan {
   return { ...plan, accessZones: plan.accessZones.filter((zone) => zone.id !== id) };
+}
+
+/**
+ * Set the floor-to-floor height, to the tenth of a metre, and carry the walking and riding times
+ * with it.
+ *
+ * A stair or an escalator whose time is still the one the board derived for the old height is
+ * re-derived for the new one. A time the reader typed is theirs and is left alone, so the saved
+ * document goes on calling it set by hand.
+ */
+export function withFloorHeight(plan: TowerPlan, heightM: number): TowerPlan {
+  const floorHeightM = Math.round(heightM * 10) / 10;
+  if (floorHeightM === plan.floorHeightM) return plan;
+  const before = planFrame(plan);
+  const next: TowerPlan = { ...plan, floorHeightM };
+  const after = planFrame(next);
+  const walkedBefore = stairSecondsFor(plan.floorHeightM);
+  const walkedAfter = stairSecondsFor(floorHeightM);
+  const transportModes = plan.transportModes.map((mode): SpecTransportMode => {
+    if (typeof mode.traversalTimeS === 'number') {
+      return mode.traversalTimeS === escalatorSecondsFor(before, mode.connects)
+        ? { ...mode, traversalTimeS: escalatorSecondsFor(after, mode.connects) }
+        : mode;
+    }
+    return mode.traversalTimeS.upS === walkedBefore.upS && mode.traversalTimeS.downS === walkedBefore.downS
+      ? { ...mode, traversalTimeS: walkedAfter }
+      : mode;
+  });
+  return { ...next, transportModes };
 }
 
 /**
