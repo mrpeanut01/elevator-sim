@@ -1247,6 +1247,28 @@ export function stageAlarmBadgeOf(o: LiveObservations): string | undefined {
 }
 
 /* -------------------------------------------------------------------------- *
+ * The stage's mute toggle
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **One press to silence the stage** — the playtest of 2026-11-13: *"game play screen needs an
+ * audio mute button fairly easily accessible"*. It is the same switch as Settings → Sound
+ * (`everydayProfileStore().soundOn()`), not a second one, so the two can never disagree and the
+ * choice is remembered with the rest of the profile. Its name is fixed and `aria-pressed` carries
+ * the state, the toggle-button pattern, so a reader hears *Mute sound, pressed* rather than a name
+ * that changes under the press. The title says what is true now and that Settings is the same switch.
+ * Recorded here under [§ D405](../../../../DECISIONS.md).
+ */
+export const STAGE_MUTE_LABEL = 'Mute sound';
+
+/** The toggle's title for the current setting — what is true now, and what a press does. */
+export function stageMuteTitleOf(soundOn: boolean): string {
+  return soundOn
+    ? 'Sound is on. Press to mute; it is the same switch as Settings, Sound.'
+    : 'Sound is off. Press to turn it back on; it is the same switch as Settings, Sound.';
+}
+
+/* -------------------------------------------------------------------------- *
  * § 7.6 — interventions
  * -------------------------------------------------------------------------- */
 

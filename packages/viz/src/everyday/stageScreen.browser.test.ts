@@ -59,6 +59,7 @@ import {
 } from '../dev/browserTier.test-helper.js';
 import { ACTION_BAR_ROWS } from './actionBar.js';
 import {
+  STAGE_MUTE_LABEL,
   DEFAULT_STAGE_SPEED_INDEX,
   STAGE_DAY_OVER,
   STAGE_PRESS_CHANGED_NOBODY,
@@ -732,6 +733,97 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     expect(up?.inStage, 'the badge is not drawn over the building').toBe(true);
     /* Terse: a count, not a sentence. */
     expect(up?.text).toMatch(/^\d+ waiting$/u);
+  });
+
+  /**
+   * **One press mutes the stage, and Settings says the same** — the playtest of 2026-11-13.
+   *
+   * *Sound turns off* is measured rather than read off the toggle. An init script counts every
+   * `AudioScheduledSourceNode.start` (how each chime and door cue begins) and keeps the last value
+   * any `AudioParam.setTargetAtTime` aimed at (how `audioEngine.ts` glides the crowd bed). A silent
+   * plan starts no cue and glides the bed to 0, so the claim is: *after the press nothing new starts
+   * and the last target is 0*. A cue is required to have started before the press, at the same speed
+   * on the same morning, or the case would pass on a stage that never made a sound. Measured on
+   * `midtown-office` at 90×, where a probe heard two cues in five seconds; with the stage's gate
+   * forced on, this case goes red.
+   */
+  it('mutes with one press beside Play, plays nothing after it, and Settings reads off', async () => {
+    const page = await openPage(browser, { viewport: { width: 1280, height: 800 } });
+    await page.addInitScript(() => {
+      const w = window as unknown as { __starts: number; __lastTarget: number | undefined };
+      w.__starts = 0;
+      w.__lastTarget = undefined;
+      const source = window.AudioScheduledSourceNode?.prototype;
+      if (source !== undefined) {
+        const start = source.start;
+        source.start = function (this: AudioScheduledSourceNode, ...args: Parameters<typeof start>) {
+          w.__starts += 1;
+          return start.apply(this, args);
+        };
+      }
+      const param = window.AudioParam?.prototype;
+      if (param !== undefined) {
+        const glide = param.setTargetAtTime;
+        param.setTargetAtTime = function (this: AudioParam, ...args: Parameters<typeof glide>) {
+          w.__lastTarget = args[0];
+          return glide.apply(this, args);
+        };
+      }
+    });
+    await page.goto(`${origin}?building=midtown-office&seed=424242`, { waitUntil: 'load' });
+    await page.waitForFunction(
+      () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+      undefined,
+      { timeout: 30_000 },
+    );
+    await enterEverydayStage(page);
+    const read = () =>
+      page.evaluate(() => {
+        const w = window as unknown as { __starts: number; __lastTarget: number | undefined };
+        return { starts: w.__starts, lastTarget: w.__lastTarget };
+      });
+
+    const mute = page.locator('.everyday-stage-mute');
+    expect(await mute.getAttribute('aria-label')).toBe(STAGE_MUTE_LABEL);
+    expect(await mute.getAttribute('aria-pressed')).toBe('false');
+    const box = await mute.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(24);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(24);
+
+    /* Heard first: a cue starts after play, beyond whatever the stage started when it mounted. */
+    await page.click('.everyday-stage-speed[data-speed-index="4"]');
+    await page.click('.everyday-stage-play');
+    const mounted = (await read()).starts;
+    await page.waitForFunction(
+      (from) => (window as unknown as { __starts: number }).__starts > from,
+      mounted,
+      { timeout: 60_000 },
+    );
+
+    /* One press, while it plays. The header does not move for it. */
+    const headerBefore = await page.locator('.everyday-stage-header').boundingBox();
+    await mute.click();
+    expect(await mute.getAttribute('aria-pressed')).toBe('true');
+    expect(await page.locator('.everyday-stage-header').boundingBox()).toEqual(headerBefore);
+    const atPress = (await read()).starts;
+    await page.waitForTimeout(10_000);
+    expect(await page.textContent('.everyday-stage-play')).toContain('Pause');
+    const after = await read();
+    expect(after.starts, 'a cue started after the press').toBe(atPress);
+    expect(after.lastTarget, 'the bed was not glided to silence').toBe(0);
+    expect(
+      await page.evaluate(() => {
+        const raw = window.localStorage.getItem('elevator-sim.everyday-profile');
+        return raw === null ? undefined : (JSON.parse(raw) as { soundOn?: unknown }).soundOn;
+      }),
+    ).toBe(false);
+
+    /* The same switch: Settings reads off without being touched. */
+    await page.click('.everyday-stage-play');
+    await page.click('.everyday-rail-settings');
+    await page.waitForSelector('.everyday-settings', { timeout: 20_000 });
+    expect(await page.textContent('.everyday-settings-sound')).toBe('off');
+    await page.close();
   });
 
   /**

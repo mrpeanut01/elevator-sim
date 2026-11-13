@@ -333,6 +333,8 @@ import {
   STAGE_SWITCH_PICKER_NOTE,
   stageAlarmOf,
   stageGutterLabelOf,
+  stageMuteTitleOf,
+  STAGE_MUTE_LABEL,
   stageBarModelOf,
   stageRunFailedViewOf,
   stageCarReadoutOf,
@@ -13307,6 +13309,8 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#stageBookedOutOf',
     'everyday/stageScreenModel.ts#stageAlarmOf',
     'everyday/stageScreenModel.ts#stageGutterLabelOf',
+    'everyday/stageScreenModel.ts#STAGE_MUTE_LABEL',
+    'everyday/stageScreenModel.ts#stageMuteTitleOf',
     'everyday/stageScreenModel.ts#stageInterventionsOf',
     'everyday/stageScreenModel.ts#stageBarModelOf',
     'everyday/stageScreenModel.ts#stageCrowdCapOf',
@@ -13646,6 +13650,10 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         role: 'label',
       });
     }
+    /* The header's mute toggle: its fixed name, and its title in both states. */
+    seeds.push({ field: 'stage.mute.label', text: STAGE_MUTE_LABEL, role: 'label' });
+    seeds.push({ field: 'stage.mute.title.on', text: stageMuteTitleOf(true), role: 'reason' });
+    seeds.push({ field: 'stage.mute.title.off', text: stageMuteTitleOf(false), role: 'reason' });
     seeds.push({ field: 'stage.gutter.sky-lobby-unnamed', text: stageGutterLabelOf({ isSkyLobby: true }, '31'), role: 'label' });
 
     for (const rung of stageLegend()) {
