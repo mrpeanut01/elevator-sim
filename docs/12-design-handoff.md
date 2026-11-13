@@ -1139,6 +1139,31 @@ hall draws the same things. Every rail row the two groups carried is still on th
 floor. The rest of § 3.3's table ships as transcribed, and `actionBar.test.ts` reads the vendored
 guide to hold the two changed cells as a deviation in both directions.
 
+
+### 4.23 The stage shows who is arriving next, and on a wide screen it is two columns
+
+**The deviation.** The casual guide's § 7 stacks the stage: header, building, interventions, race
+strip. It draws nothing about people who have not arrived. On the product owner's direction of
+2026-11-12, this build adds an *Arriving next* card above the building, and on a screen region of
+980 px or more it moves the goals, the wait key, the choices and the day so far into a 320 px
+column beside the building. The day's call card goes to the top of that column, so the building
+does not move when the day stops. A rush and any narrower screen keep the stacked order, with the
+call under the header. The card is one wrapping row (words, approach, schedule) so that at 1280×800
+the header, the card and the building clear the action bar.
+
+**Why.** At 1440×900 the goals pushed the lobby below the fold and the choices sat under the
+building, so the queue, the goals and the controls were never on one screen. And an empty lobby
+before the rush looked the same as a quiet day.
+
+**What the card may read.** Arrivals are the generator's and no press moves them
+(`record/crowd.ts`), so they are an input in [`docs/28`](28-art-direction.md) § 4.3's sense. The
+card still reads nothing past its ten minutes, scales against no day-long peak, and draws the day's
+shape from `demandPhases`, the schedule. `everyday/stageArrivals.ts` carries the argument and
+`stageArrivals.test.ts` holds each of the three.
+
+**What it does not change.** The canvas keeps its 60 vh. No node is built twice: the same panels
+move between the two layouts, with their ids and listeners.
+
 The refactor is done when all of the following are true, and not before.
 
 1. **Layout fidelity** — the three regions, their widths, their order and their internal card

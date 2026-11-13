@@ -59,7 +59,21 @@
 
 import type { DispatcherProfile, InterventionChange, RunInterventionConfig } from '@elevator-sim/core/browser';
 
+import { drawApproach, drawDayShape } from './arrivalsStrip.js';
 import { drawCutaway, sizeCanvas } from './cutaway.js';
+import {
+  ARRIVALS_DAY_LABEL,
+  ARRIVALS_FAR_LABEL,
+  ARRIVALS_KEY_DOORS,
+  ARRIVALS_KEY_FLOORS,
+  ARRIVALS_NOTE,
+  ARRIVALS_NOW_LABEL,
+  ARRIVALS_TITLE,
+  stageArrivalsAheadAt,
+  stageArrivalsDescriptionOf,
+  stageArrivalsIndexOf,
+  type StageArrivalsIndex,
+} from './stageArrivals.js';
 import { Playback } from '../playback/playback.js';
 import { systemClock } from '../playback/clock.js';
 import type { Frame, VizFloor, VizRecording } from '../contract/types.js';
@@ -362,6 +376,28 @@ const GOAL_INK: Readonly<Record<GoalState, string>> = Object.freeze({
  * viewport is already 60 %.
  */
 const STAGE_CANVAS_HEIGHT = '60vh';
+
+/**
+ * The narrowest screen region that gets the two-column stage: the building on the left, and the
+ * goals, the key, the choices and the day so far in a column beside it. Below this the panels stack
+ * as they always did. At 1280 px of viewport the region is about 1 030 px, so the tier-1 desktop
+ * gets two columns and a tablet does not.
+ */
+const STAGE_TWO_COLUMN_MIN_PX = 980;
+
+/**
+ * The least width a shaft keeps before the side column is granted. A tower with many wells needs
+ * the whole row: measured on `vertical-city` (35 shafts) at 1280 px, the side column took the cars
+ * under the width at which a door leaf is still a pixel, and `stageScreen.browser.test.ts`'s
+ * shut-door case went red. So the column is offered only where the building can spare it.
+ */
+const STAGE_TWO_COLUMN_MIN_SHAFT_PX = 36;
+
+/** The side column's width in the two-column stage. */
+const STAGE_SIDE_COLUMN_PX = 320;
+
+/** The height of the two small pictures on the *Arriving next* card. */
+const ARRIVALS_CANVAS_HEIGHT_PX = 44;
 
 /** The shortest the rush's compact row lets the building get — wave AS, lane AS-1 ({@link syncRushCompact}). */
 const RUSH_COMPACT_MIN_CANVAS_PX = 260;
@@ -1197,6 +1233,84 @@ function mountStage(
   status.append(statusText, quietNote, startRow, failedRow);
   stageWrap.append(canvas, description, watchPill, status);
 
+  /*
+   * **Arriving next** — who is about to walk in, drawn above the building they walk into. The door
+   * is at the left of the approach and the next ten minutes run away from it, so the crowd slides
+   * toward the door as the clock runs. Every count and sentence is `stageArrivals.ts`'; the two
+   * canvases are `arrivalsStrip.ts`' and carry no words. Hidden until a day is adopted.
+   */
+  const arrivals = el(doc, 'section', 'everyday-stage-arrivals');
+  arrivals.setAttribute('aria-label', ARRIVALS_TITLE);
+  /*
+   * One row that wraps: the words, the approach, the day. Side by side the card is about 75 px
+   * tall, which is what lets the header, this card and the 60vh building clear the action bar at
+   * 1280x800; stacked above the pictures the words took the lobby row under it. On a phone the
+   * three wrap onto rows of their own. The note is the card's tooltip, not a line of its own, for
+   * the same room.
+   */
+  arrivals.title = ARRIVALS_NOTE;
+  arrivals.style.cssText = [
+    'display:none',
+    'flex-wrap:wrap',
+    'align-items:center',
+    `gap:6px ${String(GAP.section)}px`,
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.card)}px`,
+    `background:${C.card}`,
+    'padding:6px 14px',
+    'min-width:0',
+  ].join(';');
+  const arrivalsHead = el(doc, 'div', 'everyday-stage-arrivals-head');
+  arrivalsHead.style.cssText = 'flex:1 1 230px;min-width:0;display:flex;flex-direction:column;gap:1px';
+  const arrivalsEyebrow = el(doc, 'span', 'everyday-stage-arrivals-title', ARRIVALS_TITLE);
+  arrivalsEyebrow.style.cssText = EYEBROW;
+  const arrivalsHeadline = el(doc, 'span', 'everyday-stage-arrivals-headline');
+  arrivalsHeadline.style.cssText = `font:600 15px ${TYPE.heading};color:${C.ink}`;
+  const arrivalsOutlook = el(doc, 'span', 'everyday-stage-arrivals-outlook');
+  arrivalsOutlook.style.cssText = `font-size:12px;color:${C.inkSoft};font-weight:600`;
+  arrivalsHead.append(arrivalsEyebrow, arrivalsHeadline, arrivalsOutlook);
+
+  const AXIS_CSS = `display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:2px 10px;font:500 9.5px ${TYPE.mono};letter-spacing:.08em;color:${C.label};text-transform:uppercase;margin-top:3px`;
+  const approachCol = el(doc, 'div', 'everyday-stage-arrivals-approach');
+  approachCol.style.cssText = 'flex:4 1 300px;min-width:0';
+  const approachCanvas = el(doc, 'canvas', 'everyday-stage-arrivals-canvas');
+  approachCanvas.style.cssText = `display:block;width:100%;height:${String(ARRIVALS_CANVAS_HEIGHT_PX)}px`;
+  approachCanvas.setAttribute('role', 'img');
+  const approachAxis = el(doc, 'div');
+  approachAxis.style.cssText = AXIS_CSS;
+  /* The key sits on the axis line, and each swatch carries its own count (`doorsLine`, `floorsLine`). */
+  const arrivalsKey = el(doc, 'span', 'everyday-stage-arrivals-key');
+  arrivalsKey.style.cssText = `display:flex;flex-wrap:wrap;align-items:center;gap:2px ${String(GAP.row + 4)}px;font:400 11px ${TYPE.body};letter-spacing:0;text-transform:none;color:${C.warmGrey}`;
+  const keyItem = (swatchCss: string, label: string): HTMLElement => {
+    const item = el(doc, 'span');
+    item.style.cssText = 'display:flex;align-items:center;gap:6px';
+    const swatch = el(doc, 'span');
+    swatch.style.cssText = `width:9px;height:9px;flex:none;box-sizing:border-box;${swatchCss}`;
+    const said = el(doc, 'span', undefined, label);
+    item.append(swatch, said);
+    return said;
+  };
+  const arrivalsDoorsLine = keyItem(`background:${C.ink}`, ARRIVALS_KEY_DOORS);
+  const arrivalsFloorsLine = keyItem(`background:${C.paperDeeper};border:1px solid ${C.warmGrey}`, ARRIVALS_KEY_FLOORS);
+  for (const said of [arrivalsDoorsLine, arrivalsFloorsLine]) {
+    if (said.parentElement !== null) arrivalsKey.append(said.parentElement);
+  }
+  approachAxis.append(el(doc, 'span', undefined, ARRIVALS_NOW_LABEL), arrivalsKey, el(doc, 'span', undefined, ARRIVALS_FAR_LABEL));
+  approachCol.append(approachCanvas, approachAxis);
+  const dayCol = el(doc, 'div', 'everyday-stage-arrivals-day');
+  dayCol.style.cssText = 'flex:1 1 150px;min-width:0';
+  const dayCanvas = el(doc, 'canvas', 'everyday-stage-arrivals-day-canvas');
+  dayCanvas.style.cssText = `display:block;width:100%;height:${String(ARRIVALS_CANVAS_HEIGHT_PX)}px`;
+  dayCanvas.setAttribute('aria-hidden', 'true');
+  const dayAxis = el(doc, 'div');
+  dayAxis.style.cssText = AXIS_CSS;
+  dayAxis.append(el(doc, 'span', undefined, ARRIVALS_DAY_LABEL));
+  dayCol.append(dayCanvas, dayAxis);
+  arrivals.append(arrivalsHead, approachCol, dayCol);
+  /** The arrivals index, and the recording it was sorted from: rebuilt on a new recording, never per frame. */
+  let arrivalsIndex: StageArrivalsIndex | undefined;
+  let arrivalsIndexFor: VizRecording | undefined;
+
   const legend = el(doc, 'div', 'everyday-stage-legend');
   legend.style.cssText = `display:flex;flex-wrap:wrap;gap:${String(GAP.section)}px;font-size:11.5px;color:${C.warmGrey}`;
   for (const rung of stageLegend()) {
@@ -2023,6 +2137,7 @@ function mountStage(
     watchBand,
     alarm,
     alarmSay,
+    arrivals,
     stageRow,
     legend,
     interventions,
@@ -2054,6 +2169,52 @@ function mountStage(
     root.insertBefore(rushNotes, stageRow.nextSibling);
   }
   region.append(root);
+
+  /*
+   * **Two columns on a wide screen** — the building on the left with the approach above it, and
+   * everything a player reads or presses while watching in a column beside it. Stacked, the goals
+   * sat above the building and pushed the lobby below the fold at 1440×900, and the choices and the
+   * day so far sat below it, so the three things a player looks between were never on one screen.
+   *
+   * Decided on a resize and on a new recording, never per frame, because it reads a laid-out width. The same nodes move;
+   * nothing is built twice, so every id, listener and `aria-describedby` is kept. A rush keeps its
+   * own order (the chips under the header), and so does any region narrower than
+   * {@link STAGE_TWO_COLUMN_MIN_PX}. Recorded under [§ D405](../../../../DECISIONS.md).
+   */
+  const side = el(doc, 'div', 'everyday-stage-side');
+  side.style.cssText = [
+    `flex:0 0 ${String(STAGE_SIDE_COLUMN_PX)}px`,
+    'max-width:100%',
+    'min-width:0',
+    'display:flex',
+    'flex-direction:column',
+    `gap:${String(GAP.block)}px`,
+  ].join(';');
+  let twoColumn = false;
+  function syncColumns(): void {
+    const width = region.clientWidth;
+    const shafts = adopted?.shafts.length ?? 0;
+    const wide =
+      context.ctx !== 'rush' &&
+      width >= STAGE_TWO_COLUMN_MIN_PX &&
+      width - STAGE_SIDE_COLUMN_PX >= shafts * STAGE_TWO_COLUMN_MIN_SHAFT_PX;
+    if (wide === twoColumn) return;
+    twoColumn = wide;
+    /*
+     * The call goes with them: at the top of the side column it is beside the building it is about,
+     * and the building does not move when the day stops. Stacked, it is back under the header.
+     */
+    if (wide) {
+      side.append(callCard, lostCard, callRows, goals, legend, interventions, race);
+      stageWrap.after(side);
+    } else {
+      header.after(callCard, lostCard, callRows);
+      root.insertBefore(goals, watchBand);
+      stageRow.after(legend, interventions, race);
+      side.remove();
+    }
+    requestFrame();
+  }
 
   /* ------------------------------------------------------------- behaviour */
 
@@ -2166,7 +2327,7 @@ function mountStage(
     if (context.ctx !== 'rush') return;
     const compact = rushCompactHudOf({ regionWidth: region.clientWidth, playing: playback?.state === 'playing' });
     /* Every time, not on the edge: the transport rewrites the chips' whole style on each change. */
-    for (const node of [driving, cameras, floorJump, skipButton, ...speedButtons, switchPicker, switchButton, switchPickerNote, interventionRefusal, interventionNote]) {
+    for (const node of [arrivals, driving, cameras, floorJump, skipButton, ...speedButtons, switchPicker, switchButton, switchPickerNote, interventionRefusal, interventionNote]) {
       fold(node, compact);
     }
     if (compact !== rushCompact) {
@@ -4150,6 +4311,41 @@ function mountStage(
       }
     }
 
+    /*
+     * Arriving next. The index is sorted once per recording; the read at the playhead is two binary
+     * searches. Words are written only when they change, and the two pictures are skipped over a
+     * box with no size yet, as the cutaway is.
+     */
+    if (arrivalsIndexFor !== recording || arrivalsIndex === undefined) {
+      arrivalsIndex = stageArrivalsIndexOf(recording);
+      arrivalsIndexFor = recording;
+      /* A new building may have more wells than the last: ask again whether the side column fits. */
+      syncColumns();
+      dayCol.style.display = arrivalsIndex.day.length === 0 ? 'none' : '';
+    }
+    if (!rushCompact && arrivals.style.display === 'none') arrivals.style.display = 'flex';
+    if (arrivals.style.display !== 'none') {
+      const ahead = stageArrivalsAheadAt(arrivalsIndex, simTimeS);
+      if (arrivalsHeadline.textContent !== ahead.headline) arrivalsHeadline.textContent = ahead.headline;
+      if (arrivalsDoorsLine.textContent !== ahead.doorsLine) arrivalsDoorsLine.textContent = ahead.doorsLine;
+      if (arrivalsFloorsLine.textContent !== ahead.floorsLine) arrivalsFloorsLine.textContent = ahead.floorsLine;
+      if (arrivalsOutlook.textContent !== ahead.outlook) arrivalsOutlook.textContent = ahead.outlook;
+      const said = stageArrivalsDescriptionOf(ahead);
+      if (approachCanvas.getAttribute('aria-label') !== said) approachCanvas.setAttribute('aria-label', said);
+      const approachCtx = sizeCanvas(approachCanvas);
+      if (approachCtx !== undefined) {
+        const box = approachCanvas.getBoundingClientRect();
+        drawApproach(approachCtx, ahead, { width: box.width, height: box.height });
+      }
+      if (arrivalsIndex.day.length > 0) {
+        const dayCtx = sizeCanvas(dayCanvas);
+        if (dayCtx !== undefined) {
+          const box = dayCanvas.getBoundingClientRect();
+          drawDayShape(dayCtx, ahead, arrivalsIndex, { width: box.width, height: box.height });
+        }
+      }
+    }
+
     const ctx = sizeCanvas(canvas);
     if (ctx !== undefined) {
       const rect = canvas.getBoundingClientRect();
@@ -4772,11 +4968,13 @@ function mountStage(
 
   const unsubscribe = host.subscribe(onHostChange);
   const onResize = (): void => {
+    syncColumns();
     syncRushCompact();
     syncHeaderStick();
     requestFrame();
   };
   view?.addEventListener('resize', onResize);
+  syncColumns();
 
   /*
    * **Never on a watch** — GitHub issue #182, § D436, and this is the one line that would have

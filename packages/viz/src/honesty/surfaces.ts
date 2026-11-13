@@ -348,6 +348,15 @@ import {
   stageSkipViewOf,
   type StageSwitchTarget,
 } from '../everyday/stageScreenModel.js';
+import {
+  ARRIVALS_DAY_LABEL,
+  ARRIVALS_KEY_DOORS,
+  ARRIVALS_KEY_FLOORS,
+  ARRIVALS_NOTE,
+  ARRIVALS_TITLE,
+  stageArrivalsAheadAt,
+  stageArrivalsIndexOf,
+} from '../everyday/stageArrivals.js';
 import { todayOf, type TodayRecord } from '../everyday/today.js';
 import {
   RUSH_NOT_LANDED,
@@ -13375,6 +13384,17 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#stageOpeningLineOf',
     'everyday/stageScreenModel.ts#stageNextStretchOf',
     /*
+     * The *Arriving next* card. Its three sentences are seeded at every sample playhead below, as
+     * observations, so the whole-run property reads the count ahead of the playhead beside the
+     * finished day's totals; its five fixed strings are seeded once.
+     */
+    'everyday/stageArrivals.ts#stageArrivalsAheadAt',
+    'everyday/stageArrivals.ts#ARRIVALS_TITLE',
+    'everyday/stageArrivals.ts#ARRIVALS_DAY_LABEL',
+    'everyday/stageArrivals.ts#ARRIVALS_KEY_DOORS',
+    'everyday/stageArrivals.ts#ARRIVALS_KEY_FLOORS',
+    'everyday/stageArrivals.ts#ARRIVALS_NOTE',
+    /*
      * § D991's note beside the chips — GitHub issue #592. Seeded below at every sampled playhead
      * on the temporal axis, as the note a whole day would draw there: it names the next act's start
      * from the timetable and whether somebody has waited a minute from the present frame, and
@@ -14266,9 +14286,29 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       }
     }
 
+    for (const [key, text] of [
+      ['title', ARRIVALS_TITLE],
+      ['day', ARRIVALS_DAY_LABEL],
+      ['key.doors', ARRIVALS_KEY_DOORS],
+      ['key.floors', ARRIVALS_KEY_FLOORS],
+      ['note', ARRIVALS_NOTE],
+    ] as const) {
+      seeds.push({ field: `stage.arrivals.${key}`, text, role: 'prose' });
+    }
+    const arrivalsIndex = stageArrivalsIndexOf(recording);
+
     for (const at of sampleTimes(recording)) {
       const stamp = at.toFixed(0);
       const observations = observationsAt(recording, at);
+      {
+        const ahead = stageArrivalsAheadAt(arrivalsIndex, at);
+        const playhead = atPlayhead(recording, at);
+        seeds.push({ field: `stage(@${stamp}s).arrivals.headline`, text: ahead.headline, role: 'observation', playhead });
+        if (ahead.split !== '') {
+          seeds.push({ field: `stage(@${stamp}s).arrivals.split`, text: ahead.split, role: 'observation', playhead });
+        }
+        seeds.push({ field: `stage(@${stamp}s).arrivals.outlook`, text: ahead.outlook, role: 'label', playhead });
+      }
       const head = stageHeaderOf({
         simTimeS: at,
         recording,
