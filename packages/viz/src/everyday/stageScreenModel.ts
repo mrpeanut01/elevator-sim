@@ -865,7 +865,8 @@ function standingNowOf(o: LiveObservations): StageFigure {
  */
 function longestSoFarOf(o: LiveObservations): StageFigure {
   if (o.worstWaitSoFarS === undefined) {
-    return { label: 'longest so far', value: '—', refusal: 'nobody has called a lift yet' };
+    /* 21ch: inside the stage's 22ch note, so it is never cut (`stageScreen.ts#drawFigures`, the playtest of 2026-11-13). */
+    return { label: 'longest so far', value: '—', refusal: 'nobody has called yet' };
   }
   const seconds = `${String(Math.round(o.worstWaitSoFarS))} s`;
   return {

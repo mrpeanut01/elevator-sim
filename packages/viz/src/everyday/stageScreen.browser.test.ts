@@ -716,7 +716,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
       const back = layout();
       return {
         text: (badge.textContent ?? '').trim(),
-        inStage: badge.parentElement?.classList.contains('everyday-stage-wrap') ?? false,
+        inStage: badge.closest('.everyday-stage-wrap') !== null,
         up,
         down,
         back,
@@ -731,6 +731,64 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     /* Terse: a count, not a sentence. */
     expect(seen?.text).toMatch(/^\d+ waiting$/u);
   });
+
+  /**
+   * **Play and Pause move nothing below the header** — the playtest of 2026-11-13,
+   * [§ D1627](../../../../DECISIONS.md). A probe at 1280 × 800 found three causes, each a few
+   * pixels to a whole line: *⏸ Pause* is wider and taller than *▶ Play* and re-wrapped the speed
+   * chips; the pace and skip notes came up inside the speed strip the moment a day played; and on
+   * `vertical-city` the longest-wait figure's note wrapped to two lines until somebody rode. Each
+   * building here showed at least one of them. The claim is measured on the boxes rather than read
+   * off a style: the header's, the speed chips' and the stage's, before the first press, while
+   * playing, and paused.
+   * The notes are required to have come up, inside the stage, so the case cannot pass on a day
+   * that never paced.
+   */
+  it.each(['midtown-office', 'vertical-city'])(
+    'keeps the header one size through Play and Pause on %s',
+    async (building) => {
+      const page = await coldLoad(building);
+      await enterEverydayStage(page);
+      const boxes = () =>
+        page.evaluate(() => {
+          const rect = (selector: string) => document.querySelector(selector)?.getBoundingClientRect();
+          const size = (r: DOMRect | undefined): string =>
+            r === undefined ? 'absent' : `${String(r.width)}x${String(r.height)}`;
+          const header = rect('.everyday-stage-header');
+          const speeds = rect('.everyday-stage-speeds');
+          /*
+           * Sizes, and the speed chips' place inside the header — a label that changes width slides
+           * them under the pointer. Not page positions: Play scrolls the stage into view under a
+           * pinned header, which is scrolling, not layout.
+           */
+          return {
+            header: size(header),
+            speeds:
+              header === undefined || speeds === undefined
+                ? 'absent'
+                : `${String(speeds.left - header.left)},${String(speeds.top - header.top)} ${size(speeds)}`,
+            stage: size(rect('.everyday-stage-wrap')),
+          };
+        });
+      const before = await boxes();
+      await page.click('.everyday-stage-play');
+      expect(await page.textContent('.everyday-stage-play')).toContain('Pause');
+      await page.waitForFunction(
+        () => {
+          const notes = document.querySelector<HTMLElement>('.everyday-stage-transport-notes');
+          return notes !== null && notes.style.display !== 'none' && (notes.textContent ?? '') !== '';
+        },
+        undefined,
+        { timeout: 30_000 },
+      );
+      expect(await page.evaluate(() => document.querySelector('.everyday-stage-transport-notes')?.closest('.everyday-stage-wrap') != null)).toBe(true);
+      expect(await boxes(), 'playing').toEqual(before);
+      await page.click('.everyday-stage-play');
+      expect(await page.textContent('.everyday-stage-play')).toContain('Play');
+      expect(await boxes(), 'paused').toEqual(before);
+      await page.close();
+    },
+  );
 
   /**
    * **One press mutes the stage, and Settings says the same** — the playtest of 2026-11-13.

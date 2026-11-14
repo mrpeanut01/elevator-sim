@@ -185,7 +185,8 @@ describe.skipIf(!HAS_BROWSER)('the lost day — § D1435', () => {
    * under `STAGE_TWO_COLUMN_MIN_PX`), the card pushed the building down ~130 px on the frame the day
    * was lost and back up on *Watch the rest*. It is drawn over the top of the building now, so the
    * building's box is read on the frame before the card and on the card's own frame, and again after
-   * the card goes. Red before: the stage stood ~130 px lower under the card.
+   * the card goes. Red before: the stage stood ~130 px lower under the card. Positions are read in
+   * the screen's own content, so the card's scroll clear of a pinned header is not counted.
    */
   it('stands over the building when stacked, so neither the card nor Watch the rest moves it', async () => {
     const page = await openPage(browser, { viewport: { width: 900, height: 900 } });
@@ -195,7 +196,16 @@ describe.skipIf(!HAS_BROWSER)('the lost day — § D1435', () => {
       await page.locator('.everyday-stage-speed', { hasText: '90×' }).click();
       await page.locator('.everyday-stage-start').click();
       const seen = await page.evaluate(async () => {
-        const topOf = (): number => document.querySelector('.everyday-stage-wrap')?.getBoundingClientRect().top ?? Number.NaN;
+        /*
+         * The building's place in the screen's own content, not on the page: the card scrolls itself
+         * clear of the pinned header (`syncCardMargins`), which is scrolling rather than layout.
+         */
+        const topOf = (): number => {
+          const region = document.querySelector('.everyday-screen');
+          const wrap = document.querySelector('.everyday-stage-wrap');
+          if (region === null || wrap === null) return Number.NaN;
+          return wrap.getBoundingClientRect().top - region.getBoundingClientRect().top + region.scrollTop;
+        };
         let before = topOf();
         const began = performance.now();
         return new Promise<{ before: number; under: number; inStage: boolean } | undefined>((done) => {
@@ -221,12 +231,26 @@ describe.skipIf(!HAS_BROWSER)('the lost day — § D1435', () => {
       expect(seen, 'the day never stopped on the card').toBeDefined();
       expect(seen?.under, 'the building moved when the card came up').toBe(seen?.before);
       expect(seen?.inStage, 'the card is not drawn over the building').toBe(true);
+      /*
+       * The card's going, judged alone: hidden and read in one synchronous task, so nothing else can
+       * draw in between. *Watch the rest* also changes the header (its *End the day* chip appears),
+       * which is the header's own business and not this card's.
+       */
+      const going = await page.evaluate(() => {
+        const region = document.querySelector('.everyday-screen');
+        const wrap = document.querySelector('.everyday-stage-wrap');
+        const card = document.querySelector<HTMLElement>('.everyday-stage-lost');
+        if (region === null || wrap === null || card === null) return undefined;
+        const at = (): number => wrap.getBoundingClientRect().top - region.getBoundingClientRect().top + region.scrollTop;
+        const up = at();
+        card.hidden = true;
+        const down = at();
+        card.hidden = false;
+        return { up, down };
+      });
+      expect(going?.down, 'the building moved when the card went').toBe(going?.up);
       await page.locator('.everyday-stage-lost-watch').click();
       expect(await page.locator('.everyday-stage-lost:not([hidden])').count()).toBe(0);
-      const after = await page.evaluate(
-        () => document.querySelector('.everyday-stage-wrap')?.getBoundingClientRect().top ?? Number.NaN,
-      );
-      expect(after, 'the building moved when the card went').toBe(seen?.under);
     } finally {
       await page.close();
     }
