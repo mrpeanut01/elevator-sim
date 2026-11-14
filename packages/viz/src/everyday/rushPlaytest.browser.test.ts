@@ -50,6 +50,8 @@ async function openRushSetup(page: Page): Promise<void> {
   if ((await page.locator('.everyday-consent-no').count()) > 0) await page.locator('.everyday-consent-no').click();
   await page.locator('.everyday-mode[data-screen="rush"]').click();
   await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+  /* § D1636: these rounds are the classic climb's, the card the house rows and the line of forty are about. */
+  await page.locator('.everyday-rush-model[data-model="climb"]').click();
 }
 
 async function startRush(page: Page): Promise<void> {
@@ -210,6 +212,53 @@ describe.skipIf(!HAS_BROWSER)('Rush, after the post-AP playtest — wave AQ, lan
       await page.reload({ waitUntil: 'load' });
       await openRushSetup(page);
       expect(await page.locator('.everyday-rush-unfinished').count()).toBe(0);
+    } finally {
+      await page.close();
+    }
+  });
+  it('7: a card other than the climb states its own line, plays, and the result counts its breakdowns — § D1636', async () => {
+    const page = await coldLoad(1280, 800);
+    try {
+      await openRushSetup(page);
+      /* The opener lands on the classic climb: forty, and the house's time to pass. */
+      expect(await page.textContent('.everyday-rush-hold')).toContain('Ends when 40 people have waited over 2 minutes at once.');
+      expect(await page.locator('.everyday-rush-model[aria-pressed="true"]').getAttribute('data-model')).toBe('climb');
+      expect(await page.locator('.everyday-rush-another').isDisabled()).toBe(true);
+
+      await page.locator('.everyday-rush-model[data-model="surges"]').click();
+      expect(await page.locator('.everyday-rush-model[aria-pressed="true"]').getAttribute('data-model')).toBe('surges');
+      expect(await page.textContent('.everyday-rush-hold')).toContain('Ends when 50 people have waited over 2 minutes at once.');
+      expect(await page.textContent('.everyday-rush-hold')).toContain('Lifts break down during the round.');
+      const morning = await page.textContent('.everyday-rush-card-name');
+      expect(morning).toMatch(/^Surges · morning \d+/u);
+      /* Off the house's card the screen does not offer a house time to pass, and says whose rows these are. */
+      expect(await page.locator('.everyday-rush-to-beat').count()).toBe(0);
+      expect(await page.textContent('.everyday-rush-house-note')).toContain('The house has not run Surges.');
+
+      /* Another morning is the next roll of the same model. */
+      await page.locator('.everyday-rush-another').click();
+      expect(await page.textContent('.everyday-rush-card-name')).not.toBe(morning);
+      expect(await page.textContent('.everyday-rush-card-name')).toMatch(/^Surges · morning \d+/u);
+
+      /* The worked answer is no longer on this screen. */
+      expect(await page.locator('.everyday-worked-answer').count()).toBe(0);
+
+      await startRush(page);
+      expect(await page.textContent('.everyday-stage-header')).toMatch(/past two minutes, of 50/u);
+      await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('.everyday-stage-skip')?.disabled === false, undefined, {
+        timeout: 60_000,
+      });
+      await page.locator('.everyday-stage-skip').click();
+      await page.waitForSelector('.everyday-rush-result', { timeout: 30_000 });
+      const result = await page.evaluate(() => ({
+        outcome: document.querySelector<HTMLElement>('.everyday-rush-result')?.dataset['outcome'] ?? '',
+        account: document.querySelector('.everyday-rush-result-account')?.textContent ?? '',
+        house: document.querySelectorAll('.everyday-rush-result-house').length,
+      }));
+      expect(result.outcome).toBe('broke');
+      expect(result.account).toMatch(/\d+ people had waited over two minutes at once/u);
+      expect(result.account).toMatch(/\d+ breakdowns? before the round ended|No lift broke down before the round ended/u);
+      expect(result.house).toBe(0);
     } finally {
       await page.close();
     }

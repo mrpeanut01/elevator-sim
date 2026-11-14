@@ -213,6 +213,10 @@ const DOORS: Readonly<Record<keyof EverydayHost, Door>> = Object.freeze({
   /* Wave AR lane AR-1: marks the device's rush round running; no attempt, no day. */
   rushRoundPlaying: 'elsewhere',
   rushDisclosure: 'reads',
+  /* § D1636: the card is the host's own memory until a rush starts, and `startRush` is the door that writes it. */
+  rushCard: 'reads',
+  setRushCard: 'reads',
+  rushPlay: 'reads',
   rushRebuild: 'reads',
   pickRushRebuild: 'elsewhere',
   rushOpeningPurse: 'reads',

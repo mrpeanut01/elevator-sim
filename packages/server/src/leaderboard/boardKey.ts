@@ -112,6 +112,8 @@
  * bought something, and never what they paid.
  */
 
+import { RUSH_CLASSIC_CARD, rushCardIsClassic, rushCardKeyOf, type RushCard } from '@elevator-sim/core';
+
 import type { ClaimedModifier } from '../chimes/ledger.js';
 
 import { digestOf, type ResolvedDataFacts, type SubmittedRun } from './submission.js';
@@ -467,9 +469,10 @@ export function rushPlacementOf(
   buildingId: string,
   nowMs: number,
   claimedModifiers: ModifierSet | undefined,
+  card: RushCard = RUSH_CLASSIC_CARD,
 ): RushPlacement {
   const modifiers = canonicalModifierSet(claimedModifiers);
-  const { key: board, date } = rushDayBoardOf(buildingId, nowMs);
+  const { key: board, date } = rushDayBoardOf(buildingId, nowMs, card);
   const setKey = modifierSetKeyOf(modifiers);
   return Object.freeze({ kind: 'rush', key: setKey === '' ? board : `${board}/${setKey}`, date, buildingId, modifiers });
 }
@@ -481,9 +484,19 @@ export function rushPlacementOf(
  * player's own best ({@link rushPlacementOf}'s reader, `http/api.ts#rushBestOf`) cannot come to
  * name a different day from the one a post lands on ([§ D1359](../../../../DECISIONS.md)).
  */
-export function rushDayBoardOf(buildingId: string, nowMs: number): { readonly key: string; readonly date: string } {
+export function rushDayBoardOf(
+  buildingId: string,
+  nowMs: number,
+  card: RushCard = RUSH_CLASSIC_CARD,
+): { readonly key: string; readonly date: string } {
   const date = dailyDateOf(nowMs);
-  return Object.freeze({ key: `rush:${buildingId}:${date}`, date });
+  /*
+   * A card other than the classic climb has a board of its own, `rush:<building>:<date>:<model>.<roll>`
+   * (§ D1636): rows on one board must have met the identical crowd and the identical incidents, and a
+   * card is exactly what decides both. The classic card keeps the key it has always had.
+   */
+  const stem = `rush:${buildingId}:${date}`;
+  return Object.freeze({ key: rushCardIsClassic(card) ? stem : `${stem}:${rushCardKeyOf(card)}`, date });
 }
 
 /* -------------------------------------------------------------------------- *

@@ -64,7 +64,10 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 
 import {
   CHIME_COMPLETIONS,
+  RUSH_CLASSIC_CARD,
   RUSH_STREAM,
+  rushSeedOf,
+  type RushCards,
   type ChimeLedgerTable,
   type ChimeTurn,
   type RushPurseTable,
@@ -224,6 +227,8 @@ export interface ApiDeps {
    * no route takes a purse or an amount from a request, which is {@link chimeLedger}'s rule one mode over.
    */
   readonly rushPurse: RushPurseTable;
+  /** `data/rush-cards.json`, § D1636. Absent, a sitting may only be on the classic card. */
+  readonly rushCards?: RushCards | undefined;
   /**
    * Where a posted sitting is replayed: worker threads, one replay at a time on each, under one limit for
    * the whole process — PR #513's review, finding 2. Built by `bootstrap.ts` from
@@ -1458,7 +1463,7 @@ async function submitRushSitting(
   if (user === undefined) {
     return { status: 401, body: { error: 'not-signed-in', detail: 'Sign in to post a rush.' } };
   }
-  const issues = rushSittingIssues(request.body, deps.rushPurse);
+  const issues = rushSittingIssues(request.body, deps.rushPurse, deps.rushCards);
   if (issues.length > 0) return { status: 400, body: { error: 'invalid-sitting', issues } };
   const sitting = request.body as SubmittedRushSitting;
 
@@ -1545,14 +1550,14 @@ async function replayAndPostRushSitting(
     };
   }
 
-  const placement = rushPlacementOf(sitting.buildingId, deps.now(), claimed);
+  const placement = rushPlacementOf(sitting.buildingId, deps.now(), claimed, sitting.card);
   let entry: RushEntryRow;
   try {
     entry = await deps.store.recordRushEntry({
       boardKey: placement.key,
       userId: user.id,
       buildingId: sitting.buildingId,
-      seed: String(RUSH_STREAM.seed),
+      seed: String(rushSeedOf(sitting.card ?? RUSH_CLASSIC_CARD)),
       heldS: verification.heldS,
       furthestWave: verification.furthestWave,
       rounds: sitting.rounds.map((round, index) => {
@@ -1642,6 +1647,7 @@ async function rushBestOf(deps: ApiDeps, request: ApiRequest): Promise<ApiRespon
   if (buildingId === '') {
     return { status: 400, body: { error: 'no-building', detail: 'Name a tower with ?building=…' } };
   }
+  /* The classic climb's boards. A card's own board is read by its key, through the rush board route (§ D1636). */
   const day = rushDayBoardOf(buildingId, deps.now());
   const entries = await deps.store.rushBestsOf(user.id, buildingId, day.key);
   return {

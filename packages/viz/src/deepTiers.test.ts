@@ -646,6 +646,17 @@ const TIERS: Readonly<Record<string, Tier>> = Object.freeze({
       'It is re-run by hand when the rush, the parking kinds, a dispatcher or Midtown moves',
     scheduled: false,
   },
+  'packages/viz/src/everyday/rushCardSpread.sweep.test.ts': {
+    gates: ['RUSH_CARD_SPREAD'],
+    reason:
+      '§ D1636’s instrument — every Rush wave model on four mornings over nine buildings and four ' +
+      'dispatchers, through the path a player’s rush takes: each round’s held time against the classic ' +
+      'climb’s on the same building and dispatcher, and the spread between mornings. It produced § D1636’s ' +
+      'table and is what the tuned lines in data/rush-cards.json were set against. Not scheduled because ' +
+      'it is about 600 simulations behind a tuning decision rather than a check. It is re-run by hand ' +
+      'when a wave model, the incident deck, a line, a dispatcher or a building moves',
+    scheduled: false,
+  },
   'packages/viz/src/everyday/callFlip.sweep.test.ts': {
     gates: ['CALL_FLIP_SWEEP'],
     reason:

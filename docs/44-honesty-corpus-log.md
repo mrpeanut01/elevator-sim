@@ -19,6 +19,21 @@ after this split; the entries below are older than the cap and are registered th
 The always-on row is measured on the integrated head; the deep row is read from the nightly
 `corpus-figures` job in [`.github/workflows/deep-tiers.yml`](../.github/workflows/deep-tiers.yml).
 
+## Wave BF
+
+**Wave BF moves +348.14 strings a case always-on, with the surface set unchanged.** One lane: the
+Rush as cards ([§ D1636](../DECISIONS.md)). The base is `main` at `393f8de1`, re-measured: it stands
++147 over wave BE's row, from the three designer fixes merged after it. The same 80 surfaces speak.
+The move is the card chooser, the end rule on each card, and every sentence of the breakdown deck
+with its cars named, driven over every wave model on two mornings of each case's building, less the
+Rush's worked-answer entry point, which is withdrawn. The deep row still names `c181913`.
+
+| tree | strings | move | per case | surfaces |
+|---|---|---|---|---|
+| wave BE's row | 1 176 338 | | | 80 |
+| base, `main` at `393f8de1` (#678, #680 and #681 integrated) | 1 176 485 | +147 | +3.00 | 80, same set |
+| wave BF's head, integrated on that base | **1 193 544** | **+17 059** | **+348.14** | 80, **same set** |
+
 ## Wave BE
 
 **Wave BE moves +75.69 strings a case always-on, with the surface set unchanged.** One wave of copy

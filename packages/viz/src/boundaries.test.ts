@@ -643,8 +643,8 @@ describe('§ 16 rule 15 — a missing server can only leave a hole where the wor
  * un-swept the one surface most in need of sweeping.
  */
 const WORKED_ANSWER_READERS: readonly string[] = Object.freeze([
-  // § D529 clause 2's two entry points: the rush's, and the tutorial's own.
-  'everyday/rushScreenModel.ts',
+  // The tutorial's own entry point. § D529 clause 2's second, the rush's, was withdrawn by § D1636:
+  // the Rush setup screen showed a fix and offered no way to make it.
   'everyday/tutorialModel.ts',
   // Screen two's mount, for the pending line the component owns and for nothing else — see above.
   'everyday/tutorialScreens.ts',
@@ -654,12 +654,11 @@ const WORKED_ANSWER_READERS: readonly string[] = Object.freeze([
 
 /** Who may draw the component — screen two, and § D529 clause 2's one reuse. */
 const WORKED_ANSWER_MOUNTERS: readonly string[] = Object.freeze([
-  'everyday/rushScreen.ts',
   'everyday/tutorialScreens.ts',
 ]);
 
 describe('§ D529 clause 4 — the worked answer is the tutorial’s and nobody else’s', () => {
-  it('confines the words to the two entry points, screen two and the sweep', async () => {
+  it('confines the words to the tutorial’s entry point, screen two and the sweep', async () => {
     const readers = (await vizSources())
       .filter((file) => !isTest(file.id))
       .filter((file) =>
@@ -677,7 +676,7 @@ describe('§ D529 clause 4 — the worked answer is the tutorial’s and nobody 
     ).toEqual([...WORKED_ANSWER_READERS]);
   });
 
-  it('confines the component to screen two and the rush tutorial', async () => {
+  it('confines the component to screen two', async () => {
     const mounters = (await vizSources())
       .filter((file) => !isTest(file.id))
       .filter((file) => file.id !== 'everyday/tutorialScreens.ts')
@@ -704,7 +703,7 @@ describe('§ D529 clause 4 — the worked answer is the tutorial’s and nobody 
     expect(sources.filter((file) => file.id === 'everyday/workedAnswer.ts')).toHaveLength(1);
     expect(sources.filter((file) => file.id === 'everyday/tutorialScreens.ts')).toHaveLength(1);
     expect(WORKED_ANSWER_READERS.length).toBeGreaterThan(1);
-    expect(WORKED_ANSWER_MOUNTERS.length).toBe(2);
+    expect(WORKED_ANSWER_MOUNTERS.length).toBe(1);
     /*
      * The narrower claim the paragraph above makes, checked rather than asserted in prose: the
      * mount imports the component's copy table and does not word an answer. A file that gained

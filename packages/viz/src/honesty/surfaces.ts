@@ -362,9 +362,12 @@ import {
 } from '../everyday/stageArrivals.js';
 import { todayOf, type TodayRecord } from '../everyday/today.js';
 import {
+  RUSH_INCIDENT_COPY,
   RUSH_NOT_LANDED,
   RUSH_RESULT_EMPTY_LEDE,
   rushDisclosureOf,
+  rushIncidentNoticeOf,
+  rushIncidentRecapOf,
   rushInterventionStampOf,
   rushLossLineOf,
   rushOpeningPaceOf,
@@ -373,6 +376,8 @@ import {
   rushStageHeaderOf,
   type RushOutcome,
 } from '../everyday/rush.js';
+import { RUSH_CARD_COPY, rushCardLinesOf, rushCardViewOf } from '../everyday/rushCardView.js';
+import { RUSH_CARDS, rushPlayOf } from '../shift/rushPlay.js';
 import { rushPostViewOf } from '../everyday/rushPost.js';
 import { RUSH_SITTING_COPY, rushSittingOf, type RushRoundRecord } from '../everyday/rushSitting.js';
 import {
@@ -474,7 +479,6 @@ import { wayThroughSentenceOf, WEEK_WAY } from '../shift/weekWay.js';
 import { admittedPressDayIds, pressDayFor } from '../shift/ladder.js';
 import { PRESS_DAY_DRIVER_HELD, TODAY_CHOICE_LINE_HELD, TODAY_CHOICE_LINE_HELD_PAST } from '../everyday/today.js';
 import { actsOf, wholeDayFor } from '../shift/dayLength.js';
-import { rushTutorialWorkedAnswerOf } from '../everyday/rushScreenModel.js';
 import { WORKED_ANSWER_COPY, type WorkedAnswerFacts, type WorkedAnswerView } from '../everyday/workedAnswer.js';
 import { WEEK_START_NEXT_LABEL, WEEK_TOP_RUSH_COPY, driverRecordLinesOf, weekScreenViewOf, weekTopRushOf } from '../everyday/weekView.js';
 import {
@@ -10885,6 +10889,17 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/rushScreenModel.ts#rushGeneratedRangeLine',
     'everyday/rushScreenModel.ts#rushOpeningLine',
     /*
+     * The card — § D1636. The setup screen's chooser and end rule, the stage's breakdown banner and
+     * the result's recap, driven over every wave model on two mornings of the case's own building,
+     * so every sentence of the deck that building can draw is read with its cars' names filled in.
+     */
+    'everyday/rushCardView.ts#RUSH_CARD_COPY',
+    'everyday/rushCardView.ts#rushCardLinesOf',
+    'everyday/rushCardView.ts#rushCardViewOf',
+    'everyday/rush.ts#RUSH_INCIDENT_COPY',
+    'everyday/rush.ts#rushIncidentNoticeOf',
+    'everyday/rush.ts#rushIncidentRecapOf',
+    /*
      * That this sitting starts on a fitted tower, and where it will be posted — § D672. Seeded
      * below rather than merely claimed, on wave T's finding that being in `covers` is not being
      * swept: it is drawn only when the account owns the kit, so nothing that renders this screen
@@ -11015,6 +11030,39 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       seeds.push({ field: 'rush.bar.note', text: bar.note ?? '', role: 'prose' });
     }
     seeds.push({ field: 'rush.holdLine.figure', text: rushHoldLineFigure(), role: 'label' });
+    for (const [key, entry] of Object.entries(RUSH_CARD_COPY)) {
+      if (typeof entry === 'string') seeds.push({ field: `rush.card.copy.${key}`, text: entry, role: key === 'eyebrow' || key === 'today' || key === 'another' ? 'label' : 'prose' });
+    }
+    seeds.push({ field: 'rush.card.copy.morning', text: RUSH_CARD_COPY.morning(20_405), role: 'label' });
+    seeds.push({ field: 'rush.incident.copy.recapNone', text: RUSH_INCIDENT_COPY.recapNone, role: 'observation' });
+    for (const model of RUSH_CARDS.waveModels) {
+      seeds.push({ field: `rush.card.${model.id}.name`, text: model.name, role: 'label' });
+      seeds.push({ field: `rush.card.${model.id}.blurb`, text: model.blurb, role: 'prose' });
+      seeds.push({ field: `rush.card.${model.id}.elsewhere`, text: RUSH_CARD_COPY.houseElsewhere(model.name), role: 'prose' });
+      for (const roll of model.incidents ? [1, 2] : [0]) {
+        const play = rushPlayOf(context.building, { model: model.id, roll });
+        const card = rushCardViewOf(play, { model: model.id, roll: 1 });
+        seeds.push({ field: `rush.card.${model.id}.${String(roll)}.title`, text: card.name, role: 'label' });
+        seeds.push({ field: `rush.card.${model.id}.${String(roll)}.tag`, text: card.tag, role: 'label' });
+        for (const [index, line] of rushCardLinesOf(play).entries()) {
+          seeds.push({ field: `rush.card.${model.id}.${String(roll)}.line.${String(index)}`, text: line, role: 'prose' });
+        }
+        const labelOf = (car: { readonly carId: string }): string => RUSH_INCIDENT_COPY.lift(car.carId);
+        for (const [index, incident] of play.incidents.entries()) {
+          for (const at of [incident.atS, incident.untilS]) {
+            const notice = rushIncidentNoticeOf(play, at, labelOf);
+            if (notice === undefined) continue;
+            const field = `rush.card.${model.id}.${String(roll)}.incident.${String(index)}.${notice.kind}`;
+            seeds.push({ field: `${field}.title`, text: notice.title, role: 'label' });
+            seeds.push({ field: `${field}.text`, text: notice.text, role: 'observation' });
+            seeds.push({ field: `${field}.detail`, text: notice.detail, role: 'observation' });
+          }
+        }
+        for (const heldS of [0, 1500, 5400]) {
+          seeds.push({ field: `rush.card.${model.id}.${String(roll)}.recap.${String(heldS)}`, text: rushIncidentRecapOf(play, heldS) ?? '', role: 'observation' });
+        }
+      }
+    }
     seeds.push({ field: 'rush.generated', text: rushGeneratedRangeLine(), role: 'prose' });
     seeds.push({ field: 'rush.opening', text: rushOpeningLine(), role: 'prose' });
     /*
@@ -17949,8 +17997,6 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
     'everyday/tutorialModel.ts#tutorialClockOf',
     'everyday/workedAnswer.ts#workedAnswerViewOf',
     'everyday/workedAnswer.ts#WORKED_ANSWER_COPY',
-    'everyday/rushScreenModel.ts#rushTutorialWorkedAnswerOf',
-    'everyday/rushScreenModel.ts#RUSH_TUTORIAL_WHY',
   ],
   render(this: SurfaceAdapter, context) {
     const seeds: TextSeed[] = [];
@@ -18017,7 +18063,6 @@ const EVERYDAY_TUTORIAL: SurfaceAdapter = {
     };
     const worked: readonly (readonly [string, WorkedAnswerView])[] = [
       ['tutorial', tutorialWorkedAnswerOf(facts)],
-      ['rush', rushTutorialWorkedAnswerOf(facts)],
       /*
        * The crowd-changed arm, which the pair above cannot reach: the tutorial's own repair is a
        * dispatcher setting and never moves who arrives, so the basis line for a pair that did

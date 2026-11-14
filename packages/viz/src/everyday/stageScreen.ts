@@ -57,7 +57,7 @@
  * *Run this shift* performs, so the day it produces may file.
  */
 
-import type { DispatcherProfile, InterventionChange, RunInterventionConfig } from '@elevator-sim/core/browser';
+import { rushLinePeopleAt, type DispatcherProfile, type InterventionChange, type RunInterventionConfig } from '@elevator-sim/core/browser';
 
 import { drawApproach, drawDayShape } from './arrivalsStrip.js';
 import { drawCutaway, sizeCanvas } from './cutaway.js';
@@ -96,7 +96,7 @@ import {
 import type { LiveObservations } from '../live/types.js';
 import type { GoalState } from '../shift/types.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
-import { RUSH_LOSS_HOLD_MS, RUSH_NOT_LANDED, rushCompactHudOf, rushInterventionStampOf, rushLossLineOf, rushOpeningPaceOf, rushStageHeaderOf } from './rush.js';
+import { RUSH_INCIDENT_COPY, RUSH_LOSS_HOLD_MS, RUSH_NOT_LANDED, rushCompactHudOf, rushIncidentNoticeOf, rushInterventionStampOf, rushLossLineOf, rushOpeningPaceOf, rushStageHeaderOf } from './rush.js';
 import { RUSH_END_ASK_COPY, RUSH_STREAM } from './rushScreenModel.js';
 import type { EverydayHost } from './host.js';
 import { SCREEN_NAMES, type EverydayScreenModule } from './screens.js';
@@ -2236,8 +2236,24 @@ function mountStage(
    * goals or race to keep above them. Every other context keeps its order. Recorded here under
    * [§ D405](../../../../DECISIONS.md).
    */
+  /*
+   * § D1636: the rush's breakdown banner. One live region, so a screen reader hears a lift leave and
+   * come back; the countdown is its own node outside the region's label, so it is not read every frame.
+   */
+  const rushIncident = el(doc, 'div', 'everyday-stage-rush-incident');
+  rushIncident.style.cssText = `display:none;gap:2px;padding:9px 12px;border:1px solid ${C.alarm};border-left-width:4px;border-radius:${String(R.well)}px;background:${C.card};color:${C.ink}`;
+  const rushIncidentTitle = el(doc, 'div', 'everyday-stage-rush-incident-title');
+  rushIncidentTitle.style.cssText = `font:600 10.5px ${TYPE.mono};letter-spacing:.12em;text-transform:uppercase;color:${C.label}`;
+  const rushIncidentText = el(doc, 'div', 'everyday-stage-rush-incident-text');
+  rushIncidentText.setAttribute('role', 'status');
+  rushIncidentText.style.cssText = 'font-size:14px;line-height:1.45;text-wrap:pretty';
+  const rushIncidentDetail = el(doc, 'div', 'everyday-stage-rush-incident-detail');
+  rushIncidentDetail.setAttribute('aria-hidden', 'true');
+  rushIncidentDetail.style.cssText = `font:500 11.5px ${TYPE.mono};color:${C.warmGrey}`;
+  rushIncident.append(rushIncidentTitle, rushIncidentText, rushIncidentDetail);
   if (context.ctx === 'rush') {
     root.insertBefore(interventions, header.nextSibling);
+    root.insertBefore(rushIncident, header.nextSibling);
     root.insertBefore(endAsk, header.nextSibling);
     /*
      * **And the chips' notes go under the building** — wave AR, lane AR-1 (GitHub issue #633): on a
@@ -4201,7 +4217,7 @@ function mountStage(
           context.go('report');
           return;
         }
-        rushLossLine = rushLossLineOf();
+        rushLossLine = rushLossLineOf(rushLinePeopleAt(session.play.line, session.holdAtS - recording.startedAt));
         if (simTimeS > session.holdAtS) playback.seekTo(session.holdAtS);
         rushLossTimer = view.setTimeout(goToRushResult, RUSH_LOSS_HOLD_MS);
         syncTransport();
@@ -4215,7 +4231,33 @@ function mountStage(
         return;
       }
     }
-    const rushHead = context.ctx === 'rush' ? rushStageHeaderOf({ recording, simTimeS, driverName }) : undefined;
+    const rushPlay = context.ctx === 'rush' ? host.rush()?.play : undefined;
+    const rushHead = context.ctx === 'rush' ? rushStageHeaderOf({ recording, simTimeS, driverName, line: rushPlay?.line }) : undefined;
+    /*
+     * § D1636: the card's breakdown at the playhead, under the header, in the deck's own words with
+     * the shafts' own labels. Hidden when no car is out and none has just come back.
+     */
+    const incidentNotice =
+      rushPlay === undefined
+        ? undefined
+        : rushIncidentNoticeOf(rushPlay, simTimeS - recording.startedAt, (car) => {
+            const shaft = recording.shafts.find((entry) => entry.bankId === car.bankId && entry.carId === car.carId);
+            return RUSH_INCIDENT_COPY.lift(shaft?.label ?? car.carId);
+          });
+    if (incidentNotice === undefined) {
+      rushIncident.style.display = 'none';
+    } else {
+      const key = `${incidentNotice.kind}|${incidentNotice.text}|${incidentNotice.detail}`;
+      if (rushIncident.dataset['shown'] !== key) {
+        rushIncident.dataset['shown'] = key;
+        rushIncident.dataset['kind'] = incidentNotice.kind;
+        rushIncidentTitle.textContent = incidentNotice.title;
+        rushIncidentText.textContent = incidentNotice.text;
+        rushIncidentDetail.textContent = incidentNotice.detail;
+        rushIncident.style.borderColor = incidentNotice.kind === 'open' ? C.alarm : C.moss;
+      }
+      rushIncident.style.display = 'grid';
+    }
     const head =
       rushHead === undefined
         ? stageHeaderOf({ simTimeS, recording, observations, dayStartS: host.dayStartS(), driverName })

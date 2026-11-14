@@ -58,7 +58,10 @@
 
 import {
   interventionKindRefusal,
+  rushCardIsClassic,
   type DispatcherProfile,
+  type RushCard,
+  type RushRoundLine,
   type RuleRowConfig,
   type RunInterventionConfig,
 } from '@elevator-sim/core/browser';
@@ -247,6 +250,8 @@ export function rushRoundRecordOf(input: {
   readonly dispatcherName: string;
   /** What was bought before this round — {@link RushRoundRecord.rebuild}. The host holds it from the press. */
   readonly rebuild?: readonly string[];
+  /** The round's own line, where its card moved it (§ D1636). Absent is the classic line. */
+  readonly line?: RushRoundLine | undefined;
 }): RushRoundRecord {
   const { state, resources, recording } = input;
   const shipped = resources.dispatcherProfiles.profiles;
@@ -260,8 +265,8 @@ export function rushRoundRecordOf(input: {
   const wire = wireRoundInterventions(state.interventions, shipped);
   unpostable.push(...wire.refusals);
 
-  const holdAtS = rushHoldAt(recording);
-  const outcome = rushOutcomeOf(recording, input.endedAtS);
+  const holdAtS = rushHoldAt(recording, input.line);
+  const outcome = rushOutcomeOf(recording, input.endedAtS, input.line);
   /*
    * The changes and the drivers, in time order — GitHub issue #565, § D859. The log is authored in
    * press order, which is time order for a control that appends at the playhead, but the sheet's
@@ -377,6 +382,8 @@ export interface RushSittingBody {
   readonly buildingId: string;
   readonly rounds: readonly RushSittingRoundBody[];
   readonly modifiers?: readonly ClaimedRushModifier[] | undefined;
+  /** The card the sitting was played on (§ D1636). Absent is the classic climb. */
+  readonly card?: RushCard | undefined;
 }
 
 /**
@@ -461,6 +468,7 @@ export function rushSittingOf(input: {
   readonly modifiers?: readonly ClaimedRushModifier[] | undefined;
   /** Whether {@link modifiers} were bought from this device's tally — [§ D1418](../../../../DECISIONS.md). */
   readonly boughtOnDevice?: boolean | undefined;
+  readonly card?: RushCard | undefined;
 }): RushSittingCheck {
   const rounds = input.rounds;
   if (rounds.length === 0) return { ok: false, reasons: Object.freeze([RUSH_SITTING_COPY.noRounds]) };
@@ -498,11 +506,13 @@ export function rushSittingBodyOf(input: {
   readonly buildingId: string;
   readonly rounds: readonly RushRoundRecord[];
   readonly modifiers?: readonly ClaimedRushModifier[] | undefined;
+  readonly card?: RushCard | undefined;
 }): RushSittingBody {
   const rounds = input.rounds;
   const modifiers = input.modifiers ?? [];
   return Object.freeze({
     buildingId: input.buildingId,
+    ...(input.card === undefined || rushCardIsClassic(input.card) ? {} : { card: input.card }),
     rounds: Object.freeze(
       rounds.map((round) =>
         Object.freeze({

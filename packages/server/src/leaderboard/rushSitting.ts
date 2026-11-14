@@ -176,7 +176,16 @@ import {
   playerWaveAt,
   priceOf,
   rushFitOf,
-  rushHoldAtLegs,
+  RUSH_CLASSIC_CARD,
+  RUSH_CLASSIC_LINE,
+  RUSH_MAX_ROLL,
+  parseRushCards,
+  rushCardIssueOf,
+  rushHoldAtLegsOn,
+  rushIncidentsOf,
+  rushRoundLineOf,
+  rushSeedOf,
+  rushWaveModelOf,
   rushLevelsAfter,
   rushPurseOpeningUnits,
   rushPurseRounds,
@@ -193,7 +202,10 @@ import {
   type PriceSchedule,
   type RuleRowConfig,
   type RushFit,
+  type RushCard,
+  type RushCards,
   type RushFitLevels,
+  type RushRoundLine,
   type RushPurseTable,
   type RushRebuildRefusal,
   type SimulationConfig,
@@ -201,7 +213,7 @@ import {
 
 import { claimedModifierIssues, type ClaimedModifier } from '../chimes/ledger.js';
 import { interventionIssues, ruleRowIssues, type SubmittedIntervention } from './submission.js';
-import { METRIC_EPSILON, rushRoundConfigFor, type RejectionCode, type VerificationResources } from './verify.js';
+import { METRIC_EPSILON, rushRoundConfigFor, type RejectionCode, type RushRoundPlay, type VerificationResources } from './verify.js';
 
 /* -------------------------------------------------------------------------- *
  * The purse, at boot
@@ -233,6 +245,28 @@ export async function loadRushPurse(dataDir: string, ledger: ChimeLedgerTable): 
 }
 
 /** What `data/` calls the price schedule. */
+const RUSH_CARDS_FILE = 'rush-cards.json';
+const RUSH_WAVE_TEMPLATES_FILE = 'rush-wave-templates.json';
+
+/**
+ * `data/rush-cards.json`, parsed and held to the templates it names — § D1636. **Throws** on a wave
+ * model whose template this server does not ship, on {@link loadRushPurse}'s ground: a sitting on that
+ * card could be posted and never replayed.
+ */
+export async function loadRushCards(dataDir: string, templateIds: ReadonlySet<string>): Promise<RushCards> {
+  const cards = parseRushCards(
+    JSON.parse(await readFile(join(dataDir, RUSH_CARDS_FILE), 'utf8')) as unknown,
+    JSON.parse(await readFile(join(dataDir, RUSH_WAVE_TEMPLATES_FILE), 'utf8')) as unknown,
+  );
+  // The classic climb's template is the traffic profiles' own; every other model's is the cards'.
+  const held = new Set([...templateIds, ...cards.templates.map((template) => template.id)]);
+  const missing = cards.waveModels.filter((model) => !held.has(model.templateId));
+  if (missing.length > 0) {
+    throw new Error(`rush cards: no demand template for ${missing.map((model) => `${model.id} (${model.templateId})`).join(', ')}.`);
+  }
+  return cards;
+}
+
 const PRICE_SCHEDULE_FILE = 'price-schedule.json';
 
 /**
@@ -301,6 +335,11 @@ export interface SubmittedRushSitting {
   readonly rounds: readonly SubmittedRushRound[];
   /** What the account bought for this sitting — the modifier, never the spend (§ D526 clause 3). */
   readonly modifiers?: readonly ClaimedModifier[] | undefined;
+  /**
+   * The card every round of the sitting was played on — § D1636. Absent is the classic climb, which
+   * is what every sitting posted before cards was. One card a sitting, because a sitting is one board row.
+   */
+  readonly card?: RushCard | undefined;
 }
 
 /**
@@ -340,7 +379,8 @@ const MAX_SITTING_ROUNDS = 12;
 export const MAX_RUSH_SITTING_BODY_BYTES = 1.5 * 1024 * 1024;
 
 /** The keys a sitting may carry. Every other key is refused, by name. */
-const SITTING_KEYS: readonly string[] = Object.freeze(['buildingId', 'rounds', 'modifiers']);
+const SITTING_KEYS: readonly string[] = Object.freeze(['buildingId', 'rounds', 'modifiers', 'card']);
+const CARD_KEYS: readonly string[] = Object.freeze(['model', 'roll']);
 /** The keys a round may carry. */
 const ROUND_KEYS: readonly string[] = Object.freeze(['dispatcherProfileId', 'ruleRows', 'interventions', 'rebuild', 'claimedHeldS', 'stoppedS']);
 /**
@@ -532,7 +572,7 @@ function rebuildIssues(rounds: unknown, modifiers: unknown): readonly string[] {
  * ends can ask, and {@link loadRushPurse} holds the ledger to it at boot — so a sink renamed out
  * from under this line is a server that will not start, not a gate that quietly narrows.
  */
-export function rushSittingIssues(body: unknown, purse: RushPurseTable): readonly string[] {
+export function rushSittingIssues(body: unknown, purse: RushPurseTable, cards?: RushCards): readonly string[] {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) return ['a sitting must be an object'];
   const sitting = body as Record<string, unknown>;
   const issues: string[] = keyIssues(sitting, SITTING_KEYS, 'the sitting');
@@ -574,6 +614,25 @@ export function rushSittingIssues(body: unknown, purse: RushPurseTable): readonl
     }
   }
 
+  const card = sitting['card'];
+  if (card !== undefined) {
+    if (typeof card !== 'object' || card === null || Array.isArray(card)) {
+      issues.push('card must be an object naming a wave model and a roll, or absent for the classic climb');
+    } else {
+      const entry = card as Record<string, unknown>;
+      issues.push(...keyIssues(entry, CARD_KEYS, 'the card'));
+      const model = idIssue(entry['model'], 'card.model');
+      const roll = entry['roll'];
+      if (model !== undefined) issues.push(model);
+      if (typeof roll !== 'number' || !Number.isInteger(roll) || roll < 0 || roll > RUSH_MAX_ROLL) {
+        issues.push(`card.roll must be a whole number from 0 to ${String(RUSH_MAX_ROLL)}`);
+      } else if (model === undefined) {
+        const issue = cards === undefined ? 'this server holds no rush cards' : rushCardIssueOf(cards, entry as unknown as RushCard);
+        if (issue !== undefined) issues.push(`the card cannot be played here: ${issue}`);
+      }
+    }
+  }
+
   const modifiers = sitting['modifiers'];
   issues.push(...rebuildIssues(rounds, modifiers));
   const shape = claimedModifierIssues(modifiers);
@@ -603,6 +662,7 @@ export type RushSittingRejectionCode =
   | RejectionCode
   | 'held-does-not-reproduce'
   | 'no-breaking-point'
+  | 'unknown-card'
   /** A round's rebuild is one the menu does not sell or that changes nothing — the gate's refusal, re-asked here. */
   | 'rebuild-refused'
   /** A round's rebuild costs more than the purse the rounds before it left — GitHub issue #372, § D1295. */
@@ -648,6 +708,8 @@ export interface RushSittingResources {
   readonly ledger: ChimeLedgerTable;
   /** `data/price-schedule.json`, which prices a rebuild — {@link loadRushPriceSchedule}. */
   readonly schedule: PriceSchedule;
+  /** `data/rush-cards.json`. Absent, only the classic card can be replayed. */
+  readonly cards?: RushCards | undefined;
 }
 
 function refused(
@@ -704,6 +766,21 @@ export function replayRushSitting(sitting: SubmittedRushSitting, from: RushSitti
   const configs: SimulationConfig[] = [];
   const spends: number[] = [];
   const asShipped = from.resources.buildingsById.get(sitting.buildingId);
+  /*
+   * The card, read once for the sitting — § D1636. Each round's incidents are drawn on the building
+   * that round runs on, and its line is the model's raised over them. No card leaves `play` undefined
+   * and every round below exactly what it was.
+   */
+  const card = sitting.card ?? RUSH_CLASSIC_CARD;
+  let play: RushRoundPlay | undefined;
+  const lines: RushRoundLine[] = [];
+  if (sitting.card !== undefined) {
+    const model = from.cards === undefined ? undefined : rushWaveModelOf(from.cards, card);
+    if (from.cards === undefined || model === undefined) {
+      return refused('unknown-card', `This server does not ship a rush wave model "${card.model}".`, undefined, 0);
+    }
+    play = { cards: from.cards, card, model, seed: rushSeedOf(card) };
+  }
   for (const [index, round] of sitting.rounds.entries()) {
     const bought = round.rebuild ?? [];
     if (bought.length > 0) {
@@ -742,7 +819,7 @@ export function replayRushSitting(sitting: SubmittedRushSitting, from: RushSitti
     }
     const fit: RushFit = rushFitOf(levels);
     spends.push(bought.length === 0 ? 0 : rushRebuildUnits(from.schedule, bought));
-    const config = rushRoundConfigFor(sitting.buildingId, round, from.resources, fit);
+    const config = rushRoundConfigFor(sitting.buildingId, round, from.resources, fit, play);
     if (typeof config === 'string') {
       return refused(
         config,
@@ -761,6 +838,9 @@ export function replayRushSitting(sitting: SubmittedRushSitting, from: RushSitti
       );
     }
     configs.push(config);
+    lines.push(
+      play === undefined ? RUSH_CLASSIC_LINE : rushRoundLineOf(play.cards, card, rushIncidentsOf(play.cards, config.building, card)),
+    );
   }
 
   const opening = rushPurseOpeningUnits(from.purse, from.ledger, sitting.modifiers ?? []);
@@ -801,7 +881,7 @@ export function replayRushSitting(sitting: SubmittedRushSitting, from: RushSitti
       );
     }
     simulations += 1;
-    const holdAtS = rushHoldAtLegs(record.passengers, record.startedAt, record.endedAt);
+    const holdAtS = rushHoldAtLegsOn(lines[index] ?? RUSH_CLASSIC_LINE, record.passengers, record.startedAt, record.endedAt);
     const heldS = holdAtS === undefined ? null : holdAtS - record.startedAt;
     const claim = sitting.rounds[index]?.claimedHeldS ?? null;
     const agrees = heldS === null || claim === null ? heldS === claim : Math.abs(heldS - claim) <= METRIC_EPSILON;

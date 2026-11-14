@@ -59,11 +59,6 @@ import {
 import type { GroupLevers } from '../authoring/dispatcherSpec.js';
 
 import type { ActionBarModel } from './actionBar.js';
-import {
-  workedAnswerViewOf,
-  type WorkedAnswerFacts,
-  type WorkedAnswerView,
-} from './workedAnswer.js';
 
 /* -------------------------------------------------------------------------- *
  * ENGINE_CONTRACT § 3.2 — the stream, as arithmetic
@@ -167,10 +162,8 @@ export { RUSH_HOLD_LINE };
 export const RUSH_SCREEN_COPY = Object.freeze({
   eyebrow: 'RUSH',
   title: 'How long can it hold?',
-  lede: 'More people arrive every three minutes. See how far your dispatcher gets.',
+  lede: 'The crowd grows every three minutes and lifts break down. Pick who drives, and see how long it holds.',
   bandsEyebrow: 'THE WAVES',
-  /** The end rule in one line, off {@link RUSH_HOLD_LINE}: change the constant and the line moves. */
-  holdLine: `Ends when ${String(RUSH_HOLD_LINE.people)} people have waited over ${String(RUSH_HOLD_LINE.overS / 60)} minutes at once.`,
   /*
    * **How rush works**, behind a link beside the end rule (the copy edit's `explainer`). The lede's
    * second half, the end rule's reason, the definition of a sitting and the note on what a further
@@ -178,10 +171,10 @@ export const RUSH_SCREEN_COPY = Object.freeze({
    */
   howLink: 'How rush works',
   howWaves: 'A wave lasts three minutes, and each wave brings more people than the last. The tower and the lifts stay the same.',
-  howEnd:
-    `A round ends when ${String(RUSH_HOLD_LINE.people)} people have each waited over ` +
-    `${String(RUSH_HOLD_LINE.overS / 60)} minutes at the same moment. That is about when a real building would start ` +
-    'getting phone calls.',
+  howIncidents:
+    'On every card but The Climb, a lift goes out of service every few waves and comes back a few minutes later. ' +
+    'While it is out, and for two minutes after, the line a round ends on is higher. The Climb has no ' +
+    'breakdowns and always ends at 40.',
   howSitting:
     'A sitting is every round you play since the building was as shipped. Leave the rush and the next ' +
     'sitting starts from the building as shipped.',
@@ -191,15 +184,18 @@ export const RUSH_SCREEN_COPY = Object.freeze({
   bestsEyebrow: 'HOUSE RUNS',
   drivingEyebrow: 'DRIVING',
   drivingNote:
-    'Everyone gets the same waves, so a further run means a better dispatcher or a luckier morning. ' +
-    'The Test bench can tell which.',
+    'Everyone who plays a card gets the same waves and the same breakdowns. On another morning a further ' +
+    'run can be a luckier morning. The Test bench can tell a better dispatcher from one.',
   rebuildLink: 'Rebuilding between rounds',
   /*
    * **The pre-run pick's two strings** — GitHub issue **#565**, second defect,
    * [§ D857](../../../../DECISIONS.md). See {@link rushDrivingLine} for why the control the
    * prototype draws here is drawn now and was not before.
    */
-  driverPickLabel: 'Change dispatcher',
+  driverPickLabel: 'Dispatcher',
+  /** § D1636: the two routes to something of the player's own, each a press from `everyday/rushScreen.ts`. */
+  tuneLabel: 'Tune or build a dispatcher',
+  designLabel: 'Design a tower',
   /**
    * What else the pick writes, said before it is pressed rather than discovered afterwards.
    *
@@ -309,8 +305,8 @@ export function rushRebuildLineOf(unitsPerWave: number, openingUnits: number): s
   return openingUnits > 0 ? `${base} This sitting opens with ${units(openingUnits)} you bought with chimes.` : base;
 }
 
-export function rushHoldLineFigure(): string {
-  return `${String(RUSH_HOLD_LINE.overS)} s × ${String(RUSH_HOLD_LINE.people)} people`;
+export function rushHoldLineFigure(people: number = RUSH_HOLD_LINE.people): string {
+  return `${String(RUSH_HOLD_LINE.overS)} s × ${String(people)} people`;
 }
 
 /**
@@ -321,7 +317,7 @@ export function rushHoldLineFigure(): string {
  * as a claim about a run that stops.
  */
 export function rushGeneratedRangeLine(): string {
-  return `The waves run for ${String(Math.round(RUSH_STREAM.lengthS / 60))} minutes and reach wave ${String(LAST_GENERATED_WAVE)}. Everybody gets the same waves (seed ${String(RUSH_STREAM.seed)}).`;
+  return `The waves run for ${String(Math.round(RUSH_STREAM.lengthS / 60))} minutes and reach wave ${String(LAST_GENERATED_WAVE)}. A card is the same waves for everybody who plays it.`;
 }
 
 /**
@@ -802,36 +798,6 @@ export function rushBarModel(base: ActionBarModel): ActionBarModel {
    * `bar()` goes through, so the note stays the table's and not a second copy.
    */
   return base;
-}
-
-/* -------------------------------------------------------------------------- *
- * The Rush tutorial — § D529 clause 2's second use of screen two
- * -------------------------------------------------------------------------- */
-
-/**
- * Why a player opening Rush is being handed an answer — the framing line, and the only field this
- * entry point may differ from the tutorial's on.
- *
- * [§ D529](../../../../DECISIONS.md) clause 2: *"Screen two is reused as the Rush tutorial when the
- * player later opens Rush. Building it twice is what this clause exists to prevent."* The rush is
- * the one mode whose whole subject is a building that stops draining, so the screen that showed
- * one coming apart is the screen that belongs in front of it — and § D525 clause 6 made the
- * climbing stream a front-door mode rather than a bench instrument, which is what gives a
- * first-time rush player nothing else to have learned it from.
- */
-export const RUSH_TUTORIAL_WHY =
-  'Before you start: a smaller building losing, and the change that stopped it.';
-
-/**
- * **The Rush entry point into the worked answer** — the second of the two § D529 clause 2 names.
- *
- * One line, exactly as `tutorialModel.ts#tutorialWorkedAnswerOf` is, and calling the same view.
- * The facts are the tutorial's own: reused means the same component about the same runs, not a
- * second worked answer written for the rush. `workedAnswer.test.ts` drives both entry points in
- * one case with one measurement and asserts every field but {@link WorkedAnswerView.why} matches.
- */
-export function rushTutorialWorkedAnswerOf(facts: WorkedAnswerFacts): WorkedAnswerView {
-  return workedAnswerViewOf(facts, RUSH_TUTORIAL_WHY);
 }
 
 /**
