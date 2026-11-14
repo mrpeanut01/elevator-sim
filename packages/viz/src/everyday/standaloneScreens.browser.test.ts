@@ -81,6 +81,8 @@ async function openRush(page: Page): Promise<void> {
   await leaveTutorialIfOffered(page);
   await page.click('.everyday-mode[data-screen="rush"]');
   await page.waitForSelector('.everyday-rush');
+  /* § D1636: the classic climb, the card whose line is forty and whose rows the house ran. */
+  await page.locator('.everyday-rush-model[data-model="climb"]').click();
 }
 
 
@@ -131,7 +133,8 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
     expect(rates).toHaveLength(5);
     for (const rate of rates) expect(rate).toMatch(/a minute · [\d.]+× wave 1/);
 
-    // § 20.5's line, one sentence carrying both figures; its long account is behind *How rush works*.
+    // § 20.5's line on the classic card, one sentence carrying both figures; the bands above and the
+    // long account are behind *How rush works* since § D1636.
     expect(await page.textContent('.everyday-rush-hold')).toContain('over 2 minutes');
     expect(await page.textContent('.everyday-rush-hold')).toContain('Ends when 40 people have waited over 2 minutes at once.');
     await page.close();

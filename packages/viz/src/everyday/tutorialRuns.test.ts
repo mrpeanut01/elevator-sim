@@ -64,7 +64,6 @@ import type { VizRecording } from '../contract/types.js';
 import { frameAt } from '../frame/frameAt.js';
 import { plainLeversOf } from '../mode/plainLevers.js';
 import { recordRun, type RecordedRun } from '../record/recordRun.js';
-import { rushTutorialWorkedAnswerOf } from './rushScreenModel.js';
 import { waitBandsAt } from '../live/bands.js';
 import { ManualClock } from '../playback/clock.js';
 import { Playback } from '../playback/playback.js';
@@ -261,16 +260,12 @@ describe('§ D529 — both screens are real runs on the real engine', () => {
     expect(view.after).toContain(String(measured.complaintAfter));
   });
 
-  it('says the same thing from both entry points over the measured pair', () => {
-    /*
-     * § D529 clause 2 again, this time over facts a run produced rather than a literal.
-     * `workedAnswer.test.ts` makes the same comparison on a fixture; making it here as well is what
-     * says the reuse survives the one input that is not under a test's control.
-     */
+  it('fills the worked answer from the measured pair', () => {
+    /* One entry point since § D1636 withdrew the Rush's: the facts a run produced fill every field. */
     const facts = workedAnswerFactsOf(entry, before.recording, after.recording);
-    const { why: _tutorialWhy, ...fromTutorial } = tutorialWorkedAnswerOf(facts);
-    const { why: _rushWhy, ...fromRush } = rushTutorialWorkedAnswerOf(facts);
-    expect(fromRush).toEqual(fromTutorial);
+    for (const [field, text] of Object.entries(tutorialWorkedAnswerOf(facts))) {
+      expect(text.trim(), `${field} is blank`).not.toBe('');
+    }
   });
 });
 

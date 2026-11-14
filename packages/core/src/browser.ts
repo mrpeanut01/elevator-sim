@@ -1335,3 +1335,38 @@ export type {
   UndeliveredReason,
   RushHoldLeg,
 } from './sim/index.js';
+
+/** The Rush as cards: wave models, the roll, incidents and a round's own line. `sim/rushCards.ts`, § D1636. */
+export {
+  RUSH_CLASSIC_CARD,
+  RUSH_CLASSIC_LINE,
+  RUSH_MAX_ROLL,
+  RushCardsError,
+  parseRushCards,
+  rushBuildingWithIncidents,
+  rushCardIsClassic,
+  rushCardIssueOf,
+  rushCardKeyOf,
+  rushHoldAtLegsOn,
+  rushIncidentTextOf,
+  rushIncidentsOf,
+  rushLinePeopleAt,
+  rushModelRatePctPop5min,
+  rushRoundLineOf,
+  rushSeedOf,
+  rushServiceEventsOf,
+  rushTrafficProfilesOf,
+  rushWaveModelOf,
+} from './sim/rushCards.js';
+export type {
+  RushCard,
+  RushCards,
+  RushIncident,
+  RushIncidentCar,
+  RushIncidentKind,
+  RushIncidentSchedule,
+  RushLine,
+  RushRoundLine,
+  RushSlack,
+  RushWaveModel,
+} from './sim/rushCards.js';

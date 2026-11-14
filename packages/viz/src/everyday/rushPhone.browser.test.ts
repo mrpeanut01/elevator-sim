@@ -56,6 +56,8 @@ async function openRushSetup(page: Page): Promise<void> {
   if ((await page.locator('.everyday-consent-no').count()) > 0) await page.locator('.everyday-consent-no').click();
   await page.locator('.everyday-mode[data-screen="rush"]').click();
   await page.waitForSelector('.everyday-rush-driving', { timeout: 15_000 });
+  /* § D1636: these rounds are the classic climb's, the card the house rows and the line of forty are about. */
+  await page.locator('.everyday-rush-model[data-model="climb"]').click();
 }
 
 async function waitForWave(page: Page): Promise<void> {
@@ -296,8 +298,8 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
     try {
       await openRushSetup(page);
       /*
-       * The order at every width: title, lede, your best, who drives, then the waves and the house's
-       * runs. Side by side the house's runs are a column of their own, so *before* is asked two ways:
+       * The order at every width: title, lede, your best, who drives, then the crowd's card and the
+       * house's runs (the five wave bands are behind *How rush works* since § D1636). Side by side the house's runs are a column of their own, so *before* is asked two ways:
        * the picker is in the paper column between the facts and the waves, and it precedes the first
        * house row in the document, which is the order a keyboard and a screen reader meet them in.
        * Test 1 holds the same order on a phone, where it is also top to bottom.
@@ -314,7 +316,7 @@ describe.skipIf(!HAS_BROWSER)('Rush on a phone, after the re-play — wave AR, l
             (picker.compareDocumentPosition(firstHouseRow) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
           facts: top('.everyday-rush-facts'),
           picker: top('.everyday-rush-picker'),
-          waves: top('.everyday-rush-bands'),
+          waves: top('.everyday-rush-card'),
         };
       });
       expect(order.inPaper, JSON.stringify(order)).toBe(true);

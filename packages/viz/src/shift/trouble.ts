@@ -93,7 +93,7 @@
  * `rush.ts#RUSH_RESULT_COPY.beatWhere` is the worked example of what one looks like.
  */
 
-import { RUSH_HOLD_LINE, rushHoldAtLegs, type SimTime } from '@elevator-sim/core/browser';
+import { RUSH_CLASSIC_LINE, rushHoldAtLegsOn, rushLinePeopleAt, type RushRoundLine, type SimTime } from '@elevator-sim/core/browser';
 
 import type { VizLeg, VizRecording } from '../contract/types.js';
 import { isWaitingAt } from '../frame/overlay.js';
@@ -226,6 +226,8 @@ export interface TroubleOptions {
    * announcing a fail state the day does not have. A rush passes `true`; nobody else should.
    */
   readonly includeHoldLine?: boolean | undefined;
+  /** The round's own line, where its card moved it (§ D1636). Absent is the classic line. */
+  readonly holdLine?: RushRoundLine | undefined;
 }
 
 /** What {@link troubleOf} returns. */
@@ -346,20 +348,21 @@ function heldLandings(
 function holdLandings(
   recording: Pick<VizRecording, 'legs' | 'startedAt' | 'endedAt'>,
   standingAtS: (t: SimTime) => readonly VizLeg[],
+  line: RushRoundLine,
 ): readonly LocatedMoment[] {
-  const atS = rushHoldAtLegs(recording.legs, recording.startedAt, recording.endedAt);
+  const atS = rushHoldAtLegsOn(line, recording.legs, recording.startedAt, recording.endedAt);
   if (atS === undefined) return [];
   const standing = standingAtS(atS);
-  const over = standing.filter((leg) => atS - leg.arrivedAt >= RUSH_HOLD_LINE.overS);
+  const over = standing.filter((leg) => atS - leg.arrivedAt >= line.overS);
   const floorIds = [...new Set(over.map((leg) => leg.originFloorId))].sort((a, b) => a.localeCompare(b));
   return floorIds.map((floorId) => ({
     source: 'hold' as const,
     floorId,
     atS,
     untilS: undefined,
-    ...bandAt(RUSH_HOLD_LINE.overS),
-    figures: crowdFigures(standing, floorId, atS, RUSH_HOLD_LINE.overS),
-    bar: { value: RUSH_HOLD_LINE.people, unit: 'people' as const, sense: 'at-least' as const },
+    ...bandAt(line.overS),
+    figures: crowdFigures(standing, floorId, atS, line.overS),
+    bar: { value: rushLinePeopleAt(line, atS - recording.startedAt), unit: 'people' as const, sense: 'at-least' as const },
   }));
 }
 
@@ -485,7 +488,7 @@ export function troubleOf(recording: VizRecording, options: TroubleOptions = {})
 
   if (options.includeHoldLine === true) {
     asked.push('hold');
-    moments.push(...holdLandings(recording, standingAtS));
+    moments.push(...holdLandings(recording, standingAtS, options.holdLine ?? RUSH_CLASSIC_LINE));
   }
   const queueAtMost = options.bars?.queueAtMost;
   if (queueAtMost !== undefined) {

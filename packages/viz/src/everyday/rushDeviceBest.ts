@@ -148,7 +148,7 @@ export function rushDeviceReplayOf(resources: BrowserResources, body: RushSittin
     resources,
     last.dispatcherProfileId,
   );
-  const patch = rushPatchOf(resources, standing, modifiers, levels);
+  const patch = rushPatchOf(resources, standing, modifiers, levels, body.card);
   if (patch === undefined) return RUSH_DEVICE_REPLAY_REFUSAL.building;
   return shiftRunConfigOf(resources, {
     ...standing,

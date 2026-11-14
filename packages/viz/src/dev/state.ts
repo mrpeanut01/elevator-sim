@@ -32,6 +32,7 @@ import {
   type DoorCrowdingConfig,
   type ElevatorSpecs,
   type PatienceConfig,
+  rushBuildingWithIncidents,
   type ResolvedBuilding,
   type RunInterventionConfig,
   type SimulationConfig,
@@ -112,6 +113,7 @@ import {
 } from '../shift/ladder.js';
 import { bookedOutCarsOf, carAbsencesOf, type BookedOutCar } from '../shift/bookedOut.js';
 import { weekBookingsOn } from '../shift/weekLevels.js';
+import { rushCardOfRun, rushPlayOf, rushTrafficProfilesFor } from '../shift/rushPlay.js';
 import { dayCallsOffered, type DayCallWrinkle } from '../shift/dayCalls.js';
 import { pressCallOf, type PressCall } from '../shift/pressCall.js';
 import { grownBuilding } from '../shift/growth.js';
@@ -239,6 +241,23 @@ export function shiftLengthForContract(contractId: string): number {
  * thirty-minute up-peak. It is left exactly where it is, because it is still the right answer for
  * the three shipped crowds no authored day covers.
  */
+/**
+ * **The building a rush round runs on, with its card's incidents on the service schedule** —
+ * [§ D1636](../../../../DECISIONS.md). Any other run, and the classic card, get `building` back by
+ * identity.
+ *
+ * Derived from the two fields a rush already writes, the stream and the seed, so the incidents need
+ * no field of their own: every path that builds a run from a rush's state (the press, the device
+ * replay, the house's rows) gets the same incidents, and `everyday/rushCrowd.test.ts`'s rule that a
+ * rush reads only what its press writes still holds. The server puts the same events on the same
+ * building through the same `core` function (`leaderboard/verify.ts#rushRoundConfigFor`).
+ */
+function rushIncidentBuildingOf(state: ViewerState, building: ResolvedBuilding): ResolvedBuilding {
+  if (state.playMode !== 'endless') return building;
+  const card = rushCardOfRun(state.freePlay?.demandTemplateId, state.seed);
+  return card === undefined ? building : rushBuildingWithIncidents(building, rushPlayOf(building, card).incidents);
+}
+
 export function shiftDemandTemplateId(
   resources: BrowserResources,
   state: ViewerState,
@@ -2218,7 +2237,7 @@ export function weekGrowthPerDayOf(resources: BrowserResources, state: ViewerSta
  *    travels out in {@link ShiftRunConfig.withheld}.
  */
 export function shiftRunConfigOf(
-  resources: BrowserResources,
+  given: BrowserResources,
   state: ViewerState,
   /*
    * **The week level's bookings for this day** — wave AO, lane DS-1, [§ D1400](../../../../DECISIONS.md):
@@ -2231,6 +2250,28 @@ export function shiftRunConfigOf(
    */
   /* A sandbox day's copy is dealt as the week it copied (`shift/types.ts#dealtKeyOf`, § D1451). */
   weekBookings: readonly ContractIncident[] = weekBookingsOn(dealtKeyOf(state.week), state.week.day, state.week.dayIdx),
+): ShiftRunConfig {
+  return shiftRunConfigOver(rushResourcesOf(given, state), state, weekBookings);
+}
+
+/**
+ * **The resources a run is built from** — `given`, except for a rush round on a card other than the
+ * classic climb, which runs on traffic profiles that also hold the wave models' templates
+ * ([§ D1636](../../../../DECISIONS.md), `core`'s `rushTrafficProfilesOf` says why they are not in
+ * `data/traffic-profiles.json`). Every other run, the classic rush included, gets `given` by identity.
+ */
+function rushResourcesOf(given: BrowserResources, state: ViewerState): BrowserResources {
+  if (state.playMode !== 'endless') return given;
+  const templateId = state.freePlay?.demandTemplateId;
+  if (templateId === undefined || given.trafficProfiles.demandTemplates.some((template) => template.id === templateId)) return given;
+  const trafficProfiles = rushTrafficProfilesFor(given.trafficProfiles);
+  return trafficProfiles === given.trafficProfiles ? given : { ...given, trafficProfiles };
+}
+
+function shiftRunConfigOver(
+  resources: BrowserResources,
+  state: ViewerState,
+  weekBookings: readonly ContractIncident[],
 ): ShiftRunConfig {
   const authored = buildingConfigOf(resources, state.savedBuildings, state.buildingId);
   if (authored === undefined) {
@@ -2650,7 +2691,7 @@ export function shiftRunConfigOf(
     wholeDayRun,
     episode: spliced === undefined ? undefined : { startS: spliced.startS, endS: spliced.endS },
     config: {
-      building: finalBuilding,
+      building: rushIncidentBuildingOf(state, finalBuilding),
       dispatcherProfile,
       trafficProfiles: runProfiles,
       elevatorSpecs: specs,

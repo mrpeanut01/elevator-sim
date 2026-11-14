@@ -50,7 +50,6 @@ import {
   rushLeftBehindLine,
   rushOpeningLine,
   rushRebuildLineOf,
-  rushTutorialWorkedAnswerOf,
   rushFittedLineOf,
   RUSH_SCREEN_COPY as COPY,
   type RushFurthestStanding,
@@ -58,7 +57,8 @@ import {
 import { RUSH_HOUSE_COPY, rushHouseToBeatLineOf, rushStandingsOf, type RushPostedStandings, type RushYoursRowView } from './rushHouse.js';
 import type { RushDeviceStanding } from './rushDeviceBest.js';
 import { RUSH_PURSE } from './rushRebuild.js';
-import { mountWorkedAnswer } from './tutorialScreens.js';
+import { deviceNowMs } from '../shift/deviceDate.js';
+import { RUSH_CARD_COPY, rushCardViewOf, rushDayNumberOf, rushPlayIsHouseCard, rushModelChoicesOf, rushNextMorningOf, rushTodayCardOf } from './rushCardView.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_RADII as R,
@@ -67,6 +67,9 @@ import {
 } from './tokens.js';
 
 const EYEBROW = `font:500 10.5px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
+
+/** The hosts whose card this screen has set to the day's, so a player's own pick is not overwritten on the way back. */
+const CARD_SET = new WeakSet<object>();
 
 /** The ink column's width beside the paper — the grid's old upper track. */
 const RUSH_ASIDE_PX = 340;
@@ -143,7 +146,6 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     }
   }
   drawFacts();
-  paper.append(facts);
 
   /*
    * **Who drives, in the paper column under the facts** — the product owner's ruling of 2026-11-13.
@@ -208,7 +210,27 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   pickNote.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:8px 0 0`;
   pickSelect.setAttribute('aria-describedby', 'everyday-rush-pick-note');
   pickNote.id = 'everyday-rush-pick-note';
-  drivingBlock.append(pickRow, pickNote);
+  /*
+   * § D1636: the two ways to bring something of your own. A rush runs the standing dispatcher and the
+   * standing tower, saved ones included, so the workshop and the design floor are where a player
+   * changes what this screen starts; each is one press from here and the Rush floor is one press back.
+   */
+  const ownRow = el(doc, 'div', 'everyday-rush-own');
+  ownRow.style.cssText = 'display:flex;gap:10px;margin-top:12px;flex-wrap:wrap';
+  const linkButton = (className: string, label: string, to: 'workshop' | 'designer'): HTMLButtonElement => {
+    const button = el(doc, 'button', className, label);
+    button.type = 'button';
+    button.style.cssText = `border:1px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.card};color:${C.ink};padding:8px 13px;font:600 13px ${TYPE.body};cursor:pointer;min-height:36px`;
+    button.addEventListener('click', () => {
+      context.go(to);
+    });
+    return button;
+  };
+  ownRow.append(
+    linkButton('everyday-rush-tune', COPY.tuneLabel, 'workshop'),
+    linkButton('everyday-rush-design', COPY.designLabel, 'designer'),
+  );
+  drivingBlock.append(pickRow, pickNote, ownRow);
 
   /*
    * What a rush does not run of the player's settings, under the driver it names — GitHub issue #523,
@@ -272,7 +294,6 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     disclosure.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.inkSoft};margin:12px 0 0`;
     drivingBlock.append(disclosure);
   }
-  paper.append(drivingBlock);
 
   /* § 9.1's bands, each a label on the ramp with its proportional bar */
   const bandsBlock = el(doc, 'div');
@@ -306,25 +327,24 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    * The end rule in one line under the waves, with the long account one press away: how the waves
    * climb, why the rule is where it is, what a sitting is and what a further run means.
    */
-  const holdLine = el(doc, 'div', 'everyday-rush-hold', `${COPY.holdLine} `);
+  const holdLine = el(doc, 'div', 'everyday-rush-hold');
   holdLine.style.cssText = `font-size:14px;line-height:1.5;color:${C.inkSoft};margin:12px 0 0;max-width:660px`;
-  holdLine.append(
-    explainer(doc, {
+  const howLink = explainer(doc, {
       link: COPY.howLink,
       title: COPY.howLink,
       body: [
         COPY.howWaves,
+        bandsEyebrow,
+        bandsList,
         rushOpeningLine(),
-        COPY.howEnd,
+        COPY.howIncidents,
         rushGeneratedRangeLine(),
         COPY.howSitting,
         COPY.howFurthest,
         COPY.drivingNote,
       ],
-    }).root,
-  );
-  bandsBlock.append(bandsEyebrow, bandsList, holdLine);
-  paper.append(bandsBlock);
+    }).root;
+  bandsBlock.append(holdLine);
 
   /*
    * **The refusal is not drawn here any more, and the block that used to be is why** — GitHub
@@ -346,6 +366,93 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
    */
 
   /* ------------------------------------------------------------------ ink */
+  /*
+   * **The card** — § D1636. The wave models as buttons, the morning under them, and the end rule on
+   * the card chosen. The day's card is set once a page, the first time this screen mounts with the
+   * classic card standing and no sitting; after that the host keeps what the player picked.
+   */
+  const today = rushTodayCardOf(rushDayNumberOf(deviceNowMs()));
+  if (context.host.rush() === undefined && !CARD_SET.has(context.host)) {
+    CARD_SET.add(context.host);
+    context.host.setRushCard(today);
+  }
+  const cardBlock = el(doc, 'div', 'everyday-rush-card');
+  cardBlock.style.cssText = 'margin-top:24px;max-width:660px';
+  const cardEyebrow = el(doc, 'div', undefined, RUSH_CARD_COPY.eyebrow);
+  cardEyebrow.style.cssText = `${EYEBROW};margin-bottom:9px`;
+  const modelRow = el(doc, 'div', 'everyday-rush-models');
+  modelRow.setAttribute('role', 'group');
+  modelRow.setAttribute('aria-label', RUSH_CARD_COPY.eyebrow);
+  modelRow.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px';
+  const cardName = el(doc, 'div', 'everyday-rush-card-name');
+  cardName.style.cssText = `font:600 15px ${TYPE.body};color:${C.ink};margin-top:14px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap`;
+  const morningRow = el(doc, 'div');
+  morningRow.style.cssText = 'display:flex;gap:10px;margin-top:9px;flex-wrap:wrap';
+  const morningButton = (className: string, label: string): HTMLButtonElement => {
+    const button = el(doc, 'button', className, label);
+    button.type = 'button';
+    button.style.cssText = `border:1px solid ${C.rule};border-radius:${String(R.control)}px;background:${C.card};color:${C.ink};padding:7px 12px;font:600 12.5px ${TYPE.body};cursor:pointer;min-height:34px`;
+    return button;
+  };
+  const todayButton = morningButton('everyday-rush-today', RUSH_CARD_COPY.today);
+  const anotherButton = morningButton('everyday-rush-another', RUSH_CARD_COPY.another);
+  morningRow.append(todayButton, anotherButton);
+  cardBlock.append(cardEyebrow, modelRow, cardName, morningRow);
+  /*
+   * The owner's order of 2026-11-13 holds: your best, then who drives. § D1636 puts the crowd's card
+   * after the driver and the five wave bands behind *How rush works*.
+   */
+  paper.append(facts, drivingBlock, cardBlock, bandsBlock);
+  function syncCard(): void {
+    const play = context.host.rushPlay();
+    const card = context.host.rushCard();
+    modelRow.replaceChildren();
+    for (const choice of rushModelChoicesOf(card)) {
+      const button = el(doc, 'button', 'everyday-rush-model');
+      button.type = 'button';
+      button.dataset['model'] = choice.id;
+      button.setAttribute('aria-pressed', choice.selected ? 'true' : 'false');
+      button.style.cssText = `text-align:left;border:${choice.selected ? `2px solid ${C.terracotta}` : `1px solid ${C.rule}`};border-radius:${String(R.well)}px;background:${choice.selected ? C.amberWash : C.card};color:${C.ink};padding:${choice.selected ? '9px 11px' : '10px 12px'};cursor:pointer;min-width:0`;
+      const name = el(doc, 'span', undefined, choice.name);
+      name.style.cssText = `display:block;font:600 14px ${TYPE.body}`;
+      const blurb = el(doc, 'span', undefined, choice.blurb);
+      blurb.style.cssText = `display:block;font-size:12.5px;line-height:1.4;color:${C.inkSoft};margin-top:3px`;
+      button.append(name, blurb);
+      button.addEventListener('click', () => {
+        context.host.setRushCard({ model: choice.id, roll: choice.id === 'climb' ? 0 : Math.max(1, context.host.rushCard().roll || today.roll) });
+        syncCard();
+        syncDriver();
+        modelRow.querySelector<HTMLButtonElement>(`[data-model="${choice.id}"]`)?.focus();
+      });
+      modelRow.append(button);
+    }
+    cardName.replaceChildren();
+    holdLine.replaceChildren();
+    if (play === undefined) return;
+    const view = rushCardViewOf(play, today);
+    const tag = el(doc, 'span', 'everyday-rush-card-tag', view.tag);
+    tag.style.cssText = `font:500 11px ${TYPE.mono};color:${C.warmGrey}`;
+    cardName.append(el(doc, 'span', undefined, view.name), tag);
+    /* The climb is one morning by definition: it is the card the house rows were measured on. */
+    anotherButton.disabled = !play.model.incidents;
+    anotherButton.style.opacity = play.model.incidents ? '1' : '.5';
+    for (const line of view.lines) {
+      const row = el(doc, 'div', 'everyday-rush-card-line', line);
+      holdLine.append(row);
+    }
+    holdLine.append(howLink);
+  }
+  todayButton.addEventListener('click', () => {
+    context.host.setRushCard(today);
+    syncCard();
+    syncDriver();
+  });
+  anotherButton.addEventListener('click', () => {
+    context.host.setRushCard(rushNextMorningOf(context.host.rushCard()));
+    syncCard();
+    syncDriver();
+  });
+
   const ink = el(doc, 'div', 'everyday-rush-aside');
   ink.style.cssText = `background:${C.ink};color:${C.paper};padding:30px 26px;display:flex;flex-direction:column;min-width:0`;
 
@@ -411,7 +518,9 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       dispatcherId: selection.dispatcherId,
       dispatcherName: driver?.name ?? selection.dispatcherId,
     });
-    if (toBeatLine === undefined) {
+    const play = context.host.rushPlay();
+    const onHouseCard = play === undefined || rushPlayIsHouseCard(play);
+    if (toBeatLine === undefined || !onHouseCard) {
       toBeat.remove();
     } else {
       toBeat.textContent = toBeatLine;
@@ -446,7 +555,8 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
       return;
     }
     /* The caption above the rows, and the long account of what they are behind its link. */
-    const houseNote = el(doc, 'div', 'everyday-rush-house-note', `${standings.note} `);
+    /* § D1636: off the house's card the caption is the line that says so, and the note's own claim about *the same waves* is not drawn. */
+    const houseNote = el(doc, 'div', 'everyday-rush-house-note', `${onHouseCard || play === undefined ? standings.note : RUSH_CARD_COPY.houseElsewhere(play.model.name)} `);
     houseNote.style.cssText = `font-size:11.5px;line-height:1.5;color:${C.label};margin:0 0 11px;text-wrap:pretty`;
     const houseAbout = explainer(doc, {
       link: RUSH_HOUSE_COPY.aboutLink,
@@ -524,6 +634,7 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
     syncDriver();
   });
   syncDriver();
+  syncCard();
   void context.host.rushPosted(askedFor).then(
     (answer) => {
       if (!alive) return;
@@ -565,19 +676,10 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   host.append(root);
 
   /*
-   * **The Rush tutorial — § D529 clause 2, the second use of screen two.**
-   *
-   * *"Screen two is reused as the Rush tutorial when the player later opens Rush. Building it
-   * twice is what this clause exists to prevent."* So this is the tutorial's own component, called
-   * with the rush's entry point, and not a second worked answer written for this screen: the runs,
-   * the diagnosis, the change and the counts are all the tutorial's, and the only thing the rush
-   * words differently is why an answer is on the screen at all.
-   *
-   * `boundaries.test.ts` holds the allowlist that keeps this the second of two uses rather than
-   * the first of many — a module outside the tutorial that gains the component fails the build,
-   * and this file is one of the two names on it.
+   * **The worked answer is not mounted here any more** — § D1636, the owner's direction of 2026-11-13:
+   * this screen showed a fix and offered no way to make it. § D529 clause 2's reuse is withdrawn, and
+   * the tutorial keeps the component.
    */
-  mountWorkedAnswer(root, rushTutorialWorkedAnswerOf);
 
   return {
     unmount: () => {

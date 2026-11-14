@@ -10,6 +10,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { rushClassicPlay } from '../shift/rushPlay.js';
+import { rushCardLinesOf } from './rushCardView.js';
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
@@ -100,7 +102,8 @@ describe('§ 3.2’s stream, as the contract states it', () => {
     expect(LAST_GENERATED_WAVE).toBe(30);
     expect(rushGeneratedRangeLine()).toContain('90 minutes');
     expect(rushGeneratedRangeLine()).toContain('wave 30');
-    expect(rushGeneratedRangeLine()).toContain('90210');
+    // The seed left this line with § D1636: a card's seed is the rush's moved by its roll.
+    expect(rushGeneratedRangeLine()).not.toMatch(/seed/u);
   });
 });
 
@@ -180,10 +183,10 @@ describe('§ 20.5’s hold line', () => {
 
   it('prints the rule as a figure beside the sentence that spells it out', () => {
     expect(rushHoldLineFigure()).toBe('120 s × 40 people');
-    // The prose says the same thing in words — § 9.1's copy, and § 9.2's rule.
-    expect(RUSH_SCREEN_COPY.holdLine).toContain(`${String(RUSH_HOLD_LINE.people)} people`);
-    expect(RUSH_SCREEN_COPY.holdLine).toContain(`over ${String(RUSH_HOLD_LINE.overS / 60)} minutes`);
-    expect(RUSH_SCREEN_COPY.holdLine).toBe('Ends when 40 people have waited over 2 minutes at once.');
+    // The prose says the same thing in words. Since § D1636 it is the card's own line, and on the
+    // classic climb it is the sentence this screen has always printed.
+    expect(rushCardLinesOf(rushClassicPlay())[0]).toBe('Ends when 40 people have waited over 2 minutes at once.');
+    expect(rushHoldLineFigure(55)).toBe('120 s × 55 people');
   });
 });
 
@@ -480,13 +483,6 @@ describe('every rush constant names the module that draws it — § D227, GitHub
      * checkable rather than remembered, and it is the row #293 would have failed on.
      */
     RUSH_ABSENCES: 'buildNotes.ts',
-    /*
-     * § D529 clause 2's framing line (GitHub issue #380). In-file: `rushTutorialWorkedAnswerOf`
-     * hands it to `workedAnswer.ts#workedAnswerViewOf` and the rush setup screen draws the *view*,
-     * never the constant — which is what makes the reuse one component with two framings rather
-     * than a second screen quoting a second string.
-     */
-    RUSH_TUTORIAL_WHY: 'rushScreenModel.ts',
     /*
      * § D672's disclosure: a sitting the account has bought a fitted start for says so before it
      * starts, and says where it will be posted. Drawn by the setup screen on

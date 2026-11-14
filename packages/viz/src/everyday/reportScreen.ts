@@ -121,8 +121,9 @@ import {
   EVERYDAY_RADII as R,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
-import { RUSH_RESULT_EMPTY_LEDE, rushOutcomeOf, rushResultViewOf } from './rush.js';
+import { RUSH_RESULT_EMPTY_LEDE, rushIncidentRecapOf, rushOutcomeOf, rushResultViewOf } from './rush.js';
 import { rushHouseLineOf } from './rushHouse.js';
+import { rushPlayIsHouseCard } from './rushCardView.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 
 
@@ -381,8 +382,8 @@ function mountReportScreen(
       root.append(empty);
       return;
     }
-    const outcome = rushOutcomeOf(recording, session.endedAtS);
-    const view = rushResultViewOf(outcome, session.disclosure);
+    const outcome = rushOutcomeOf(recording, session.endedAtS, session.play.line);
+    const view = rushResultViewOf(outcome, session.disclosure, rushIncidentRecapOf(session.play, outcome.heldS));
     const block = el(doc, 'div', 'everyday-rush-result');
     block.dataset['outcome'] = view.outcome;
     const eyebrow = el(doc, 'div', 'everyday-report-meta', view.eyebrow);
@@ -397,7 +398,8 @@ function mountReportScreen(
      * verdict (`rushHouse.ts#rushHouseLineOf`). The round's opening dispatcher is the selection's.
      */
     const selection = context.host.selection();
-    const houseLine = rushHouseLineOf({
+    /* § D1636: only on the card the house ran. On any other the two rounds did not meet the same crowd. */
+    const houseLine = !rushPlayIsHouseCard(session.play) ? undefined : rushHouseLineOf({
       buildingId: selection.buildingId,
       dispatcherId: selection.dispatcherId,
       dispatcherName: context.host.dispatcherById(selection.dispatcherId)?.name ?? selection.dispatcherId,

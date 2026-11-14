@@ -1,0 +1,263 @@
+{
+  "$comment": "The Rush as cards (DECISIONS.md section D1636). A card is a wave model and a roll; packages/core/src/sim/rushCards.ts reads this file and says what each field does. waveModels[0] is the rush as it ran before cards and must not move: stored sittings and data/rush-house-runs.json are that rush. shape, mixes and beats are read only by scripts/generate-rush-wave-models.mjs, which writes each model's template into data/rush-wave-templates.json; run it after changing them. holdLine.people on every model but the climb, and the incident schedule, are TUNED and not cited: they were set so one dispatcher holds about as long under every model, and packages/viz/src/everyday/rushCardSpread.test.ts pins the spread they give.",
+  "version": 1,
+  "waveModels": [
+    {
+      "id": "climb",
+      "name": "The Climb",
+      "blurb": "The plain ramp. Every wave is busier than the last, and no lift breaks down.",
+      "templateId": "endless-rush",
+      "peakFactor": 1,
+      "incidents": false,
+      "holdLine": {
+        "people": 40,
+        "overS": 120
+      }
+    },
+    {
+      "id": "surges",
+      "name": "Surges",
+      "blurb": "Every wave is a lull and then a crush. Lifts break down.",
+      "templateId": "rush-surges",
+      "peakFactor": 1.4,
+      "incidents": true,
+      "holdLine": {
+        "people": 50,
+        "overS": 120
+      },
+      "shape": "the climb in surges: every three-minute wave is a lull and then a crest, each wave bigger than the last",
+      "mixes": {
+        "steady": {
+          "incoming": 0.62,
+          "outgoing": 0.19,
+          "interfloor": 0.19
+        }
+      },
+      "beats": [
+        {
+          "factor": 0.6,
+          "mix": "steady"
+        },
+        {
+          "factor": 1.4,
+          "mix": "steady"
+        }
+      ]
+    },
+    {
+      "id": "tides",
+      "name": "Tides",
+      "blurb": "The crowd pours in at the lobby, then pours out of the floors, twice a wave. Lifts break down.",
+      "templateId": "rush-tides",
+      "peakFactor": 1,
+      "incidents": true,
+      "holdLine": {
+        "people": 40,
+        "overS": 120
+      },
+      "shape": "the climb with the tide turning: half of every wave pours in at the lobby and half pours out of the floors, each wave bigger than the last",
+      "mixes": {
+        "in": {
+          "incoming": 0.8,
+          "outgoing": 0.1,
+          "interfloor": 0.1
+        },
+        "out": {
+          "incoming": 0.3,
+          "outgoing": 0.5,
+          "interfloor": 0.2
+        }
+      },
+      "beats": [
+        {
+          "factor": 1,
+          "mix": "in"
+        },
+        {
+          "factor": 1,
+          "mix": "out"
+        }
+      ]
+    },
+    {
+      "id": "crossfire",
+      "name": "Crossfire",
+      "blurb": "Lunchtime. Most people are going between floors, in three pulses a wave. Lifts break down.",
+      "templateId": "rush-crossfire",
+      "peakFactor": 1.25,
+      "incidents": true,
+      "holdLine": {
+        "people": 40,
+        "overS": 120
+      },
+      "shape": "the climb at lunchtime: everybody is going between floors, in three quick pulses a wave, each wave bigger than the last",
+      "mixes": {
+        "lunch": {
+          "incoming": 0.4,
+          "outgoing": 0.25,
+          "interfloor": 0.35
+        }
+      },
+      "beats": [
+        {
+          "factor": 1.25,
+          "mix": "lunch"
+        },
+        {
+          "factor": 0.75,
+          "mix": "lunch"
+        },
+        {
+          "factor": 1,
+          "mix": "lunch"
+        }
+      ]
+    }
+  ],
+  "incidents": {
+    "firstWave": 4,
+    "gapWaves": {
+      "min": 2,
+      "max": 3
+    },
+    "offsetS": {
+      "min": 20,
+      "max": 120
+    },
+    "recoveryS": 120,
+    "deck": [
+      {
+        "id": "jumper",
+        "title": "The jumper",
+        "text": "A rider in {car} jumped just as it stopped, to see what would happen. What happened is a sprained ankle. {car} is out until the paramedics arrive, and the paramedics have taken {other} to get there.",
+        "allClear": "The jumper has been carried out, embarrassed. {car} and {other} are back.",
+        "cars": 2,
+        "durationS": 240,
+        "minWave": 6,
+        "slackPeople": 20,
+        "minSpeedMps": 4
+      },
+      {
+        "id": "sofa",
+        "title": "Sofa in the doors",
+        "text": "Two movers have wedged a sofa across the doors of {car}. They are discussing angles.",
+        "allClear": "The sofa is out. It went in sideways after all. {car} is back.",
+        "cars": 1,
+        "durationS": 180,
+        "minWave": 4,
+        "slackPeople": 10
+      },
+      {
+        "id": "wedding",
+        "title": "Wedding photographs",
+        "text": "A wedding party is holding {car} for photographs. The photographer wants one more.",
+        "allClear": "The wedding party has left for the reception. {car} is back.",
+        "cars": 1,
+        "durationS": 150,
+        "minWave": 4,
+        "slackPeople": 10
+      },
+      {
+        "id": "inspector",
+        "title": "The inspector is early",
+        "text": "The lift inspector has turned up a day early and has {car} on inspection.",
+        "allClear": "The inspector has signed off {car} and left a note about the carpet.",
+        "cars": 1,
+        "durationS": 240,
+        "minWave": 5,
+        "slackPeople": 10
+      },
+      {
+        "id": "toddler",
+        "title": "Every button",
+        "text": "A toddler in {car} has pressed every button, the alarm included. Security is holding the car at the lobby until a parent turns up.",
+        "allClear": "A parent has turned up. {car} is back.",
+        "cars": 1,
+        "durationS": 120,
+        "minWave": 4,
+        "slackPeople": 8
+      },
+      {
+        "id": "overload",
+        "title": "Five-a-side",
+        "text": "A whole five-a-side team got into {car} at once and tripped the overload. It needs a reset.",
+        "allClear": "The team took the stairs. {car} is back.",
+        "cars": 1,
+        "durationS": 120,
+        "minWave": 5,
+        "slackPeople": 8
+      },
+      {
+        "id": "coffee",
+        "title": "Coffee in the panel",
+        "text": "Somebody tipped a full coffee into the button panel of {car}. An engineer is drying it with a hair dryer.",
+        "allClear": "The panel is dry and smells of latte. {car} is back.",
+        "cars": 1,
+        "durationS": 180,
+        "minWave": 4,
+        "slackPeople": 10
+      },
+      {
+        "id": "trapped",
+        "title": "Stuck between floors",
+        "text": "{car} has stopped between floors with six people in it. The engineer is using {other} alongside to get them out.",
+        "allClear": "Everybody is out and nobody is hurt. {car} and {other} are back.",
+        "cars": 2,
+        "durationS": 240,
+        "minWave": 8,
+        "slackPeople": 25
+      },
+      {
+        "id": "pigeon",
+        "title": "Pigeon",
+        "text": "There is a pigeon in {car}. Nobody will get in with it.",
+        "allClear": "The pigeon left by the lobby doors. {car} is back.",
+        "cars": 1,
+        "durationS": 150,
+        "minWave": 4,
+        "slackPeople": 8
+      },
+      {
+        "id": "piano",
+        "title": "Piano delivery",
+        "text": "A piano is being delivered, and the movers have {car} to themselves until it is upstairs.",
+        "allClear": "The piano is in. {car} is back.",
+        "cars": 1,
+        "durationS": 240,
+        "minWave": 6,
+        "slackPeople": 15
+      },
+      {
+        "id": "power-dip",
+        "title": "Power dip",
+        "text": "A dip in the supply tripped the drive on {car}. It is resetting itself.",
+        "allClear": "The drive has reset. {car} is back.",
+        "cars": 1,
+        "durationS": 90,
+        "minWave": 4,
+        "slackPeople": 5
+      },
+      {
+        "id": "entourage",
+        "title": "The entourage",
+        "text": "A visiting chief executive’s security team has taken {car} for a private ride to the top.",
+        "allClear": "The chief executive has arrived. {car} is back.",
+        "cars": 1,
+        "durationS": 200,
+        "minWave": 7,
+        "slackPeople": 10,
+        "minSpeedMps": 6
+      },
+      {
+        "id": "dropped-key",
+        "title": "Key in the track",
+        "text": "A dropped key has jammed the door track of {car}. Facilities is fishing for it with a coat hanger.",
+        "allClear": "The key is out and the coat hanger is ruined. {car} is back.",
+        "cars": 1,
+        "durationS": 200,
+        "minWave": 5,
+        "slackPeople": 10
+      }
+    ]
+  }
+}

@@ -500,7 +500,7 @@ export const ACTION_BAR_ROWS: readonly ActionBarRow[] = Object.freeze([
     leave: leave(LEAVE_RUSH),
     back: { label: 'The day', screen: 'stage' },
     primary: primary(['Run the rush again']),
-    note: 'Waves are identical for everyone.',
+    note: 'A card is the same waves for everyone.',
     /*
      * **Not inverted, and no second way out** — wave AQ, lane AQ-3, the post-AP playtest. § 3.3
      * inverts this row, so the loud button read *Leave the rush* (and went to the setup screen, not
