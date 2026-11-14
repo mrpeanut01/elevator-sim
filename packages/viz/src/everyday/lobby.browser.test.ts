@@ -418,3 +418,90 @@ describe.skipIf(!HAS_BROWSER)('§ D1628 — the lobby is the main menu', () => {
     }
   });
 });
+
+/*
+ * **An idle lobby makes no sound.** A playtester sitting on the lobby heard a bell now and then and
+ * could not say where it came from. The only sounds the game makes are the lobby's own chime, struck
+ * by a press on a landing, and a stage's building, so a lobby nobody is touching must start no audio
+ * at all, whatever has been pressed before. Every way a page can make a noise is counted from the
+ * first script on the page: a context built, a source or oscillator started, a media element played.
+ * Motion is left **on** and Sound at its default of on, because those are the settings the car's
+ * timers and the chime run under.
+ */
+const IDLE_MS = 10_000;
+
+interface SoundLog {
+  readonly contexts: number;
+  readonly started: readonly string[];
+}
+
+async function listenForSound(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const log = { contexts: 0, started: [] as string[] };
+    (window as unknown as { __sound: typeof log }).__sound = log;
+    const where = (): string => (new Error().stack ?? '').split('\n').slice(2, 6).join(' | ');
+    const Base = window.AudioContext;
+    if (typeof Base === 'function') {
+      window.AudioContext = class extends Base {
+        constructor(options?: AudioContextOptions) {
+          super(options);
+          log.contexts += 1;
+        }
+      };
+    }
+    if (typeof AudioScheduledSourceNode === 'function') {
+      const start = AudioScheduledSourceNode.prototype.start;
+      AudioScheduledSourceNode.prototype.start = function (this: AudioScheduledSourceNode, ...args: [number?]) {
+        log.started.push(`${this.constructor.name} ${where()}`);
+        start.apply(this, args);
+      };
+    }
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      log.started.push(`media ${where()}`);
+      return play.call(this);
+    };
+  });
+}
+
+const soundLog = (page: Page): Promise<SoundLog> =>
+  page.evaluate(() => (window as unknown as { __sound: SoundLog }).__sound);
+
+describe.skipIf(!HAS_BROWSER)('the lobby is silent until it is pressed', () => {
+  it('starts no sound in ten seconds on a cold lobby nobody touches, with Sound on', async () => {
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      await listenForSound(page);
+      await page.goto(origin, { waitUntil: 'load' });
+      await page.waitForSelector('.everyday-lobby', { timeout: 30_000 });
+      await page.waitForTimeout(IDLE_MS);
+      expect(await page.locator('.everyday-lobby').count(), 'still on the lobby').toBe(1);
+      const heard = await soundLog(page);
+      expect(heard.started, 'an idle lobby started a sound').toEqual([]);
+      expect(heard.contexts, 'an idle lobby built an audio context').toBe(0);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('chimes on a press, and is silent again for ten seconds once the player is back on it', async () => {
+    const page = await openPage(browser, { viewport: { width: 1440, height: 900 } });
+    try {
+      await listenForSound(page);
+      await page.goto(origin, { waitUntil: 'load' });
+      await page.waitForSelector('.everyday-lobby', { timeout: 30_000 });
+      await page.locator('.everyday-lobby-floor-button[data-floor="M"]').click();
+      await page.waitForSelector('.everyday-rail-floor[aria-current="location"][data-floor="M"]', { timeout: 15_000 });
+      const pressed = await soundLog(page);
+      expect(pressed.started.length, 'the press struck the chime').toBeGreaterThan(0);
+      await page.locator('.everyday-rail-menu').click();
+      await page.waitForSelector('.everyday-lobby', { timeout: 15_000 });
+      const back = (await soundLog(page)).started.length;
+      await page.waitForTimeout(IDLE_MS);
+      const after = await soundLog(page);
+      expect(after.started.slice(back), 'the lobby made a sound with nobody touching it').toEqual([]);
+    } finally {
+      await page.close();
+    }
+  });
+});
