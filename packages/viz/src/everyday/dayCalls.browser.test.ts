@@ -385,7 +385,7 @@ describe.skipIf(!HAS_BROWSER)('an ordinary day’s calls — § D1138', () => {
             '.everyday-stage-call:not([hidden]) .everyday-stage-call-answer[data-answer="leave"]',
           );
           leave?.click();
-          return document.querySelector<HTMLElement>('.everyday-stage-end-day')?.checkVisibility() === true;
+          return document.querySelector<HTMLElement>('.everyday-stage-end-day')?.checkVisibility({ visibilityProperty: true }) === true;
         },
         undefined,
         { timeout: 180_000, polling: 100 },

@@ -406,7 +406,23 @@ export interface StageFigure {
    * [§ D1381](../../../../DECISIONS.md)). Absent on a figure no goal grades.
    */
   readonly reads?: ShiftGoal['reads'] | undefined;
+  /**
+   * The width, in characters of the value's own face, of the longest value this figure can show,
+   * where it can show values of very different lengths; the stage holds the value that wide from
+   * the start. Absent where every value is short. See {@link STAGE_LONGEST_SO_FAR_WIDEST}.
+   */
+  readonly widestValueCh?: number | undefined;
 }
+
+/**
+ * **The room *longest so far* keeps for its value** — the playtest of 2026-11-13. The value turns
+ * from `24 s` into `24 s and counting` and back as the longest wait passes between somebody still
+ * standing and somebody gone, and at a 900 px window that 38 px re-wrapped the header and moved the
+ * whole stage 7 px, many times a minute ([§ D1627](../../../../DECISIONS.md)). So the figure says how
+ * wide its longest form is, four digits of seconds and the clause, and the box is always that wide.
+ * A wait past 9 999 s would widen it, and no shipped day comes near that.
+ */
+const STAGE_LONGEST_SO_FAR_WIDEST = '9999 s and counting';
 
 /**
  * **How a header figure is drawn** — [§ D1381](../../../../DECISIONS.md), the post-AN panel's seat B
@@ -866,13 +882,19 @@ function standingNowOf(o: LiveObservations): StageFigure {
 function longestSoFarOf(o: LiveObservations): StageFigure {
   if (o.worstWaitSoFarS === undefined) {
     /* 21ch: inside the stage's 22ch note, so it is never cut (`stageScreen.ts#drawFigures`, the playtest of 2026-11-13). */
-    return { label: 'longest so far', value: '—', refusal: 'nobody has called yet' };
+    return {
+      label: 'longest so far',
+      value: '—',
+      refusal: 'nobody has called yet',
+      widestValueCh: STAGE_LONGEST_SO_FAR_WIDEST.length,
+    };
   }
   const seconds = `${String(Math.round(o.worstWaitSoFarS))} s`;
   return {
     label: 'longest so far',
     value: o.worstWaitIsCensored ? `${seconds} and counting` : seconds,
     reads: 'worstWaitS',
+    widestValueCh: STAGE_LONGEST_SO_FAR_WIDEST.length,
   };
 }
 

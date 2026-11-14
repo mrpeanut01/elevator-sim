@@ -191,6 +191,7 @@ import {
   stageCallStandingOrderOf,
   stageCallPresentOf,
   stageCallPhaseOf,
+  STAGE_END_DAY_COPY,
   stageEndDayOf,
   stageLostCardOf,
   STAGE_LOST_COPY,
@@ -719,7 +720,11 @@ function mountStage(
   let bookedCars: readonly BookedOutCar[] = [];
 
   const driving = el(doc, 'span', 'everyday-stage-driving');
-  driving.style.cssText = 'display:flex;align-items:center;gap:6px';
+  /*
+   * The pills' 20 px, so a row the *booked out* pill shares with this line keeps its height when the
+   * pill goes (the playtest of 2026-11-13: 1.2 px of the header, at every car's return).
+   */
+  driving.style.cssText = 'display:flex;align-items:center;gap:6px;min-height:20px';
   /* The model's own word, here and on every draw from `stageHeaderOf`'s `drivingLabel` — the corpus
      sweeps that one, so a literal here was one word with two sources and one of them checked. */
   const drivingEyebrow = el(doc, 'span', undefined, STAGE_DRIVING_LABEL);
@@ -899,9 +904,18 @@ function mountStage(
    * clear and the stage asks nothing more. Beside the skip, because it is the same kind of control:
    * it moves no run, and files the day on the recording already made.
    */
-  const endDayButton = el(doc, 'button', 'everyday-stage-end-day');
+  const endDayButton = el(doc, 'button', 'everyday-stage-end-day', STAGE_END_DAY_COPY.label);
   endDayButton.type = 'button';
-  endDayButton.style.display = 'none';
+  endDayButton.style.cssText = [
+    'background:transparent',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.control)}px`,
+    'padding:5px 9px',
+    `font:500 11px ${TYPE.mono}`,
+    `color:${C.ink}`,
+    'cursor:pointer',
+  ].join(';');
+  hideEndDay();
   endDayButton.addEventListener('click', () => {
     endTheDay();
   });
@@ -4755,22 +4769,29 @@ function mountStage(
         ? stageEndDayOf(host.goalsAt(simTimeS))
         : undefined;
     if (view === undefined) {
-      if (endDayButton.style.display !== 'none') endDayButton.style.display = 'none';
+      hideEndDay();
       return;
     }
     if (endDayButton.textContent !== view.label) endDayButton.textContent = view.label;
     if (endDayButton.title !== view.note) endDayButton.title = view.note;
-    if (endDayButton.style.display === 'none') {
-      endDayButton.style.cssText = [
-        'background:transparent',
-        `border:1px solid ${C.rule}`,
-        `border-radius:${String(R.control)}px`,
-        'padding:5px 9px',
-        `font:500 11px ${TYPE.mono}`,
-        `color:${C.ink}`,
-        'cursor:pointer',
-      ].join(';');
-    }
+    if (endDayButton.style.display !== '') endDayButton.style.display = '';
+    if (endDayButton.style.visibility !== '') endDayButton.style.visibility = '';
+  }
+
+  /**
+   * *End the day* out of sight. **On a scored day it keeps its place in the speed strip**, invisible,
+   * unfocusable and out of the accessibility tree, because it comes up at the moment the day is lost
+   * and a chip arriving in the strip re-wrapped the header and moved the stage under the player
+   * (the playtest of 2026-11-13, [§ D1627](../../../../DECISIONS.md)). Anywhere else it can never
+   * come up, so it takes no room.
+   */
+  function hideEndDay(): void {
+    const holds = context.ctx === 'daily';
+    const display = holds ? '' : 'none';
+    const visibility = holds ? 'hidden' : '';
+    if (endDayButton.style.display !== display) endDayButton.style.display = display;
+    if (endDayButton.style.visibility !== visibility) endDayButton.style.visibility = visibility;
+    if (endDayButton.title !== '') endDayButton.title = '';
   }
 
   /**
@@ -4999,7 +5020,9 @@ function mountStage(
        */
       const tone = tones[index] ?? (figure.refusal === undefined ? 'live' : 'still');
       value.dataset['tone'] = tone;
-      value.style.cssText = `font:500 16px ${TYPE.mono};color:${figure.refusal !== undefined ? C.faint : FIGURE_INK[tone]}`;
+      /* The longest value's width, held from the start, so a value growing a clause re-wraps nothing (`STAGE_LONGEST_SO_FAR_WIDEST`). */
+      const holds = figure.widestValueCh === undefined ? '' : `;white-space:nowrap;min-width:${String(figure.widestValueCh)}ch`;
+      value.style.cssText = `font:500 16px ${TYPE.mono};color:${figure.refusal !== undefined ? C.faint : FIGURE_INK[tone]}${holds}`;
       box.append(label, value);
       /*
        * R13: a ratio carries the count it was taken over, in its own box. A count is its own `n`

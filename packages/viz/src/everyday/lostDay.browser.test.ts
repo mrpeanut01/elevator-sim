@@ -188,7 +188,7 @@ describe.skipIf(!HAS_BROWSER)('the lost day — § D1435', () => {
    * the card goes. Red before: the stage stood ~130 px lower under the card. Positions are read in
    * the screen's own content, so the card's scroll clear of a pinned header is not counted.
    */
-  it('stands over the building when stacked, so neither the card nor Watch the rest moves it', async () => {
+  it('stands over the building when stacked, and the header keeps one height all day, so nothing moves it', async () => {
     const page = await openPage(browser, { viewport: { width: 900, height: 900 } });
     try {
       await onCrownsDay(page, '2026-10-05');
@@ -208,14 +208,18 @@ describe.skipIf(!HAS_BROWSER)('the lost day — § D1435', () => {
         };
         let before = topOf();
         const began = performance.now();
-        return new Promise<{ before: number; under: number; inStage: boolean } | undefined>((done) => {
+        /* Every height the header took on a frame: a value that grows a clause once re-wrapped it 7 px. */
+        const heights = new Set<number>();
+        return new Promise<{ before: number; under: number; inStage: boolean; heights: number[] } | undefined>((done) => {
           const tick = (): void => {
+            const header = document.querySelector('.everyday-stage-header');
+            if (header !== null) heights.add(header.getBoundingClientRect().height);
             document
               .querySelector<HTMLButtonElement>('.everyday-stage-call:not([hidden]) .everyday-stage-call-answer[data-answer="leave"]')
               ?.click();
             const card = document.querySelector<HTMLElement>('.everyday-stage-lost');
             if (card?.hidden === false) {
-              done({ before, under: topOf(), inStage: card.parentElement?.classList.contains('everyday-stage-wrap') ?? false });
+              done({ before, under: topOf(), inStage: card.parentElement?.classList.contains('everyday-stage-wrap') ?? false, heights: [...heights] });
               return;
             }
             if (performance.now() - began > 200_000) {
@@ -231,11 +235,8 @@ describe.skipIf(!HAS_BROWSER)('the lost day — § D1435', () => {
       expect(seen, 'the day never stopped on the card').toBeDefined();
       expect(seen?.under, 'the building moved when the card came up').toBe(seen?.before);
       expect(seen?.inStage, 'the card is not drawn over the building').toBe(true);
-      /*
-       * The card's going, judged alone: hidden and read in one synchronous task, so nothing else can
-       * draw in between. *Watch the rest* also changes the header (its *End the day* chip appears),
-       * which is the header's own business and not this card's.
-       */
+      expect(seen?.heights, 'the header changed height while the day played').toHaveLength(1);
+      /* The card's going, judged alone: hidden and read in one synchronous task, so nothing else can draw in between. */
       const going = await page.evaluate(() => {
         const region = document.querySelector('.everyday-screen');
         const wrap = document.querySelector('.everyday-stage-wrap');
@@ -251,6 +252,22 @@ describe.skipIf(!HAS_BROWSER)('the lost day — § D1435', () => {
       expect(going?.down, 'the building moved when the card went').toBe(going?.up);
       await page.locator('.everyday-stage-lost-watch').click();
       expect(await page.locator('.everyday-stage-lost:not([hidden])').count()).toBe(0);
+      /* *Watch the rest* plays on: a second of frames, every one at the height the day began at. */
+      const after = await page.evaluate(
+        () =>
+          new Promise<number[]>((done) => {
+            const heights = new Set<number>();
+            const began = performance.now();
+            const tick = (): void => {
+              const header = document.querySelector('.everyday-stage-header');
+              if (header !== null) heights.add(header.getBoundingClientRect().height);
+              if (performance.now() - began > 1_000) done([...heights]);
+              else requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          }),
+      );
+      expect(after, 'the header changed height once Watch the rest was pressed').toEqual(seen?.heights);
     } finally {
       await page.close();
     }
