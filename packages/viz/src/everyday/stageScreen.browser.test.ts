@@ -695,9 +695,22 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
           inStage: badge?.closest('.everyday-stage-wrap') != null,
           arrivals: boxOf('.everyday-stage-arrivals'),
           stage: boxOf('.everyday-stage-wrap'),
+          /*
+           * Every other block above the arrivals, by height: the header, a call card, a lost-day
+           * card, the goals. The badge itself is left out, so a badge in page flow still fails.
+           */
+          above: (() => {
+            const arrivals = document.querySelector('.everyday-stage-arrivals');
+            const sizes: string[] = [];
+            for (let node = arrivals?.previousElementSibling; node; node = node.previousElementSibling) {
+              if (node.classList.contains('everyday-stage-alarm')) continue;
+              sizes.push(`${node.className}:${String(node.getBoundingClientRect().height)}`);
+            }
+            return sizes.join('|');
+          })(),
         };
       };
-      const toggles: { up: boolean; text: string; inStage: boolean; moved: string[] }[] = [];
+      const toggles: { up: boolean; text: string; inStage: boolean; moved: string[]; confounded: boolean }[] = [];
       let before = read();
       const began = performance.now();
       await new Promise<void>((done) => {
@@ -707,11 +720,16 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
             const moved: string[] = [];
             if (now.arrivals !== before.arrivals) moved.push(`arrivals ${before.arrivals} → ${now.arrivals}`);
             if (now.stage !== before.stage) moved.push(`stage ${before.stage} → ${now.stage}`);
-            toggles.push({ up: now.up, text: now.text, inStage: now.inStage, moved });
+            /*
+             * CI found the stage stopping for a call on the very frame the badge cleared, and the
+             * call card's 503 px charged to the badge. A toggle on a frame where another block above
+             * changed size says nothing about the badge, so it is set aside, never passed.
+             */
+            toggles.push({ up: now.up, text: now.text, inStage: now.inStage, moved, confounded: now.above !== before.above });
           }
           before = now;
           /* Up once and down again is the whole claim; 60 s is inside the 120 s case budget. */
-          if (toggles.length >= 2 || performance.now() - began > 60_000) {
+          if (toggles.filter((toggle) => !toggle.confounded).length >= 2 || performance.now() - began > 60_000) {
             done();
             return;
           }
@@ -728,7 +746,9 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
       'the badge never came up on vertical-city, so this case is about nothing — restore a fixture ' +
         'whose morning raises it rather than deleting this requirement',
     ).toBeGreaterThan(0);
-    for (const toggle of seen) expect(toggle.moved, `the badge went ${toggle.up ? 'up' : 'down'}`).toEqual([]);
+    const clean = seen.filter((toggle) => !toggle.confounded);
+    expect(clean.length, 'every toggle of the badge coincided with another block above changing size').toBeGreaterThan(0);
+    for (const toggle of clean) expect(toggle.moved, `the badge went ${toggle.up ? 'up' : 'down'}`).toEqual([]);
     const up = seen.find((toggle) => toggle.up);
     expect(up?.inStage, 'the badge is not drawn over the building').toBe(true);
     /* Terse: a count, not a sentence. */
