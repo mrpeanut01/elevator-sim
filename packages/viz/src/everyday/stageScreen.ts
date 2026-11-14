@@ -2218,7 +2218,6 @@ function mountStage(
     title,
     header,
     callCard,
-    lostCard,
     callRows,
     goals,
     watchBand,
@@ -2293,6 +2292,34 @@ function mountStage(
     `gap:${String(GAP.block)}px`,
   ].join(';');
   let twoColumn = false;
+  /**
+   * **Where the lost day's card stands** — the playtest of 2026-11-13. Stacked under the header it
+   * pushed the building down ~130 px the moment the day was lost, and back up when play resumed,
+   * which is the jump the queue alarm had. The stage is stopped while the card is up, so stacked it
+   * is drawn over the top of the building instead, inside the stage's frame, and nothing below it
+   * moves. In two columns it stays at the top of the side column, where it never moved anything.
+   * Recorded under [§ D405](../../../../DECISIONS.md).
+   */
+  function placeLostCard(wide: boolean): void {
+    const overlay = [
+      ['position', 'absolute'],
+      ['top', '10px'],
+      ['left', '50%'],
+      ['transform', 'translateX(-50%)'],
+      ['width', 'min(460px, calc(100% - 20px))'],
+      ['max-height', 'calc(100% - 20px)'],
+      ['overflow-y', 'auto'],
+      ['box-sizing', 'border-box'],
+      ['z-index', '3'],
+      ['box-shadow', '0 8px 24px rgba(0,0,0,.22)'],
+    ] as const;
+    for (const [property, value] of overlay) {
+      if (wide) lostCard.style.removeProperty(property);
+      else lostCard.style.setProperty(property, value);
+    }
+    if (!wide) stageWrap.append(lostCard);
+  }
+  placeLostCard(false);
   function syncColumns(): void {
     const width = region.clientWidth;
     const shafts = adopted?.shafts.length ?? 0;
@@ -2302,6 +2329,7 @@ function mountStage(
       width - STAGE_SIDE_COLUMN_PX >= shafts * STAGE_TWO_COLUMN_MIN_SHAFT_PX;
     if (wide === twoColumn) return;
     twoColumn = wide;
+    placeLostCard(wide);
     /*
      * The call goes with them: at the top of the side column it is beside the building it is about,
      * and the building does not move when the day stops. Stacked, it is back under the header.
@@ -2310,7 +2338,7 @@ function mountStage(
       side.append(callCard, lostCard, callRows, goals, legend, interventions, race);
       stageWrap.after(side);
     } else {
-      header.after(callCard, lostCard, callRows);
+      header.after(callCard, callRows);
       root.insertBefore(goals, watchBand);
       stageRow.after(legend, interventions, race);
       side.remove();

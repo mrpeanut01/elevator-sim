@@ -180,6 +180,58 @@ describe.skipIf(!HAS_BROWSER)('the lost day — § D1435', () => {
     }
   });
 
+  /*
+   * **The card moves nothing** — the playtest of 2026-11-13. Stacked under the header (a region
+   * under `STAGE_TWO_COLUMN_MIN_PX`), the card pushed the building down ~130 px on the frame the day
+   * was lost and back up on *Watch the rest*. It is drawn over the top of the building now, so the
+   * building's box is read on the frame before the card and on the card's own frame, and again after
+   * the card goes. Red before: the stage stood ~130 px lower under the card.
+   */
+  it('stands over the building when stacked, so neither the card nor Watch the rest moves it', async () => {
+    const page = await openPage(browser, { viewport: { width: 900, height: 900 } });
+    try {
+      await onCrownsDay(page, '2026-10-05');
+      expect(await page.locator('.everyday-stage-side').count(), 'this width should stack the stage').toBe(0);
+      await page.locator('.everyday-stage-speed', { hasText: '90×' }).click();
+      await page.locator('.everyday-stage-start').click();
+      const seen = await page.evaluate(async () => {
+        const topOf = (): number => document.querySelector('.everyday-stage-wrap')?.getBoundingClientRect().top ?? Number.NaN;
+        let before = topOf();
+        const began = performance.now();
+        return new Promise<{ before: number; under: number; inStage: boolean } | undefined>((done) => {
+          const tick = (): void => {
+            document
+              .querySelector<HTMLButtonElement>('.everyday-stage-call:not([hidden]) .everyday-stage-call-answer[data-answer="leave"]')
+              ?.click();
+            const card = document.querySelector<HTMLElement>('.everyday-stage-lost');
+            if (card?.hidden === false) {
+              done({ before, under: topOf(), inStage: card.parentElement?.classList.contains('everyday-stage-wrap') ?? false });
+              return;
+            }
+            if (performance.now() - began > 200_000) {
+              done(undefined);
+              return;
+            }
+            before = topOf();
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+      });
+      expect(seen, 'the day never stopped on the card').toBeDefined();
+      expect(seen?.under, 'the building moved when the card came up').toBe(seen?.before);
+      expect(seen?.inStage, 'the card is not drawn over the building').toBe(true);
+      await page.locator('.everyday-stage-lost-watch').click();
+      expect(await page.locator('.everyday-stage-lost:not([hidden])').count()).toBe(0);
+      const after = await page.evaluate(
+        () => document.querySelector('.everyday-stage-wrap')?.getBoundingClientRect().top ?? Number.NaN,
+      );
+      expect(after, 'the building moved when the card went').toBe(seen?.under);
+    } finally {
+      await page.close();
+    }
+  });
+
   it('stops on the card at 600× on a slow page, on the instant and figure a 90× run stops on', async () => {
     const steady = await openPage(browser, { viewport: { width: 1440, height: 900 } });
     let reference = { fact: '', clock: '' };
