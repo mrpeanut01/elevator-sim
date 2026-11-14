@@ -1229,6 +1229,45 @@ export function stageAlarmOf(o: LiveObservations, floorLabelOf: (id: string) => 
   return where === undefined ? people : `${people}, deepest at ${floorLabelOf(where)}`;
 }
 
+/**
+ * The alarm's **badge**: the head count alone, *"47 waiting"*, or `undefined` exactly when
+ * {@link stageAlarmOf} is — the same threshold, so the two cannot disagree about whether there is
+ * trouble.
+ *
+ * The playtest of 2026-11-13 found the strip, a full sentence in page flow above the building,
+ * pushing the whole stage down when it came up and letting it jump back when it cleared — motion
+ * that disturbed play, which [§ D1627](../../../../DECISIONS.md) forbids. So the picture is now a
+ * badge drawn **over** the building, in space that is always there, and it says only the count.
+ * The sentence is not lost: it is the badge's `title` and the hidden announcement, unchanged.
+ * Recorded here under [§ D405](../../../../DECISIONS.md).
+ */
+export function stageAlarmBadgeOf(o: LiveObservations): string | undefined {
+  if (o.waitingNow <= STAGE_ALARM_STANDING) return undefined;
+  return `${String(o.waitingNow)} waiting`;
+}
+
+/* -------------------------------------------------------------------------- *
+ * The stage's mute toggle
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **One press to silence the stage** — the playtest of 2026-11-13: *"game play screen needs an
+ * audio mute button fairly easily accessible"*. It is the same switch as Settings → Sound
+ * (`everydayProfileStore().soundOn()`), not a second one, so the two can never disagree and the
+ * choice is remembered with the rest of the profile. Its name is fixed and `aria-pressed` carries
+ * the state, the toggle-button pattern, so a reader hears *Mute sound, pressed* rather than a name
+ * that changes under the press. The title says what is true now and that Settings is the same switch.
+ * Recorded here under [§ D405](../../../../DECISIONS.md).
+ */
+export const STAGE_MUTE_LABEL = 'Mute sound';
+
+/** The toggle's title for the current setting — what is true now, and what a press does. */
+export function stageMuteTitleOf(soundOn: boolean): string {
+  return soundOn
+    ? 'Sound is on. Press to mute; it is the same switch as Settings, Sound.'
+    : 'Sound is off. Press to turn it back on; it is the same switch as Settings, Sound.';
+}
+
 /* -------------------------------------------------------------------------- *
  * § 7.6 — interventions
  * -------------------------------------------------------------------------- */
@@ -2327,7 +2366,17 @@ export interface StageFloorRow {
   /** Pixel y of the floor's own line — the slab's top. */
   readonly y: number;
   readonly isEntrance: boolean;
-  /** Whether this row's label is legible at the current pitch. Every row is still drawn. */
+  /**
+   * A transfer floor that is not the street entrance — a sky lobby. The cutaway draws it in its own
+   * colour and never thins its label away, so the levels where riders change cars read at a glance
+   * on a hundred-storey tower (the playtest of 2026-11-13: *"the sky lobbies are not evident"*).
+   */
+  readonly isSkyLobby: boolean;
+  /**
+   * Whether this row's label is drawn. Every row is still drawn. The entrance always is; a sky lobby
+   * is unless a label already drawn sits closer than {@link MIN_LABEL_PITCH_PX} (a lower/upper deck
+   * pair keeps one label, not two through each other); any other floor only at a legible pitch.
+   */
   readonly labelled: boolean;
   /**
    * Whether the row is inside the camera's window — GitHub issue #324. `true` for every row when
@@ -2389,8 +2438,44 @@ export interface StageCameraWindow {
 }
 
 const PAD = 14;
-const GUTTER = 74;
+/**
+ * The floor-label gutter. 96 px rather than the first draft's 74, paid for out of the crowd's
+ * strip below, so a sky lobby's label reads rather than being squeezed to a smear.
+ */
+const GUTTER = 96;
 const MIN_LABEL_PITCH_PX = 13;
+
+/**
+ * **The waiting crowd's strip is narrow, and the shafts get the width** — the playtest of
+ * 2026-11-13: *"tons of room left to right with the lobby queues taking up so much room"*. The strip
+ * was a third of the well band, so on a wide window the building's shafts were packed into the right
+ * two thirds behind a mostly empty landing. It is now about an eighth, between these bounds; a crowd
+ * that does not fit one row still stacks in lanes and past {@link MAX_LANDING_FIGURES} says `+N`.
+ */
+const LANDING_SHARE = 0.12;
+const LANDING_MIN_PX = 52;
+const LANDING_MAX_PX = 104;
+
+/**
+ * The gap between two banks, as a share of one shaft's pitch — so a tower's banks read as groups
+ * (low-rise, the shuttles, the high-rise) rather than one undifferentiated row of wells.
+ */
+const BANK_GAP_SHARE = 0.6;
+
+/** What a sky lobby's row carries in the gutter before its name. */
+export const STAGE_SKY_LOBBY_GLYPH = '⇄';
+
+/**
+ * The gutter text for a row: the floor's own label, and on a sky lobby the glyph in front, plus the
+ * words *Sky lobby* when the building's label does not already say so (a drawn building may call its
+ * transfer floor just `31`).
+ */
+export function stageGutterLabelOf(row: Pick<StageFloorRow, 'isSkyLobby'>, label: string): string {
+  if (!row.isSkyLobby) return label;
+  return /sky lobby/iu.test(label)
+    ? `${STAGE_SKY_LOBBY_GLYPH} ${label}`
+    : `${STAGE_SKY_LOBBY_GLYPH} Sky lobby ${label}`;
+}
 
 /* -------------------------------------------------------------------------- *
  * § 7.3 — the camera. GitHub issue #324.
@@ -2599,7 +2684,23 @@ export function stageGeometryOf(input: StageGeometryInput): StageGeometry {
     span <= 0 ? (top + bottom) / 2 : bottom - ((heightM - lowest) / span) * (bottom - top);
 
   const rowPitch = fittedTo.length < 2 ? bottom - top : (bottom - top) / (fittedTo.length - 1);
-  const labelled = rowPitch >= MIN_LABEL_PITCH_PX;
+  const legible = rowPitch >= MIN_LABEL_PITCH_PX;
+
+  /*
+   * Entrance floors are never thinned out — it is the row a reader orients by (`RV-09`). Sky lobbies
+   * join them, yielding only to a label already drawn too close, bottom-up so the entrance wins.
+   */
+  const skyLobby = (floor: VizFloor): boolean => floor.isTransferFloor && !floor.isEntrance;
+  const labelledIds = new Set<string>();
+  let lastLabelledY = Number.POSITIVE_INFINITY;
+  for (const floor of [...input.floors].sort((a, b) => a.heightM - b.heightM)) {
+    const y = yForHeight(floor.heightM);
+    const room = Math.abs(lastLabelledY - y) >= MIN_LABEL_PITCH_PX;
+    if (legible || floor.isEntrance || (skyLobby(floor) && room)) {
+      labelledIds.add(floor.id);
+      lastLabelledY = y;
+    }
+  }
 
   const rows: readonly StageFloorRow[] = input.floors.map((floor) => ({
     floorId: floor.id,
@@ -2607,22 +2708,32 @@ export function stageGeometryOf(input: StageGeometryInput): StageGeometry {
     heightM: floor.heightM,
     y: yForHeight(floor.heightM),
     isEntrance: floor.isEntrance,
-    /* Entrance floors are never thinned out — it is the row a reader orients by (`RV-09`). */
-    labelled: labelled || floor.isEntrance,
+    isSkyLobby: skyLobby(floor),
+    labelled: labelledIds.has(floor.id),
     visible: fitted.length === 0 || inWindow(floor),
   }));
 
   const outOfService = new Set(input.outOfServiceCarIds ?? []);
   const wellsX = plot.x + GUTTER;
   const wellsWidth = Math.max(plot.x + plot.width - wellsX, 30);
-  /* The landing crowd stands in the left third of the well band, ahead of the first shaft. */
-  const landingWidth = Math.min(Math.max(wellsWidth * 0.34, 60), wellsWidth - 24);
+  /* The landing crowd stands in a narrow strip ahead of the first shaft — {@link LANDING_SHARE}. */
+  const landingWidth = Math.min(
+    Math.max(Math.min(wellsWidth * LANDING_SHARE, LANDING_MAX_PX), LANDING_MIN_PX),
+    wellsWidth - 24,
+  );
   const columnsX = wellsX + landingWidth;
   const columnsWidth = plot.x + plot.width - columnsX;
   const count = Math.max(input.shafts.length, 1);
-  const pitch = columnsWidth / count;
+  /* A bank boundary is wherever the next shaft's bank differs — {@link BANK_GAP_SHARE}. */
+  const bankStarts = input.shafts.map(
+    (shaft, index) => index > 0 && shaft.bankId !== input.shafts[index - 1]?.bankId,
+  );
+  const gaps = bankStarts.filter(Boolean).length;
+  const pitch = columnsWidth / (count + gaps * BANK_GAP_SHARE);
+  let offset = 0;
   const columns: readonly StageShaftColumn[] = input.shafts.map((shaft, index) => {
-    const x = columnsX + index * pitch + pitch * 0.12;
+    if (bankStarts[index] === true) offset += pitch * BANK_GAP_SHARE;
+    const x = columnsX + offset + index * pitch + pitch * 0.12;
     const w = pitch * 0.76;
     return {
       carId: shaft.carId,
