@@ -48,6 +48,7 @@ import {
   DEFAULT_STAGE_SPEED_INDEX,
   MAX_CAR_RIDERS,
   MAX_LANDING_FIGURES,
+  stageAlarmBadgeOf,
   stageAlarmOf,
   stageBandOf,
   stageBarModelOf,
@@ -57,6 +58,7 @@ import {
   stageCrowdCapOf,
   stageFilingLandsOn,
   stageGeometryOf,
+  stageGutterLabelOf,
   stageHeaderOf,
   stageBookedOutOf,
   stageInkFor,
@@ -560,6 +562,15 @@ describe('§ 7.2 — the alarm strip', () => {
   it('names the floor the stack is actually on rather than assuming the lobby', () => {
     const line = stageAlarmOf(observationsAt(crowdOf(60), 100), () => 'Level 12');
     expect(line).toMatch(/deepest at Level 12/);
+  });
+
+  it('badges the head count alone, on exactly the threshold the sentence uses', () => {
+    const at = (size: number) => observationsAt(crowdOf(size), 100);
+    expect(stageAlarmBadgeOf(at(STAGE_ALARM_STANDING))).toBeUndefined();
+    expect(stageAlarmBadgeOf(at(STAGE_ALARM_STANDING + 7))).toBe('47 waiting');
+    for (const size of [0, STAGE_ALARM_STANDING, STAGE_ALARM_STANDING + 1, 60]) {
+      expect(stageAlarmBadgeOf(at(size)) === undefined).toBe(stageAlarmOf(at(size), (id) => id) === undefined);
+    }
   });
 });
 
@@ -1201,6 +1212,56 @@ describe('the cutaway’s geometry', () => {
     expect(g.rows.filter((row) => row.labelled).length).toBeLessThan(60);
     /* The row a reader orients by is never thinned out — `RV-09`'s rule, kept. */
     expect(g.rows.find((row) => row.isEntrance)?.labelled).toBe(true);
+  });
+
+  /*
+   * The playtest of 2026-11-13: *"the sky lobbies are not evident … tons of room left to right with
+   * the lobby queues taking up so much room"*. A 100-storey tower with a deck pair at the street and
+   * a deck pair of sky lobbies at 50, which is `vertical-city`'s shape.
+   */
+  describe('sky lobbies, the crowd strip and the banks — the playtest of 2026-11-13', () => {
+    const tower = Array.from({ length: 100 }, (_unused, index) => ({
+      ...syntheticFloor(`L${String(index)}`, index),
+      heightM: index * 3.2,
+      isTransferFloor: index === 0 || index === 1 || index === 50 || index === 51,
+    }));
+    const g = stageGeometryOf({ width: 1280, height: 480, floors: tower, shafts });
+
+    it('marks a transfer floor a sky lobby, but not the street entrance', () => {
+      expect(g.rows.filter((row) => row.isSkyLobby).map((row) => row.floorId)).toEqual(['L1', 'L50', 'L51']);
+    });
+
+    it('labels a sky lobby where ordinary floors are thinned, and a deck pair once, not twice', () => {
+      expect(g.rowPitch).toBeLessThan(13);
+      const labelled = g.rows.filter((row) => row.labelled).map((row) => row.floorId);
+      /* The entrance, then one of the 50/51 pair; L1 yields to the entrance 4 px under it. */
+      expect(labelled).toEqual(['L0', 'L50']);
+    });
+
+    it('says sky lobby in the gutter, without saying it twice', () => {
+      expect(stageGutterLabelOf({ isSkyLobby: true }, '31')).toBe('⇄ Sky lobby 31');
+      expect(stageGutterLabelOf({ isSkyLobby: true }, 'Sky lobby A - lower')).toBe('⇄ Sky lobby A - lower');
+      expect(stageGutterLabelOf({ isSkyLobby: false }, 'Lobby')).toBe('Lobby');
+    });
+
+    it('keeps the crowd to a narrow strip, so the shafts have the width', () => {
+      const wells = g.plot.x + g.plot.width - g.landing.x;
+      expect(g.landing.width).toBeLessThanOrEqual(104);
+      expect(g.landing.width / wells).toBeLessThan(0.15);
+    });
+
+    it('opens a gap between banks wider than the gap inside one', () => {
+      const banked = [
+        { ...syntheticShaft('lo-A', 'A'), bankId: 'low' },
+        { ...syntheticShaft('lo-B', 'B'), bankId: 'low' },
+        { ...syntheticShaft('hi-A', 'C'), bankId: 'high' },
+      ];
+      const b = stageGeometryOf({ width: 1280, height: 480, floors: tower, shafts: banked });
+      const [one, two, three] = b.columns;
+      if (one === undefined || two === undefined || three === undefined) throw new Error('three columns');
+      expect(three.x - (two.x + two.width)).toBeGreaterThan((two.x - (one.x + one.width)) * 1.5);
+      expect(three.x + three.width).toBeLessThanOrEqual(b.plot.x + b.plot.width + 0.001);
+    });
   });
 
   it('lays the wells out inside the plot, without overlap, and flags the withdrawn car', () => {

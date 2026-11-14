@@ -29,6 +29,7 @@ import {
   stageCarReadoutOf,
   stageCarRestBarOf,
   stageCrowdCapOf,
+  stageGutterLabelOf,
   stageInkFor,
   stageReadoutRoomOf,
   MAX_LANDING_FIGURES,
@@ -126,17 +127,31 @@ export function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput):
    * fact once. Empty on a building that declares neither, so its gutter is what it was.
    */
   const marks = floorMarksOf(recording);
+  /*
+   * Sky lobbies first, under everything else on the row: a sky-blue stripe the full width of the
+   * building, at least a few pixels tall however thin the pitch, so a transfer level reads as one on
+   * a hundred-storey tower where an ordinary floor is a hairline.
+   */
+  for (const row of g.rows) {
+    if (!row.visible || !row.isSkyLobby) continue;
+    const band = Math.max(4, Math.min(g.rowPitch, 14));
+    ctx.fillStyle = withAlpha(C.sky, 0.22);
+    ctx.fillRect(g.plot.x + 6, row.y - band + slab, g.plot.width - 12, band);
+  }
   for (const row of g.rows) {
     if (!row.visible) continue;
-    ctx.fillStyle = row.isEntrance ? C.ruleMid : C.ruleLight;
+    ctx.fillStyle = row.isSkyLobby ? C.sky : row.isEntrance ? C.ruleMid : C.ruleLight;
     ctx.fillRect(g.plot.x + 6, row.y, g.plot.width - 12, slab);
     if (!row.labelled) continue;
-    ctx.fillStyle = row.isEntrance ? C.ink : C.warmGrey;
-    ctx.font = `600 ${String(Math.min(11, Math.max(8, g.rowPitch * 0.45)))}px ${TYPE.mono}`;
+    ctx.fillStyle = row.isSkyLobby ? C.ink : row.isEntrance ? C.ink : C.warmGrey;
+    ctx.font = `600 ${String(Math.min(11, Math.max(9, g.rowPitch * 0.45)))}px ${TYPE.mono}`;
     ctx.textBaseline = 'bottom';
     ctx.textAlign = 'left';
+    /* The name is what gets cut; the marks after it never are — they are what a reader scans for. */
+    const mark = marks.get(row.floorId) ?? '';
+    const name = stageGutterLabelOf(row, input.floorLabelOf(row.floorId));
     ctx.fillText(
-      `${input.floorLabelOf(row.floorId)}${marks.get(row.floorId) ?? ''}`,
+      `${fitText(ctx, name, g.gutterWidth - 8 - (textWidth(ctx, mark) ?? 0))}${mark}`,
       g.plot.x + 4,
       row.y - 1,
       g.gutterWidth - 8,
@@ -467,6 +482,25 @@ function stageBandRankOf(waitedS: number): number {
  * a determinism test cannot see the ramp inside it. A real context is a superset in every direction
  * this package uses, so the cast loses nothing a caller could rely on.
  */
+/**
+ * `text` cut to `maxWidth` with an ellipsis. `fillText`'s own `maxWidth` squeezes the glyphs instead,
+ * which turned a long floor name into a smear in a narrow gutter.
+ */
+function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+  const full = textWidth(ctx, text);
+  if (full === undefined || full <= maxWidth) return text;
+  let cut = text;
+  while (cut.length > 1 && (textWidth(ctx, `${cut}…`) ?? 0) > maxWidth) cut = cut.slice(0, -1);
+  return `${cut.trimEnd()}…`;
+}
+
+/** A string's drawn width, or `undefined` from a context that cannot measure (a recording fake). */
+function textWidth(ctx: CanvasRenderingContext2D, text: string): number | undefined {
+  if (text === '') return 0;
+  const measured = (ctx as Partial<CanvasRenderingContext2D>).measureText?.(text) as TextMetrics | undefined;
+  return typeof measured?.width === 'number' ? measured.width : undefined;
+}
+
 function asCanvas2DLike(ctx: CanvasRenderingContext2D): Canvas2DLike {
   return ctx as unknown as Canvas2DLike;
 }

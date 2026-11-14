@@ -117,6 +117,9 @@ import {
   STAGE_SWITCH_PICKER_LABEL,
   STAGE_SWITCH_PICKER_NOTE,
   STAGE_FLOOR_JUMP_PLACEHOLDER,
+  stageAlarmBadgeOf,
+  stageMuteTitleOf,
+  STAGE_MUTE_LABEL,
   stageAlarmOf,
   stageBarModelOf,
   stageRunFailedViewOf,
@@ -763,14 +766,96 @@ function mountStage(
     `background:${C.sun}`,
     `border:1px solid ${C.sun}`,
     `border-radius:${String(R.row)}px`,
-    'padding:7px 13px',
+    /*
+     * **One box whatever it says** — the playtest of 2026-11-13. *⏸ Pause* is 8 px wider than
+     * *▶ Play* and its glyph 2 px taller, so every press re-wrapped the header and moved the whole
+     * stage under the player's pointer (§ D1627). The height is the mute toggle's, and the width
+     * holds the longer of the two labels a running day shows; the held *Running the day ahead…*
+     * is shown before play only, so it may still grow the box.
+     */
+    'box-sizing:border-box',
+    'flex:0 0 auto',
+    'height:32px',
+    'min-width:6.8em',
+    'display:inline-flex',
+    'align-items:center',
+    'justify-content:center',
+    'line-height:1',
+    'padding:0 13px',
     `color:${C.ink}`,
     'font-size:12.5px',
     'font-weight:600',
+    'white-space:nowrap',
     'cursor:pointer',
   ].join(';');
   playButton.addEventListener('click', () => {
     togglePlay();
+  });
+
+  /*
+   * **The mute toggle** — the playtest of 2026-11-13, `stageScreenModel.ts#STAGE_MUTE_LABEL` for the
+   * words and why it is Settings' own switch. Beside Play in the header, which pins while the day
+   * plays, at a fixed 32 px square whatever its state, so a press moves nothing. The icon is drawn,
+   * not typed: an emoji's size and colour are the platform's, and this has to match the ink.
+   */
+  const muteButton = el(doc, 'button', 'everyday-stage-mute');
+  muteButton.type = 'button';
+  muteButton.setAttribute('aria-label', STAGE_MUTE_LABEL);
+  muteButton.style.cssText = [
+    'flex:0 0 auto',
+    'width:32px',
+    'height:32px',
+    'padding:0',
+    'display:inline-flex',
+    'align-items:center',
+    'justify-content:center',
+    `background:${C.paper}`,
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.row)}px`,
+    `color:${C.ink}`,
+    'cursor:pointer',
+  ].join(';');
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const muteIcon = doc.createElementNS(SVG_NS, 'svg');
+  muteIcon.setAttribute('viewBox', '0 0 20 20');
+  muteIcon.setAttribute('width', '18');
+  muteIcon.setAttribute('height', '18');
+  muteIcon.setAttribute('aria-hidden', 'true');
+  muteIcon.setAttribute('focusable', 'false');
+  const speaker = doc.createElementNS(SVG_NS, 'path');
+  speaker.setAttribute('d', 'M3 7.5h3l4-3.5v12l-4-3.5H3z');
+  speaker.setAttribute('fill', 'currentColor');
+  const waves = doc.createElementNS(SVG_NS, 'path');
+  waves.setAttribute('d', 'M13 7.2a4 4 0 0 1 0 5.6M15.2 5a7 7 0 0 1 0 10');
+  waves.setAttribute('fill', 'none');
+  waves.setAttribute('stroke', 'currentColor');
+  waves.setAttribute('stroke-width', '1.6');
+  waves.setAttribute('stroke-linecap', 'round');
+  const cross = doc.createElementNS(SVG_NS, 'path');
+  cross.setAttribute('d', 'M13 7.5l5 5M18 7.5l-5 5');
+  cross.setAttribute('fill', 'none');
+  cross.setAttribute('stroke', 'currentColor');
+  cross.setAttribute('stroke-width', '1.6');
+  cross.setAttribute('stroke-linecap', 'round');
+  muteIcon.append(speaker, waves, cross);
+  muteButton.append(muteIcon);
+  /** Paint the toggle from the store — never from its own face, the Settings row's rule. */
+  function syncMute(): void {
+    const on = everydayProfileStore().soundOn();
+    muteButton.setAttribute('aria-pressed', String(!on));
+    muteButton.title = stageMuteTitleOf(on);
+    waves.style.display = on ? '' : 'none';
+    cross.style.display = on ? 'none' : '';
+  }
+  syncMute();
+  /* Settings → Sound written anywhere repaints this toggle; released on unmount. */
+  const unsubscribeMute = everydayProfileStore().subscribe(syncMute);
+  muteButton.addEventListener('click', () => {
+    const store = everydayProfileStore();
+    store.setSoundOn(!store.soundOn());
+    syncMute();
+    /* A paused stage draws no frames, so ask for one: it builds or silences the sound now. */
+    requestFrame();
   });
 
   const speeds = el(doc, 'div', 'everyday-stage-speeds');
@@ -826,8 +911,7 @@ function mountStage(
    * run, where nothing is paced. Written by {@link pace} on change only.
    */
   const paceNote = el(doc, 'span', 'everyday-stage-pace');
-  paceNote.style.cssText = `align-self:center;font:500 11px ${TYPE.mono};color:${C.warmGrey}`;
-  speeds.append(paceNote);
+  paceNote.style.cssText = `display:block;font:500 11px ${TYPE.mono};color:${C.warmGrey}`;
   /*
    * § D1212's line — the beat's note while a skip is coming, and then what the skip passed over.
    * Its own element beside the pace note, because the pace note says why the transport is at its
@@ -836,8 +920,28 @@ function mountStage(
    */
   const skipNote = el(doc, 'span', 'everyday-stage-skip-line');
   skipNote.setAttribute('aria-live', 'polite');
-  skipNote.style.cssText = `align-self:center;font:500 11px ${TYPE.mono};color:${C.warmGrey}`;
-  speeds.append(skipNote);
+  skipNote.style.cssText = `display:block;font:500 11px ${TYPE.mono};color:${C.warmGrey}`;
+  /*
+   * **The notes are drawn over the building, not in the header** — the playtest of 2026-11-13. In
+   * the speed strip they came up the moment a day started playing and wrapped the header onto
+   * another line, which moved the stage under the player (§ D1627). They sit in a plate in the
+   * stage's top-right corner, under the queue badge, and the plate is shown only while one of them
+   * has words, so nothing in the page moves when they come and go.
+   */
+  const transportNotes = el(doc, 'div', 'everyday-stage-transport-notes');
+  transportNotes.style.cssText = [
+    'display:none',
+    'flex-direction:column',
+    'gap:2px',
+    'max-width:100%',
+    'box-sizing:border-box',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.row)}px`,
+    `background:${C.paper}`,
+    'padding:4px 10px',
+    'text-align:right',
+  ].join(';');
+  transportNotes.append(paceNote, skipNote);
 
   const cameras = el(doc, 'div', 'everyday-stage-cameras');
   /*
@@ -922,7 +1026,7 @@ function mountStage(
    * tower whose floors all fit, a control that did nothing. It joins the header only once it has
    * floors to offer, beside the camera chips under the same gate, and leaves when it has none.
    */
-  header.append(clock, phase, nextPhase, bookedPill, driving, practiceLine, figures, playButton, speeds, cameras);
+  header.append(clock, phase, nextPhase, bookedPill, driving, practiceLine, figures, muteButton, playButton, speeds, cameras);
 
   /*
    * **Pillar 3's strip** — GitHub issue **#277**, [§ D470](../../../../DECISIONS.md).
@@ -993,17 +1097,29 @@ function mountStage(
    * rather than a second number — and `AX-0` is satisfied: nothing stops being said, and nothing
    * stops being drawn.
    */
+  /*
+   * **And it is a badge over the building, not a strip in the page** — the playtest of 2026-11-13:
+   * in flow above the arrivals it pushed the whole stage down when it came up and let it jump back
+   * when it cleared, which is motion disturbing play ([§ D1627](../../../../DECISIONS.md)). It is
+   * now absolutely placed in {@link stageWrap}'s top-right corner (the replay pill holds the left),
+   * so showing or hiding it moves nothing, and it says only the count —
+   * `stageScreenModel.ts#stageAlarmBadgeOf`. The sentence stays its `title` and its announcement.
+   */
   const alarm = el(doc, 'div', 'everyday-stage-alarm');
   alarm.style.cssText = [
     'display:none',
     'align-items:center',
-    'gap:8px',
+    'gap:6px',
     `border:1px solid ${C.alarm}`,
-    `border-radius:${String(R.row)}px`,
+    `border-radius:${String(R.pill)}px`,
+    `background:${C.paper}`,
     `color:${C.alarm}`,
-    'padding:6px 11px',
+    'padding:3px 10px',
     'font-size:12.5px',
     'font-weight:600',
+    'font-variant-numeric:tabular-nums',
+    'white-space:nowrap',
+    'pointer-events:none',
   ].join(';');
 
   /**
@@ -1232,7 +1348,22 @@ function mountStage(
   ].join(';');
   startRow.append(startButton, quietSkip);
   status.append(statusText, quietNote, startRow, failedRow);
-  stageWrap.append(canvas, description, watchPill, status);
+  /* The top-right corner's readouts, stacked so the badge and the notes never sit on each other. */
+  const corner = el(doc, 'div', 'everyday-stage-corner');
+  corner.style.cssText = [
+    'position:absolute',
+    'top:10px',
+    'right:10px',
+    'z-index:2',
+    'max-width:min(70%, 520px)',
+    'display:flex',
+    'flex-direction:column',
+    'align-items:flex-end',
+    'gap:6px',
+    'pointer-events:none',
+  ].join(';');
+  corner.append(alarm, transportNotes);
+  stageWrap.append(canvas, description, watchPill, corner, status);
 
   /*
    * **Arriving next** — who is about to walk in, drawn above the building they walk into. The door
@@ -2137,7 +2268,6 @@ function mountStage(
     callRows,
     goals,
     watchBand,
-    alarm,
     alarmSay,
     arrivals,
     stageRow,
@@ -2701,6 +2831,8 @@ function mountStage(
     const lines = stageStatusOf({ pace: paceText, stopped: paceStopped, skip: said.speech });
     if (paceNote.textContent !== lines.pace) paceNote.textContent = lines.pace;
     if (skipNote.textContent !== lines.skip) skipNote.textContent = lines.skip;
+    const shown = lines.pace !== '' || lines.skip !== '' ? 'flex' : 'none';
+    if (transportNotes.style.display !== shown) transportNotes.style.display = shown;
   }
 
   /**
@@ -4279,7 +4411,8 @@ function mountStage(
     /* The strip: drawn only when the sentence changes, because a repaint that paints the same
        thing is work nobody asked for. It is no longer a live region — see {@link alarmSay}. */
     if (alarmLine !== undefined && alarmLine !== alarmDrawnLine) {
-      alarm.replaceChildren(breathingDot(doc), el(doc, 'span', undefined, alarmLine));
+      alarm.replaceChildren(breathingDot(doc), el(doc, 'span', undefined, stageAlarmBadgeOf(observations) ?? alarmLine));
+      alarm.title = alarmLine;
       alarmDrawnLine = alarmLine;
     }
     /*
@@ -4823,7 +4956,8 @@ function mountStage(
     figures.replaceChildren();
     for (const [index, figure] of list.entries()) {
       const box = el(doc, 'div', 'everyday-stage-figure');
-      box.style.cssText = 'display:flex;flex-direction:column;gap:1px';
+      /* 22ch of the note's own face: the width the note may take, so a figure is as wide before anyone rides as after. */
+      box.style.cssText = `display:flex;flex-direction:column;gap:1px;font:500 9.5px ${TYPE.mono};min-width:22ch`;
       const label = el(doc, 'span', undefined, figure.label);
       label.style.cssText = EYEBROW;
       const value = el(doc, 'span', 'everyday-stage-figure-value', figure.value);
@@ -4839,12 +4973,19 @@ function mountStage(
        * R13: a ratio carries the count it was taken over, in its own box. A count is its own `n`
        * and carries none, and a refusal carries a sentence instead of a number.
        */
+      /*
+       * **One line, always there** — the playtest of 2026-11-13. At 22ch *nobody has called a lift
+       * yet* wrapped to two lines before anyone rode, and the header lost those 10 px on the first
+       * press, moving the stage under the player (§ D1627). The note now never wraps and never
+       * passes 22ch (the model's notes fit; a longer one ends in an ellipsis, whole in its `title`),
+       * and a figure with no note keeps the empty line, so every figure is one size all day.
+       */
       const under = figure.count ?? figure.refusal;
-      if (under !== undefined) {
-        const note = el(doc, 'span', 'everyday-stage-figure-count', under);
-        note.style.cssText = `font:500 9.5px ${TYPE.mono};color:${C.label};max-width:22ch`;
-        box.append(note);
-      }
+      const note = el(doc, 'span', 'everyday-stage-figure-count', under ?? '');
+      note.style.cssText = `font:500 9.5px ${TYPE.mono};line-height:1.25;min-height:1.25em;max-width:22ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${C.label}`;
+      if (under === undefined) note.setAttribute('aria-hidden', 'true');
+      else note.title = under;
+      box.append(note);
       figures.append(box);
     }
   }
@@ -5081,6 +5222,7 @@ function mountStage(
       view?.removeEventListener('resize', onResize);
       doc.removeEventListener('keydown', onRushEntryKey);
       unsubscribe();
+      unsubscribeMute();
       playback = undefined;
       adopted = undefined;
       /* The graph and its context go with the mount — GitHub issue #258. */
