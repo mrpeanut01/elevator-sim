@@ -54,6 +54,7 @@ import '../dev/main.js';
 import { CLIENT_FAULTS } from './faults.js';
 import { EVERYDAY_HOST } from './host.js';
 import { mountEverydayShell, type EverydayShell } from './shell.js';
+import { mountOpeningDoors } from './splash.js';
 
 /**
  * The Engineer menu, and its *Resume* row — how this shell gets that menu out of the way.
@@ -218,6 +219,12 @@ export function bootEveryday(doc: Document): EverydayShell {
    * would leave the register still calling everything a start-up fault, which is what it would be.
    */
   CLIENT_FAULTS.shellMounted();
+  /*
+   * The opening doors, over a lobby that is already drawn and live — `splash.ts`. After the mount
+   * so the doors reveal the menu rather than stand in for it, and after the fault line so a splash
+   * that threw would be reported as what it is: a fault in a page the player can already use.
+   */
+  mountOpeningDoors(doc);
   return shell;
 }
 

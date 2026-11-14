@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { VizLeg } from '../contract/types.js';
 
-import { firstLostInstantOf, LOST_INSTANT_RESOLUTION_S, LOST_SCAN_STEP_S, worstWaitLossBeginsOf } from './stagePace.js';
+import { firstLostInstantOf, LOST_INSTANT_RESOLUTION_S, LOST_SCAN_STEP_S, lostReadOf, worstWaitLossBeginsOf } from './stagePace.js';
 
 function leg(id: string, arrivedAt: number, ended?: { readonly boardedAt?: number; readonly refusedAt?: number }): VizLeg {
   return {
@@ -85,5 +85,33 @@ describe('the first instant a stretch reads lost', () => {
     expect(firstLostInstantOf(readsLost, 0, 3000, [700, 2500])).toBe(700);
     const walked = firstLostInstantOf(readsLost, 0, 3000, [2500]);
     expect(walked! - queueLostFrom).toBeLessThanOrEqual(LOST_INSTANT_RESOLUTION_S);
+  });
+});
+
+describe('what a frame reads for a lost day around a call — the race CI met on PR #683', () => {
+  /* Lost from 08:44:50, with a call at 08:45:00 and one slow frame from 08:40 to 08:47. */
+  const lostFromS = 31_490;
+  const callAtS = 31_500;
+  const readsLost = (atS: number): boolean => atS >= lostFromS;
+
+  it('reads a frame that passes the loss and then a call up to the call, so the loss is found before the call stops the stage', () => {
+    const read = lostReadOf({ readToS: 31_200, playheadS: 31_620, heldByCall: false, callAtS });
+    expect(read).toEqual({ fromS: 31_200, toS: callAtS, readToS: callAtS });
+    const atS = firstLostInstantOf(readsLost, read!.fromS, read!.toS);
+    expect(atS! - lostFromS).toBeLessThanOrEqual(LOST_INSTANT_RESOLUTION_S);
+    expect(atS).toBeLessThan(callAtS);
+  });
+
+  it('reads nothing and marks nothing read while a call holds the card, so the stretch is still read after the answer', () => {
+    expect(lostReadOf({ readToS: 31_200, playheadS: callAtS, heldByCall: true })).toBeUndefined();
+    /* Answered, the next frame reads on from where reading last stopped, not from the call. */
+    const after = lostReadOf({ readToS: 31_200, playheadS: 31_560, heldByCall: false });
+    expect(after?.fromS).toBe(31_200);
+    expect(firstLostInstantOf(readsLost, after!.fromS, after!.toS)).toBeDefined();
+  });
+
+  it('never moves what is marked read back, and reads the one instant on the first frame', () => {
+    expect(lostReadOf({ readToS: 31_600, playheadS: 31_500, heldByCall: false })).toEqual({ fromS: 31_500, toS: 31_500, readToS: 31_600 });
+    expect(lostReadOf({ readToS: undefined, playheadS: 31_000, heldByCall: false })).toEqual({ fromS: 31_000, toS: 31_000, readToS: 31_000 });
   });
 });
