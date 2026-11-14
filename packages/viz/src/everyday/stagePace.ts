@@ -310,6 +310,35 @@ export function worstWaitLossBeginsOf(legs: readonly VizLeg[], barS: number): re
 }
 
 /**
+ * **The stretch the stage reads for a lost day on this frame, and how far it has read after it** —
+ * `undefined` while a call holds the lost card back, and then nothing is read or marked read.
+ *
+ * Two ways the loss went missing (the race CI met on PR #683). A frame at `600×` on a slow page
+ * covers minutes, so it can pass the instant the day was lost and then a call's second: the call
+ * puts the playhead back on its second, and the stretch with the loss in it was read and marked read
+ * under the call's card, so after the answer nothing was left to find. And a pinned day's call held
+ * the card from the day's start while every frame was still marked read. So a held frame reads
+ * nothing, and with `callAtS` (the call this frame stops at) the stretch ends at the call's second,
+ * so a loss before the call is found before the stage stops for it.
+ */
+export function lostReadOf(input: {
+  /** The furthest instant read and found not lost, or `undefined` before the first read. */
+  readonly readToS: number | undefined;
+  /** Where the frame ends, no later than the recording's end. */
+  readonly playheadS: number;
+  /** A call's card is up, or a pinned call still stands. */
+  readonly heldByCall: boolean;
+  /** The second of a call this frame stops at. */
+  readonly callAtS?: number | undefined;
+}): { readonly fromS: number; readonly toS: number; readonly readToS: number } | undefined {
+  if (input.heldByCall) return undefined;
+  const toS = input.callAtS === undefined ? input.playheadS : Math.min(input.playheadS, input.callAtS);
+  const fromS = input.readToS !== undefined && input.readToS < toS ? input.readToS : toS;
+  /* Never moved back by a frame drawn before a skip's seek lands: what is marked read stays read. */
+  return { fromS, toS, readToS: Math.max(input.readToS ?? toS, toS) };
+}
+
+/**
  * **The first instant in `(fromS, toS]` at which the day reads lost**, or `undefined` where none
  * does: wave AP, lane AP-D1, [§ D1446](../../../../DECISIONS.md), the post-AO panel's seat D (D1).
  *

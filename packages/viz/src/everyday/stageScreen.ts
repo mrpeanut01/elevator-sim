@@ -165,6 +165,7 @@ import { actsOf, type DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
 import {
   firstLostInstantOf,
+  lostReadOf,
   stagePaceNoteOf,
   stagePaceOf,
   stageSkipLineStands,
@@ -2064,7 +2065,7 @@ function mountStage(
    */
   function lostStopIn(recording: VizRecording, fromS: number, toS: number): number | undefined {
     if (lostCardShown || context.ctx !== 'daily' || watchingNow() !== undefined) return undefined;
-    if (activeCall()?.pinned === true || !callCard.hidden) return undefined;
+    if (lostHeldByCall()) return undefined;
     const atS = firstLostInstantOf(
       (at) => stageLostCardOf(host.goalsAt(at), '') !== undefined,
       fromS,
@@ -2072,6 +2073,34 @@ function mountStage(
       lostBeginsOn(recording),
     );
     return atS === undefined || atS >= recording.endedAt ? undefined : atS;
+  }
+
+  /** A call's card is up, or a pinned day's call still stands: the lost card waits for it (§ D1435). */
+  function lostHeldByCall(): boolean {
+    return activeCall()?.pinned === true || !callCard.hidden;
+  }
+
+  /**
+   * **The day lost before the call this frame stops at** — the stretch since the last read, up to the
+   * call's second, read before the stage stops for the call (`stagePace.ts#lostReadOf` says why).
+   * The loss came first, so the stage stops there first, and meets the call again when it plays on.
+   */
+  function lostBeforeCall(recording: VizRecording, callAtS: number | undefined): boolean {
+    if (callAtS === undefined || playback === undefined) return false;
+    const read = lostReadOf({
+      readToS: lostReadToS,
+      playheadS: Math.min(playback.simTimeS, recording.endedAt),
+      heldByCall: lostHeldByCall(),
+      callAtS,
+    });
+    if (read === undefined) return false;
+    const atS = lostStopIn(recording, read.fromS, read.toS);
+    if (atS === undefined) {
+      lostReadToS = read.readToS;
+      return false;
+    }
+    stopOnLoss(atS);
+    return true;
   }
 
   /**
@@ -2125,11 +2154,15 @@ function mountStage(
     if (playback === undefined) return;
     if (!lostCard.hidden && playback.state === 'playing') lostCard.hidden = true;
     if (lostCardShown) return;
-    const toS = Math.min(playback.simTimeS, recording.endedAt);
-    const fromS = lostReadToS !== undefined && lostReadToS < toS ? lostReadToS : toS;
-    const atS = lostStopIn(recording, fromS, toS);
-    /* Never moved back by a frame drawn before a skip's seek lands: what is marked read stays read. */
-    lostReadToS = Math.max(lostReadToS ?? toS, toS);
+    /* Held by a call, nothing is read or marked read, so the stretch is read once it is answered. */
+    const read = lostReadOf({
+      readToS: lostReadToS,
+      playheadS: Math.min(playback.simTimeS, recording.endedAt),
+      heldByCall: lostHeldByCall(),
+    });
+    if (read === undefined) return;
+    const atS = lostStopIn(recording, read.fromS, read.toS);
+    lostReadToS = read.readToS;
     if (atS !== undefined) stopOnLoss(atS);
   }
   /**
@@ -2759,6 +2792,8 @@ function mountStage(
         skipLineReason = state;
       }
     }
+    /* § D1446 before § D1029: a day lost before the call's second stops on its card first. */
+    if (answer.reason === 'call' && lostBeforeCall(playback.recording, activeCall()?.call.atS)) return;
     setPace(note, answer.reason === 'call');
     if (answer.reason === 'call') waitingOnCall = waiting;
     /*
