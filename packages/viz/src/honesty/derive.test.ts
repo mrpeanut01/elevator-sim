@@ -771,6 +771,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * its own is geometry, colours and class names.
          */
         'everyday/lobbyScreen.ts#mountLobby',
+        /*
+         * The opening doors a cold launch plays over the lobby, on the lobby's ground: it builds a
+         * door frame over the page and owns one removal timer and four `Element.animate` calls.
+         * The one word it draws is `LOBBY_COPY.building`, which the `EVERYDAY_LOBBY` adapter
+         * drives; the floor letter and the two arrows are `everyday/splashModel.ts`'s. What this
+         * mount authors of its own is geometry, colours and class names.
+         */
+        'everyday/splash.ts#mountOpeningDoors',
         'everyday/tutorialScreens.ts#TUTORIAL_SCREEN',
         'everyday/tutorialScreens.ts#COLLAPSE_SCREEN',
         'everyday/tutorialScreens.ts#mountWorkedAnswer',

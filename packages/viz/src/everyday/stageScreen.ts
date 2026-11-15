@@ -165,6 +165,7 @@ import { actsOf, type DayAct } from '../shift/dayLength.js';
 import type { RunHorizon } from '../shift/types.js';
 import {
   firstLostInstantOf,
+  lostReadOf,
   stagePaceNoteOf,
   stagePaceOf,
   stageSkipLineStands,
@@ -191,6 +192,7 @@ import {
   stageCallStandingOrderOf,
   stageCallPresentOf,
   stageCallPhaseOf,
+  STAGE_END_DAY_COPY,
   stageEndDayOf,
   stageLostCardOf,
   STAGE_LOST_COPY,
@@ -719,7 +721,11 @@ function mountStage(
   let bookedCars: readonly BookedOutCar[] = [];
 
   const driving = el(doc, 'span', 'everyday-stage-driving');
-  driving.style.cssText = 'display:flex;align-items:center;gap:6px';
+  /*
+   * The pills' 20 px, so a row the *booked out* pill shares with this line keeps its height when the
+   * pill goes (the playtest of 2026-11-13: 1.2 px of the header, at every car's return).
+   */
+  driving.style.cssText = 'display:flex;align-items:center;gap:6px;min-height:20px';
   /* The model's own word, here and on every draw from `stageHeaderOf`'s `drivingLabel` — the corpus
      sweeps that one, so a literal here was one word with two sources and one of them checked. */
   const drivingEyebrow = el(doc, 'span', undefined, STAGE_DRIVING_LABEL);
@@ -899,9 +905,18 @@ function mountStage(
    * clear and the stage asks nothing more. Beside the skip, because it is the same kind of control:
    * it moves no run, and files the day on the recording already made.
    */
-  const endDayButton = el(doc, 'button', 'everyday-stage-end-day');
+  const endDayButton = el(doc, 'button', 'everyday-stage-end-day', STAGE_END_DAY_COPY.label);
   endDayButton.type = 'button';
-  endDayButton.style.display = 'none';
+  endDayButton.style.cssText = [
+    'background:transparent',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.control)}px`,
+    'padding:5px 9px',
+    `font:500 11px ${TYPE.mono}`,
+    `color:${C.ink}`,
+    'cursor:pointer',
+  ].join(';');
+  hideEndDay();
   endDayButton.addEventListener('click', () => {
     endTheDay();
   });
@@ -1108,6 +1123,10 @@ function mountStage(
   const alarm = el(doc, 'div', 'everyday-stage-alarm');
   alarm.style.cssText = [
     'display:none',
+    'position:absolute',
+    'top:10px',
+    'right:10px',
+    'z-index:2',
     'align-items:center',
     'gap:6px',
     `border:1px solid ${C.alarm}`,
@@ -2046,7 +2065,7 @@ function mountStage(
    */
   function lostStopIn(recording: VizRecording, fromS: number, toS: number): number | undefined {
     if (lostCardShown || context.ctx !== 'daily' || watchingNow() !== undefined) return undefined;
-    if (activeCall()?.pinned === true || !callCard.hidden) return undefined;
+    if (lostHeldByCall()) return undefined;
     const atS = firstLostInstantOf(
       (at) => stageLostCardOf(host.goalsAt(at), '') !== undefined,
       fromS,
@@ -2054,6 +2073,34 @@ function mountStage(
       lostBeginsOn(recording),
     );
     return atS === undefined || atS >= recording.endedAt ? undefined : atS;
+  }
+
+  /** A call's card is up, or a pinned day's call still stands: the lost card waits for it (§ D1435). */
+  function lostHeldByCall(): boolean {
+    return activeCall()?.pinned === true || !callCard.hidden;
+  }
+
+  /**
+   * **The day lost before the call this frame stops at** — the stretch since the last read, up to the
+   * call's second, read before the stage stops for the call (`stagePace.ts#lostReadOf` says why).
+   * The loss came first, so the stage stops there first, and meets the call again when it plays on.
+   */
+  function lostBeforeCall(recording: VizRecording, callAtS: number | undefined): boolean {
+    if (callAtS === undefined || playback === undefined) return false;
+    const read = lostReadOf({
+      readToS: lostReadToS,
+      playheadS: Math.min(playback.simTimeS, recording.endedAt),
+      heldByCall: lostHeldByCall(),
+      callAtS,
+    });
+    if (read === undefined) return false;
+    const atS = lostStopIn(recording, read.fromS, read.toS);
+    if (atS === undefined) {
+      lostReadToS = read.readToS;
+      return false;
+    }
+    stopOnLoss(atS);
+    return true;
   }
 
   /**
@@ -2107,11 +2154,15 @@ function mountStage(
     if (playback === undefined) return;
     if (!lostCard.hidden && playback.state === 'playing') lostCard.hidden = true;
     if (lostCardShown) return;
-    const toS = Math.min(playback.simTimeS, recording.endedAt);
-    const fromS = lostReadToS !== undefined && lostReadToS < toS ? lostReadToS : toS;
-    const atS = lostStopIn(recording, fromS, toS);
-    /* Never moved back by a frame drawn before a skip's seek lands: what is marked read stays read. */
-    lostReadToS = Math.max(lostReadToS ?? toS, toS);
+    /* Held by a call, nothing is read or marked read, so the stretch is read once it is answered. */
+    const read = lostReadOf({
+      readToS: lostReadToS,
+      playheadS: Math.min(playback.simTimeS, recording.endedAt),
+      heldByCall: lostHeldByCall(),
+    });
+    if (read === undefined) return;
+    const atS = lostStopIn(recording, read.fromS, read.toS);
+    lostReadToS = read.readToS;
     if (atS !== undefined) stopOnLoss(atS);
   }
   /**
@@ -2264,7 +2315,6 @@ function mountStage(
     title,
     header,
     callCard,
-    lostCard,
     callRows,
     goals,
     watchBand,
@@ -2339,6 +2389,34 @@ function mountStage(
     `gap:${String(GAP.block)}px`,
   ].join(';');
   let twoColumn = false;
+  /**
+   * **Where the lost day's card stands** — the playtest of 2026-11-13. Stacked under the header it
+   * pushed the building down ~130 px the moment the day was lost, and back up when play resumed,
+   * which is the jump the queue alarm had. The stage is stopped while the card is up, so stacked it
+   * is drawn over the top of the building instead, inside the stage's frame, and nothing below it
+   * moves. In two columns it stays at the top of the side column, where it never moved anything.
+   * Recorded under [§ D405](../../../../DECISIONS.md).
+   */
+  function placeLostCard(wide: boolean): void {
+    const overlay = [
+      ['position', 'absolute'],
+      ['top', '10px'],
+      ['left', '50%'],
+      ['transform', 'translateX(-50%)'],
+      ['width', 'min(460px, calc(100% - 20px))'],
+      ['max-height', 'calc(100% - 20px)'],
+      ['overflow-y', 'auto'],
+      ['box-sizing', 'border-box'],
+      ['z-index', '3'],
+      ['box-shadow', '0 8px 24px rgba(0,0,0,.22)'],
+    ] as const;
+    for (const [property, value] of overlay) {
+      if (wide) lostCard.style.removeProperty(property);
+      else lostCard.style.setProperty(property, value);
+    }
+    if (!wide) stageWrap.append(lostCard);
+  }
+  placeLostCard(false);
   function syncColumns(): void {
     const width = region.clientWidth;
     const shafts = adopted?.shafts.length ?? 0;
@@ -2348,6 +2426,7 @@ function mountStage(
       width - STAGE_SIDE_COLUMN_PX >= shafts * STAGE_TWO_COLUMN_MIN_SHAFT_PX;
     if (wide === twoColumn) return;
     twoColumn = wide;
+    placeLostCard(wide);
     /*
      * The call goes with them: at the top of the side column it is beside the building it is about,
      * and the building does not move when the day stops. Stacked, it is back under the header.
@@ -2356,7 +2435,7 @@ function mountStage(
       side.append(callCard, lostCard, callRows, goals, legend, interventions, race);
       stageWrap.after(side);
     } else {
-      header.after(callCard, lostCard, callRows);
+      header.after(callCard, callRows);
       root.insertBefore(goals, watchBand);
       stageRow.after(legend, interventions, race);
       side.remove();
@@ -2713,6 +2792,8 @@ function mountStage(
         skipLineReason = state;
       }
     }
+    /* § D1446 before § D1029: a day lost before the call's second stops on its card first. */
+    if (answer.reason === 'call' && lostBeforeCall(playback.recording, activeCall()?.call.atS)) return;
     setPace(note, answer.reason === 'call');
     if (answer.reason === 'call') waitingOnCall = waiting;
     /*
@@ -4723,22 +4804,29 @@ function mountStage(
         ? stageEndDayOf(host.goalsAt(simTimeS))
         : undefined;
     if (view === undefined) {
-      if (endDayButton.style.display !== 'none') endDayButton.style.display = 'none';
+      hideEndDay();
       return;
     }
     if (endDayButton.textContent !== view.label) endDayButton.textContent = view.label;
     if (endDayButton.title !== view.note) endDayButton.title = view.note;
-    if (endDayButton.style.display === 'none') {
-      endDayButton.style.cssText = [
-        'background:transparent',
-        `border:1px solid ${C.rule}`,
-        `border-radius:${String(R.control)}px`,
-        'padding:5px 9px',
-        `font:500 11px ${TYPE.mono}`,
-        `color:${C.ink}`,
-        'cursor:pointer',
-      ].join(';');
-    }
+    if (endDayButton.style.display !== '') endDayButton.style.display = '';
+    if (endDayButton.style.visibility !== '') endDayButton.style.visibility = '';
+  }
+
+  /**
+   * *End the day* out of sight. **On a scored day it keeps its place in the speed strip**, invisible,
+   * unfocusable and out of the accessibility tree, because it comes up at the moment the day is lost
+   * and a chip arriving in the strip re-wrapped the header and moved the stage under the player
+   * (the playtest of 2026-11-13, [§ D1627](../../../../DECISIONS.md)). Anywhere else it can never
+   * come up, so it takes no room.
+   */
+  function hideEndDay(): void {
+    const holds = context.ctx === 'daily';
+    const display = holds ? '' : 'none';
+    const visibility = holds ? 'hidden' : '';
+    if (endDayButton.style.display !== display) endDayButton.style.display = display;
+    if (endDayButton.style.visibility !== visibility) endDayButton.style.visibility = visibility;
+    if (endDayButton.title !== '') endDayButton.title = '';
   }
 
   /**
@@ -4967,7 +5055,9 @@ function mountStage(
        */
       const tone = tones[index] ?? (figure.refusal === undefined ? 'live' : 'still');
       value.dataset['tone'] = tone;
-      value.style.cssText = `font:500 16px ${TYPE.mono};color:${figure.refusal !== undefined ? C.faint : FIGURE_INK[tone]}`;
+      /* The longest value's width, held from the start, so a value growing a clause re-wraps nothing (`STAGE_LONGEST_SO_FAR_WIDEST`). */
+      const holds = figure.widestValueCh === undefined ? '' : `;white-space:nowrap;min-width:${String(figure.widestValueCh)}ch`;
+      value.style.cssText = `font:500 16px ${TYPE.mono};color:${figure.refusal !== undefined ? C.faint : FIGURE_INK[tone]}${holds}`;
       box.append(label, value);
       /*
        * R13: a ratio carries the count it was taken over, in its own box. A count is its own `n`

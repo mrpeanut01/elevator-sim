@@ -180,6 +180,99 @@ describe.skipIf(!HAS_BROWSER)('the lost day — § D1435', () => {
     }
   });
 
+  /*
+   * **The card moves nothing** — the playtest of 2026-11-13. Stacked under the header (a region
+   * under `STAGE_TWO_COLUMN_MIN_PX`), the card pushed the building down ~130 px on the frame the day
+   * was lost and back up on *Watch the rest*. It is drawn over the top of the building now, so the
+   * building's box is read on the frame before the card and on the card's own frame, and again after
+   * the card goes. Red before: the stage stood ~130 px lower under the card. Positions are read in
+   * the screen's own content, so the card's scroll clear of a pinned header is not counted.
+   */
+  it('stands over the building when stacked, and the header keeps one height all day, so nothing moves it', async () => {
+    const page = await openPage(browser, { viewport: { width: 900, height: 900 } });
+    try {
+      await onCrownsDay(page, '2026-10-05');
+      expect(await page.locator('.everyday-stage-side').count(), 'this width should stack the stage').toBe(0);
+      await page.locator('.everyday-stage-speed', { hasText: '90×' }).click();
+      await page.locator('.everyday-stage-start').click();
+      const seen = await page.evaluate(async () => {
+        /*
+         * The building's place in the screen's own content, not on the page: the card scrolls itself
+         * clear of the pinned header (`syncCardMargins`), which is scrolling rather than layout.
+         */
+        const topOf = (): number => {
+          const region = document.querySelector('.everyday-screen');
+          const wrap = document.querySelector('.everyday-stage-wrap');
+          if (region === null || wrap === null) return Number.NaN;
+          return wrap.getBoundingClientRect().top - region.getBoundingClientRect().top + region.scrollTop;
+        };
+        let before = topOf();
+        const began = performance.now();
+        /* Every height the header took on a frame: a value that grows a clause once re-wrapped it 7 px. */
+        const heights = new Set<number>();
+        return new Promise<{ before: number; under: number; inStage: boolean; heights: number[] } | undefined>((done) => {
+          const tick = (): void => {
+            const header = document.querySelector('.everyday-stage-header');
+            if (header !== null) heights.add(header.getBoundingClientRect().height);
+            document
+              .querySelector<HTMLButtonElement>('.everyday-stage-call:not([hidden]) .everyday-stage-call-answer[data-answer="leave"]')
+              ?.click();
+            const card = document.querySelector<HTMLElement>('.everyday-stage-lost');
+            if (card?.hidden === false) {
+              done({ before, under: topOf(), inStage: card.parentElement?.classList.contains('everyday-stage-wrap') ?? false, heights: [...heights] });
+              return;
+            }
+            if (performance.now() - began > 200_000) {
+              done(undefined);
+              return;
+            }
+            before = topOf();
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+      });
+      expect(seen, 'the day never stopped on the card').toBeDefined();
+      expect(seen?.under, 'the building moved when the card came up').toBe(seen?.before);
+      expect(seen?.inStage, 'the card is not drawn over the building').toBe(true);
+      expect(seen?.heights, 'the header changed height while the day played').toHaveLength(1);
+      /* The card's going, judged alone: hidden and read in one synchronous task, so nothing else can draw in between. */
+      const going = await page.evaluate(() => {
+        const region = document.querySelector('.everyday-screen');
+        const wrap = document.querySelector('.everyday-stage-wrap');
+        const card = document.querySelector<HTMLElement>('.everyday-stage-lost');
+        if (region === null || wrap === null || card === null) return undefined;
+        const at = (): number => wrap.getBoundingClientRect().top - region.getBoundingClientRect().top + region.scrollTop;
+        const up = at();
+        card.hidden = true;
+        const down = at();
+        card.hidden = false;
+        return { up, down };
+      });
+      expect(going?.down, 'the building moved when the card went').toBe(going?.up);
+      await page.locator('.everyday-stage-lost-watch').click();
+      expect(await page.locator('.everyday-stage-lost:not([hidden])').count()).toBe(0);
+      /* *Watch the rest* plays on: a second of frames, every one at the height the day began at. */
+      const after = await page.evaluate(
+        () =>
+          new Promise<number[]>((done) => {
+            const heights = new Set<number>();
+            const began = performance.now();
+            const tick = (): void => {
+              const header = document.querySelector('.everyday-stage-header');
+              if (header !== null) heights.add(header.getBoundingClientRect().height);
+              if (performance.now() - began > 1_000) done([...heights]);
+              else requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          }),
+      );
+      expect(after, 'the header changed height once Watch the rest was pressed').toEqual(seen?.heights);
+    } finally {
+      await page.close();
+    }
+  });
+
   it('stops on the card at 600× on a slow page, on the instant and figure a 90× run stops on', async () => {
     const steady = await openPage(browser, { viewport: { width: 1440, height: 900 } });
     let reference = { fact: '', clock: '' };

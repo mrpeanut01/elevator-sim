@@ -344,6 +344,11 @@ const EVERYDAY_SHELL_FILES = new Set([
    */
   'everyday/lobbyScreen.ts',
   /*
+   * The opening doors a cold launch plays over the lobby. It owns one removal timer and four
+   * `Element.animate` calls; its timeline and the five-second ceiling stay pure in `splashModel.ts`.
+   */
+  'everyday/splash.ts',
+  /*
    * § 6's daily loop — four DOM halves and the vocabulary they share. Each one's words and
    * decisions stay pure in its `*View.ts` sibling (`doorView`, `briefView`, `reportView`,
    * `weekView`) plus `today.ts`, `figures.ts` and `world.ts`, none of which are exempt and all of

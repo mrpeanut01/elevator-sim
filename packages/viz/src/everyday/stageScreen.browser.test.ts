@@ -673,86 +673,63 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
    * The alarm used to be a sentence in page flow above the arrivals strip, so the whole stage was
    * pushed down when it came up and jumped back when it cleared. It is now a badge over the
    * building. `vertical-city`'s morning raises it (the AX-3 case's measurement), so this plays that
-   * morning at the top speed and, **on every frame the badge toggles**, compares the boxes of what
-   * sits below its old place against the frame before. Comparing across the toggle only, rather
-   * than across the run, is what keeps a box that moves for some other reason out of this verdict.
+   * morning at the top speed until it is up, then takes the badge down and puts it back by its own
+   * `display`, reading the layout around each, all in one synchronous task. No frame can draw inside
+   * a task, so a move can only be the badge's. Two earlier forms of this case watched toggles on a
+   * playing stage, and CI's slower runner landed other changes in the same frames (the lost card,
+   * the header's lines), so the verdict was about timing rather than about the badge.
    */
   it('shows the queue badge over the building, and toggling it moves nothing below', async () => {
     const page = await coldLoad('vertical-city');
     await enterEverydayStage(page);
     await page.click(`.everyday-stage-speed[data-speed-index="${String(TOP_SPEED_INDEX)}"]`);
     await page.click('.everyday-stage-play');
-    const seen = await page.evaluate(async () => {
-      const boxOf = (selector: string): string => {
-        const r = document.querySelector(selector)?.getBoundingClientRect();
-        return r === undefined ? 'absent' : `${String(r.top)},${String(r.height)}`;
+    const raised = await page
+      .waitForFunction(
+        () => document.querySelector<HTMLElement>('.everyday-stage-alarm')?.style.display !== 'none',
+        undefined,
+        { timeout: 60_000, polling: 'raf' },
+      )
+      .then(() => true)
+      .catch(() => false);
+    expect(
+      raised,
+      'the badge never came up on vertical-city, so this case is about nothing — restore a fixture ' +
+        'whose morning raises it rather than deleting this requirement',
+    ).toBe(true);
+    /* One synchronous task: no frame can draw between the reads, so a move can only be the badge's. */
+    const seen = await page.evaluate(() => {
+      const badge = document.querySelector<HTMLElement>('.everyday-stage-alarm');
+      if (badge === null) return undefined;
+      const layout = (): string =>
+        ['.everyday-stage-arrivals', '.everyday-stage-wrap', '.everyday-stage-canvas']
+          .map((selector) => {
+            const r = document.querySelector(selector)?.getBoundingClientRect();
+            return r === undefined ? `${selector} absent` : `${selector} ${String(r.top)},${String(r.height)}`;
+          })
+          .join(' | ');
+      const shown = badge.style.display;
+      const up = layout();
+      badge.style.display = 'none';
+      const down = layout();
+      badge.style.display = shown;
+      const back = layout();
+      return {
+        text: (badge.textContent ?? '').trim(),
+        inStage: badge.closest('.everyday-stage-wrap') !== null,
+        up,
+        down,
+        back,
       };
-      const read = () => {
-        const badge = document.querySelector<HTMLElement>('.everyday-stage-alarm');
-        return {
-          up: badge !== null && badge.style.display !== 'none',
-          text: (badge?.textContent ?? '').trim(),
-          inStage: badge?.closest('.everyday-stage-wrap') != null,
-          arrivals: boxOf('.everyday-stage-arrivals'),
-          stage: boxOf('.everyday-stage-wrap'),
-          /*
-           * Every other block above the arrivals, by height: the header, a call card, a lost-day
-           * card, the goals. The badge itself is left out, so a badge in page flow still fails.
-           */
-          above: (() => {
-            const arrivals = document.querySelector('.everyday-stage-arrivals');
-            const sizes: string[] = [];
-            for (let node = arrivals?.previousElementSibling; node; node = node.previousElementSibling) {
-              if (node.classList.contains('everyday-stage-alarm')) continue;
-              sizes.push(`${node.className}:${String(node.getBoundingClientRect().height)}`);
-            }
-            return sizes.join('|');
-          })(),
-        };
-      };
-      const toggles: { up: boolean; text: string; inStage: boolean; moved: string[]; confounded: boolean }[] = [];
-      let before = read();
-      const began = performance.now();
-      await new Promise<void>((done) => {
-        const tick = (): void => {
-          const now = read();
-          if (now.up !== before.up) {
-            const moved: string[] = [];
-            if (now.arrivals !== before.arrivals) moved.push(`arrivals ${before.arrivals} → ${now.arrivals}`);
-            if (now.stage !== before.stage) moved.push(`stage ${before.stage} → ${now.stage}`);
-            /*
-             * CI found the stage stopping for a call on the very frame the badge cleared, and the
-             * call card's 503 px charged to the badge. A toggle on a frame where another block above
-             * changed size says nothing about the badge, so it is set aside, never passed.
-             */
-            toggles.push({ up: now.up, text: now.text, inStage: now.inStage, moved, confounded: now.above !== before.above });
-          }
-          before = now;
-          /* Up once and down again is the whole claim; 60 s is inside the 120 s case budget. */
-          if (toggles.filter((toggle) => !toggle.confounded).length >= 2 || performance.now() - began > 60_000) {
-            done();
-            return;
-          }
-          requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      });
-      return toggles;
     });
     await page.close();
 
-    expect(
-      seen.length,
-      'the badge never came up on vertical-city, so this case is about nothing — restore a fixture ' +
-        'whose morning raises it rather than deleting this requirement',
-    ).toBeGreaterThan(0);
-    const clean = seen.filter((toggle) => !toggle.confounded);
-    expect(clean.length, 'every toggle of the badge coincided with another block above changing size').toBeGreaterThan(0);
-    for (const toggle of clean) expect(toggle.moved, `the badge went ${toggle.up ? 'up' : 'down'}`).toEqual([]);
-    const up = seen.find((toggle) => toggle.up);
-    expect(up?.inStage, 'the badge is not drawn over the building').toBe(true);
+    expect(seen, 'the badge is not on the stage').toBeDefined();
+    expect(seen?.down, 'taking the badge down moved the stage').toBe(seen?.up);
+    expect(seen?.back, 'putting the badge up moved the stage').toBe(seen?.up);
+    expect(seen?.inStage, 'the badge is not drawn over the building').toBe(true);
     /* Terse: a count, not a sentence. */
-    expect(up?.text).toMatch(/^\d+ waiting$/u);
+    expect(seen?.text).toMatch(/^\d+ waiting$/u);
   });
 
   /**

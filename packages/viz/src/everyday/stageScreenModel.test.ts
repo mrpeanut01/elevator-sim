@@ -457,6 +457,16 @@ describe('§ 7.1 — the three header figures', () => {
     expect(head.figures[2]?.value).toBe('300 s and counting');
   });
 
+  it('holds one width for longest so far, before the first call and with or without `and counting`', () => {
+    const recording = aDay();
+    const widths = [0, 150, 400, 2_000].map((t) => {
+      const figure = stageHeaderOf({ simTimeS: t, recording, observations: observationsAt(recording, t), driverName: 'the plain baseline' }).figures[2];
+      expect(figure?.value.length, `${String(t)}: ${figure?.value ?? ''} is wider than the room kept for it`).toBeLessThanOrEqual(figure?.widestValueCh ?? 0);
+      return figure?.widestValueCh;
+    });
+    expect(new Set(widths).size, 'the room kept moved with the value').toBe(1);
+  });
+
   it('is a fold at the playhead — every figure moves with t and none is the whole run', () => {
     const recording = aDay();
     const at = (t: number) =>
